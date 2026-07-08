@@ -1,5 +1,5 @@
 import React from "react";
-import { AbsoluteFill, Audio, Sequence, staticFile, useCurrentFrame } from "remotion";
+import { AbsoluteFill, Audio, Sequence, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
 import { CaptionOverlay } from "../captions/CaptionOverlay";
 import { TitleScene } from "../scenes/TitleScene";
 import { CodeScene } from "../scenes/CodeScene";
@@ -41,7 +41,7 @@ interface VideoCompositionProps {
   style: { primaryColor: string; font: string; codeTheme: string };
 }
 
-const renderScene = (scene: SceneData) => {
+const SceneRenderer: React.FC<{ scene: SceneData }> = ({ scene }) => {
   const dur = scene.duration;
   switch (scene.type) {
     case "title":
@@ -49,46 +49,83 @@ const renderScene = (scene: SceneData) => {
     case "code":
       return <CodeScene code={scene.code || ""} lang={scene.lang || "text"} highlightLines={[]} caption={scene.caption} duration={dur} />;
     case "bullet":
-      return <BulletScene points={scene.points || []} duration={dur} />;
+      return <BulletScene points={scene.points || []} title={scene.title} duration={dur} />;
     case "image":
       return <ImageScene src={scene.src || ""} caption={scene.caption} duration={dur} />;
     case "outro":
       return <OutroScene title={scene.title || "Thank You"} cta={scene.cta} duration={dur} />;
     default:
       return (
-        <AbsoluteFill style={{ backgroundColor: "#1a1a2e", justifyContent: "center", alignItems: "center", color: "white", fontSize: 32 }}>
+        <AbsoluteFill style={{ background: "linear-gradient(135deg, #0f0f23, #1a1a3e)", justifyContent: "center", alignItems: "center", color: "white", fontSize: 32 }}>
           {scene.title || scene.caption || ""}
         </AbsoluteFill>
       );
   }
 };
 
+/** Scoped caption overlay — only shows words for the current scene range. */
+const ScopedCaption: React.FC<{ words: CaptionWord[]; sceneStartFrame: number; sceneEndFrame: number }> = ({
+  words, sceneStartFrame, sceneEndFrame,
+}) => {
+  const frame = useCurrentFrame();
+  if (frame < sceneStartFrame || frame >= sceneEndFrame) return null;
+  const sceneMsStart = (sceneStartFrame / 30) * 1000;
+  const sceneMsEnd = (sceneEndFrame / 30) * 1000;
+  const sceneWords = words.filter(w => w.startMs >= sceneMsStart && w.startMs < sceneMsEnd);
+  return <CaptionOverlay words={sceneWords} fps={30} />;
+};
+
 export const VideoComposition: React.FC<VideoCompositionProps> = ({ scenes, audioTracks, captions }) => {
+  const { fps } = useVideoConfig();
+
   if (!scenes || scenes.length === 0) {
-    return <AbsoluteFill style={{ backgroundColor: "#000" }} />;
+    return <AbsoluteFill style={{ background: "#000" }} />;
   }
 
   let frameOffset = 0;
-  const elements: React.ReactNode[] = [];
+  const sceneElements: React.ReactNode[] = [];
+  const audioElements: React.ReactNode[] = [];
+  const captionElements: React.ReactNode[] = [];
 
   for (let i = 0; i < scenes.length; i++) {
-    const scene = scenes[i];
-    const dur = scene.duration;
-    elements.push(
+    const dur = scenes[i].duration;
+    if (dur <= 0) continue;
+
+    // Scene rendered inside Sequence — properly scoped
+    sceneElements.push(
       <Sequence key={`scene-${i}`} from={frameOffset} durationInFrames={dur}>
-        {renderScene(scene)}
+        <SceneRenderer scene={scenes[i]} />
       </Sequence>
     );
+
+    // Audio — each audio is rendered INSIDE its own Sequence so it only plays during that window
+    const audioTrack = audioTracks[i];
+    if (audioTrack) {
+      audioElements.push(
+        <Sequence key={`audio-seq-${i}`} from={frameOffset} durationInFrames={dur}>
+          <Audio src={staticFile(audioTrack.src)} />
+        </Sequence>
+      );
+    }
+
+    // Captions — scoped to this scene only
+    captionElements.push(
+      <ScopedCaption
+        key={`cap-${i}`}
+        words={captions}
+        sceneStartFrame={frameOffset}
+        sceneEndFrame={frameOffset + dur}
+      />
+    );
+
     frameOffset += dur;
   }
 
   return (
-    <AbsoluteFill style={{ backgroundColor: "#0f0f23" }}>
-      {elements}
-      {audioTracks.map((track, i) => (
-        <Audio key={`audio-${i}`} src={staticFile(track.src)} startFrom={track.startFrame} endAt={track.startFrame + track.durationFrames} />
-      ))}
-      {captions.length > 0 && <CaptionOverlay words={captions} fps={30} />}
+    <AbsoluteFill style={{ background: "#0f0f23" }}>
+      {sceneElements}
+      {audioElements}
+      {captionElements}
     </AbsoluteFill>
   );
 };

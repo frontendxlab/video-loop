@@ -1,119 +1,90 @@
 import React from "react";
-import { useCurrentFrame } from "remotion";
+import { AbsoluteFill, useCurrentFrame, interpolate, spring, useVideoConfig, Easing } from "remotion";
 import { z } from "zod";
 
 export const CodeSceneSchema = z.object({
   code: z.string(),
-  lang: z.enum(["javascript", "python", "typescript", "rust", "go"]),
-  highlightLines: z.array(z.number()).optional(),
+  lang: z.string().optional().default("text"),
+  highlightLines: z.array(z.number()).optional().default([]),
+  title: z.string().optional(),
   caption: z.string().optional(),
   duration: z.number().positive(),
 });
 
 export type CodeSceneProps = z.infer<typeof CodeSceneSchema>;
 
-const LINE_HEIGHT = 28;
-const PADDING = 20;
-
-export const CodeScene: React.FC<CodeSceneProps> = ({
-  code,
-  lang,
-  highlightLines,
-  caption,
-}) => {
+export const CodeScene: React.FC<CodeSceneProps> = ({ code, lang, highlightLines = [], title, caption }) => {
   const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  const opacity = interpolate(frame, [0, 20], [0, 1], { extrapolateRight: "clamp", easing: Easing.out(Easing.cubic) });
+  const slideUp = spring({ frame, fps, config: { damping: 14, stiffness: 90 } });
+  const titleOpacity = interpolate(frame, [0, 15], [0, 1], { extrapolateRight: "clamp" });
+  const captionOpacity = interpolate(frame, [0, 30], [0, 1], { extrapolateRight: "clamp" });
+
   const lines = code.split("\n");
-  const totalLines = lines.length;
-  const revealProgress = Math.min(1, frame / 15);
 
   return (
-    <div
-      style={{
-        flex: 1,
-        display: "flex",
-        flexDirection: "column",
-        backgroundColor: "#0d1117",
-        padding: PADDING,
-        width: "100%",
-        height: "100%",
-        fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
-        fontSize: 16,
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          padding: "8px 0",
-          marginBottom: 8,
-          borderBottom: "1px solid #30363d",
-        }}
-      >
-        <span
-          style={{
-            color: "#8b949e",
-            fontSize: 12,
-            textTransform: "uppercase",
-            letterSpacing: 1,
-          }}
-        >
-          {lang}
-        </span>
-        {caption && (
-          <span style={{ color: "#8b949e", fontSize: 12, marginLeft: 12 }}>
-            {caption}
-          </span>
-        )}
-      </div>
-      <div style={{ flex: 1, overflow: "hidden" }}>
-        {lines.map((line, i) => {
-          const isHighlighted = highlightLines?.includes(i + 1);
-          const lineOpacity = Math.min(
-            1,
-            (frame - i * 2) / 10,
-          );
-
-          return (
-            <div
-              key={i}
-              style={{
+    <AbsoluteFill style={{
+      padding: 40, display: "flex", flexDirection: "column",
+      background: "linear-gradient(135deg, #0d1117 0%, #161b22 100%)",
+      opacity, transform: `translateY(${(1 - slideUp) * 20}px)`,
+    }}>
+      {title && (
+        <div style={{
+          opacity: titleOpacity, marginBottom: 16,
+          fontSize: 22, fontWeight: "600", color: "rgba(255,255,255,0.9)",
+        }}>
+          {title}
+        </div>
+      )}
+      <div style={{
+        flex: 1, borderRadius: 16, overflow: "hidden",
+        background: "#161b22",
+        border: "1px solid rgba(255,255,255,0.06)",
+        boxShadow: "none",
+      }}>
+        <div style={{
+          padding: "12px 16px", background: "rgba(255,255,255,0.03)",
+          borderBottom: "1px solid rgba(255,255,255,0.06)",
+          display: "flex", alignItems: "center", gap: 8,
+        }}>
+          <div style={{ width: 12, height: 12, borderRadius: "50%", background: "#ff5f57" }} />
+          <div style={{ width: 12, height: 12, borderRadius: "50%", background: "#ffbd2e" }} />
+          <div style={{ width: 12, height: 12, borderRadius: "50%", background: "#28c840" }} />
+          <span style={{ marginLeft: 12, fontSize: 13, color: "rgba(255,255,255,0.4)" }}>{lang}</span>
+        </div>
+        <div style={{ padding: 16, fontFamily: "monospace", fontSize: 16, lineHeight: "1.6", overflow: "auto" }}>
+          {lines.map((line, i) => {
+            const isHighlighted = highlightLines.includes(i + 1);
+            const lineDelay = i * 2;
+            const lineOpacity = Math.min(1, Math.max(0, (frame - lineDelay) / 10));
+            return (
+              <div key={i} style={{
                 display: "flex",
-                height: LINE_HEIGHT,
-                alignItems: "center",
-                backgroundColor: isHighlighted
-                  ? "rgba(255, 235, 59, 0.1)"
-                  : "transparent",
-                borderLeft: isHighlighted
-                  ? "3px solid #ffeb3b"
-                  : "3px solid transparent",
-                opacity: Math.min(revealProgress, lineOpacity),
-                transition: "opacity 0.3s",
-              }}
-            >
-              <span
-                style={{
-                  width: 40,
-                  minWidth: 40,
-                  textAlign: "right",
-                  paddingRight: 16,
-                  color: "#484f58",
-                  userSelect: "none",
-                }}
-              >
-                {i + 1}
-              </span>
-              <span
-                style={{
-                  color: isHighlighted ? "#ffeb3b" : "#c9d1d9",
-                  whiteSpace: "pre",
-                }}
-              >
-                {line || " "}
-              </span>
-            </div>
-          );
-        })}
+                opacity: lineOpacity,
+                background: isHighlighted ? "rgba(74,144,217,0.12)" : "transparent",
+                borderRadius: 4, padding: "1px 0",
+                borderLeft: isHighlighted ? "3px solid #4a90d9" : "3px solid transparent",
+              }}>
+                <span style={{ width: 36, color: "rgba(255,255,255,0.3)", textAlign: "right", marginRight: 16, flexShrink: 0, fontSize: 14 }}>
+                  {i + 1}
+                </span>
+                <span style={{ color: isHighlighted ? "#fff" : "rgba(255,255,255,0.75)", whiteSpace: "pre" }}>
+                  {line || " "}
+                </span>
+              </div>
+            );
+          })}
+        </div>
       </div>
-    </div>
+      {caption && (
+        <div style={{
+          opacity: captionOpacity, marginTop: 12,
+          fontSize: 16, color: "rgba(255,255,255,0.5)", textAlign: "center",
+        }}>
+          {caption}
+        </div>
+      )}
+    </AbsoluteFill>
   );
 };

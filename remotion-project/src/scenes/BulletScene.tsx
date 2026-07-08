@@ -1,113 +1,81 @@
 import React from "react";
-import { useCurrentFrame } from "remotion";
+import { AbsoluteFill, useCurrentFrame, spring, useVideoConfig, interpolate, Easing } from "remotion";
 import { z } from "zod";
 
 export const BulletSceneSchema = z.object({
-  points: z.array(z.string()).min(2).max(5),
+  points: z.array(z.string()).min(1).max(8),
+  title: z.string().optional(),
   entry: z.enum(["fadeIn", "slideIn", "scaleIn"]).optional().default("fadeIn"),
   duration: z.number().positive(),
 });
 
 export type BulletSceneProps = z.infer<typeof BulletSceneSchema>;
 
-const STAGGER_FRAMES = 30;
-const ENTRY_DURATION = 20;
+const STAGGER = 25;
 
-function getEntryStyle(
-  frame: number,
-  entry: "fadeIn" | "slideIn" | "scaleIn",
-): React.CSSProperties {
-  const progress = Math.min(1, frame / ENTRY_DURATION);
-
-  switch (entry) {
-    case "fadeIn":
-      return { opacity: progress };
-    case "slideIn":
-      return {
-        opacity: progress,
-        transform: `translateX(${40 * (1 - progress)}px)`,
-      };
-    case "scaleIn":
-      return {
-        opacity: progress,
-        transform: `scale(${0.5 + 0.5 * progress})`,
-      };
-  }
-}
-
-export const BulletScene: React.FC<BulletSceneProps> = ({
-  points,
-  entry = "fadeIn",
-}) => {
+export const BulletScene: React.FC<BulletSceneProps> = ({ points, title, entry = "fadeIn" }) => {
   const frame = useCurrentFrame();
-  const activeIndex = Math.min(
-    Math.floor(frame / STAGGER_FRAMES),
-    points.length - 1,
-  );
+  const { fps } = useVideoConfig();
+  const titleOpacity = interpolate(frame, [0, 20], [0, 1], { extrapolateRight: "clamp", easing: Easing.out(Easing.cubic) });
+
+  const calcSpring = (itemFrame: number) => spring({ frame: itemFrame, fps, config: { damping: 14, stiffness: 90 } });
 
   return (
-    <div
-      style={{
-        flex: 1,
-        display: "flex",
-        flexDirection: "column",
-        justifyContent: "center",
-        padding: 60,
-        backgroundColor: "#1a1a2e",
-        width: "100%",
-        height: "100%",
-      }}
-    >
+    <AbsoluteFill style={{
+      padding: 60, display: "flex", flexDirection: "column", justifyContent: "center",
+      background: "linear-gradient(135deg, #0f0f23 0%, #1a1a3e 100%)",
+    }}>
+      {title && (
+        <div style={{
+          opacity: titleOpacity, marginBottom: 40,
+          fontSize: 28, fontWeight: "700", color: "rgba(255,255,255,0.9)",
+          letterSpacing: "-0.3px",
+        }}>
+          {title}
+        </div>
+      )}
       {points.map((point, i) => {
-        const itemFrame = frame - i * STAGGER_FRAMES;
-        const isActive = i === activeIndex;
-        const isDimmed = i < activeIndex;
+        const itemDelay = i * STAGGER;
+        const itemFrame = frame - itemDelay;
+        if (itemFrame < 0) return null;
+        const s = calcSpring(itemFrame);
+        const opacity = interpolate(itemFrame, [0, 15], [0, 1], { extrapolateRight: "clamp" });
+        const isActive = itemFrame < STAGGER + 10;
+        const isDimmed = i < Math.floor(frame / STAGGER) && !isActive;
 
-        const entryStyle = itemFrame >= 0
-          ? getEntryStyle(itemFrame, entry)
-          : { opacity: 0, transform: "scale(0.5)" };
+        const cardStyle: React.CSSProperties = {
+          display: "flex", alignItems: "center",
+          padding: "18px 24px",
+          marginBottom: 12,
+          borderRadius: 16,
+          background: isActive ? "rgba(74, 144, 217, 0.12)" : "rgba(255,255,255,0.04)",
+          border: `1px solid ${isActive ? "rgba(74,144,217,0.3)" : "rgba(255,255,255,0.06)"}`,
+          backdropFilter: "blur(2px)",
+          transform: `translateX(${(1 - s) * 30}px) scale(${0.95 + 0.05 * s})`,
+          opacity: isDimmed ? 0.4 : opacity,
+        };
+
+        const bulletDot: React.CSSProperties = {
+          width: 10, height: 10,
+          borderRadius: "50%",
+          background: isActive ? "#4a90d9" : isDimmed ? "#555" : "rgba(74,144,217,0.5)",
+          marginRight: 16,
+          flexShrink: 0,
+          boxShadow: isActive ? "0 0 12px rgba(74,144,217,0.5)" : "none",
+        };
 
         return (
-          <div
-            key={i}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              marginBottom: 20,
-              opacity: isDimmed ? 0.5 : entryStyle.opacity ?? 1,
-              transform: entryStyle.transform,
-              transition: "opacity 0.3s, transform 0.3s",
-            }}
-          >
-            <span
-              style={{
-                width: 32,
-                height: 32,
-                borderRadius: 16,
-                backgroundColor: isActive ? "#ffeb3b" : isDimmed ? "#555" : "#ffeb3b",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                marginRight: 16,
-                color: isActive ? "#1a1a2e" : "#fff",
-                fontWeight: "bold",
-                fontSize: 14,
-                flexShrink: 0,
-              }}
-            >
-              {i + 1}
-            </span>
-            <span
-              style={{
-                fontSize: 24,
-                color: isActive ? "#fff" : isDimmed ? "#888" : "#ccc",
-              }}
-            >
+          <div key={i} style={cardStyle}>
+            <div style={bulletDot} />
+            <span style={{
+              fontSize: 20, color: isActive ? "#fff" : isDimmed ? "#666" : "rgba(255,255,255,0.8)",
+              fontWeight: isActive ? "600" : "400",
+            }}>
               {point}
             </span>
           </div>
         );
       })}
-    </div>
+    </AbsoluteFill>
   );
 };
