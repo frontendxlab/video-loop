@@ -1,0 +1,591 @@
+{
+  "project": {
+    "name": "videoforge",
+    "version": "0.1.0",
+    "paradigm": "vertical-slices",
+    "description": "MCP-native automated video generation pipeline that creates developer-focused explainer videos from GitHub content (PRs, issues, changelogs). Uses FastMCP Python server, Remotion for rendering, Pocket TTS for local audio."
+  },
+  "agents": [
+    {
+      "id": "agent-infra",
+      "name": "Infrastructure Agent",
+      "focus": "Project scaffold, build tooling, CI, dependency management",
+      "slices": ["slice-001"]
+    },
+    {
+      "id": "agent-mcp",
+      "name": "MCP Server Agent",
+      "focus": "Python FastMCP server, tool definitions, orchestration logic, content fetching",
+      "slices": ["slice-002", "slice-007", "slice-008", "slice-009", "slice-013", "slice-014"]
+    },
+    {
+      "id": "agent-remotion",
+      "name": "Remotion Agent",
+      "focus": "TypeScript/React Remotion compositions, scenes, transitions, captions",
+      "slices": ["slice-004", "slice-005", "slice-006"]
+    },
+    {
+      "id": "agent-integration",
+      "name": "Integration Agent",
+      "focus": "Cross-boundary adapters (TTS, GitHub, render subprocess), E2E testing",
+      "slices": ["slice-003", "slice-010", "slice-011", "slice-012", "slice-015"]
+    }
+  ],
+  "slices": [
+    {
+      "id": "slice-001",
+      "rank": 0,
+      "name": "Project Scaffold",
+      "description": "Python package skeleton with FastMCP dependency, Remotion TypeScript subproject, pyproject.toml, package.json, tsconfig, lint/typecheck configs, CI workflow, and directory structure.",
+      "agent": "agent-infra",
+      "dependencies": [],
+      "test_files": [
+        "tests/test_scaffold.py",
+        "tests/test_imports.py"
+      ],
+      "states": {
+        "files": [
+          "pyproject.toml",
+          "setup.cfg",
+          "src/videoforge/__init__.py",
+          "src/videoforge/__main__.py",
+          "src/videoforge/server.py",
+          "remotion-project/package.json",
+          "remotion-project/tsconfig.json",
+          "remotion-project/remotion.config.ts",
+          "remotion-project/src/Root.tsx",
+          "remotion-project/src/compositions/index.ts",
+          ".github/workflows/ci.yml",
+          "pytest.ini",
+          ".ruff.toml"
+        ]
+      },
+      "acceptance_criteria": [
+        "pip install -e . installs without error",
+        "python -m videoforge --help exits 0 and prints usage",
+        "npx remotion compositions lists 0 compositions",
+        "pytest tests/ passes",
+        "ruff . passes with no errors",
+        "tsc --noEmit passes in remotion-project/"
+      ],
+      "output_artifacts": [
+        "Python wheel (editable install)",
+        "Remotion project skeleton"
+      ]
+    },
+    {
+      "id": "slice-002",
+      "rank": 1,
+      "name": "MCP Basic Tools",
+      "description": "Core FastMCP server with initialize handshake, tool listing, and basic tools: list_compositions, list_scenes, list_voices, server_info. JSON-Schema tool definitions with no agent-specific imports.",
+      "agent": "agent-mcp",
+      "dependencies": ["slice-001"],
+      "test_files": [
+        "tests/mcp/test_basic_tools.py",
+        "tests/mcp/test_server_init.py",
+        "tests/mcp/test_schema_compliance.py"
+      ],
+      "states": {
+        "files": [
+          "src/videoforge/server.py",
+          "src/videoforge/tools/__init__.py",
+          "src/videoforge/tools/basic.py",
+          "src/videoforge/schemas.py",
+          "tests/mcp/__init__.py"
+        ]
+      },
+      "acceptance_criteria": [
+        "Server responds to initialize with valid protocol version",
+        "tools/list returns all 4 basic tools with valid JSON-Schema",
+        "list_compositions returns empty array (no compositions yet)",
+        "list_voices returns empty array (no TTS adapter yet)",
+        "No agent-specific SDK imports present in any tool file"
+      ],
+      "output_artifacts": [
+        "MCP server with 4 working tools"
+      ]
+    },
+    {
+      "id": "slice-003",
+      "rank": 1,
+      "name": "TTS Adapter & Audio Pipeline",
+      "description": "Python adapter wrapping Pocket TTS MCP server HTTP calls. Handles chunking (≤50 tokens per chunk), FFmpeg crossfade stitching, word-timestamp estimation, and outputs 24kHz 16-bit mono WAV with caption timing metadata.",
+      "agent": "agent-integration",
+      "dependencies": ["slice-001"],
+      "test_files": [
+        "tests/audio/test_tts_adapter.py",
+        "tests/audio/test_chunker.py",
+        "tests/audio/test_stitcher.py",
+        "tests/audio/test_caption_timing.py"
+      ],
+      "states": {
+        "files": [
+          "src/videoforge/audio/__init__.py",
+          "src/videoforge/audio/adapter.py",
+          "src/videoforge/audio/chunker.py",
+          "src/videoforge/audio/stitcher.py",
+          "src/videoforge/audio/captions.py",
+          "tests/audio/__init__.py"
+        ]
+      },
+      "acceptance_criteria": [
+        "adapter.generate() returns (wav_bytes, caption_words[]) for any input text",
+        "Chunker splits text into ≤50 token chunks at sentence boundaries",
+        "Stitcher combines multiple WAV chunks with configurable crossfade (default 25ms)",
+        "Output WAV is 24kHz, 16-bit, mono",
+        "Caption words array contains word, start_time, end_time for each word",
+        "FFmpeg is detected at runtime; falls back to simple concatenation if absent"
+      ],
+      "output_artifacts": [
+        "WAV audio file",
+        "Word-timestamp JSON array"
+      ]
+    },
+    {
+      "id": "slice-004",
+      "rank": 1,
+      "name": "Remotion Scaffold",
+      "description": "Remotion project with Root component, composition registry, inputProps type system, Still + Composition setup, and a test composition that renders a colored frame from JSON inputProps. Serves as the base for all scene and composition development.",
+      "agent": "agent-remotion",
+      "dependencies": ["slice-001"],
+      "test_files": [
+        "remotion-project/src/__tests__/Root.test.tsx",
+        "remotion-project/src/__tests__/inputProps.test.ts"
+      ],
+      "states": {
+        "files": [
+          "remotion-project/src/Root.tsx",
+          "remotion-project/src/compositions/index.ts",
+          "remotion-project/src/compositions/types.ts",
+          "remotion-project/src/compositions/test/TestComposition.tsx",
+          "remotion-project/src/input-props.ts"
+        ]
+      },
+      "acceptance_criteria": [
+        "npx remotion compositions lists TestComposition",
+        "npx remotion still TestComposition --props='{\"color\":\"red\"}' produces a png file",
+        "input-props.ts exports a Zod schema and a TypeScript type",
+        "Root.tsx registers compositions dynamically from the registry"
+      ],
+      "output_artifacts": [
+        "Rendered test still image",
+        "Composition registry",
+        "InputProps type system"
+      ]
+    },
+    {
+      "id": "slice-005",
+      "rank": 2,
+      "name": "Scenes & Compositions",
+      "description": "Eight scene components (TitleScene, CodeScene, DiffScene, BulletScene, ImageScene, ComparisonScene, DiagramScene, OutroScene) and four composition types (CodeWalkthrough, PRSummary, IssueExplainer, ChangelogVideo). Each scene accepts typed inputProps and renders independently.",
+      "agent": "agent-remotion",
+      "dependencies": ["slice-004"],
+      "test_files": [
+        "remotion-project/src/__tests__/scenes/TitleScene.test.tsx",
+        "remotion-project/src/__tests__/scenes/CodeScene.test.tsx",
+        "remotion-project/src/__tests__/scenes/DiffScene.test.tsx",
+        "remotion-project/src/__tests__/scenes/BulletScene.test.tsx",
+        "remotion-project/src/__tests__/scenes/ImageScene.test.tsx",
+        "remotion-project/src/__tests__/scenes/ComparisonScene.test.tsx",
+        "remotion-project/src/__tests__/scenes/DiagramScene.test.tsx",
+        "remotion-project/src/__tests__/scenes/OutroScene.test.tsx",
+        "remotion-project/src/__tests__/compositions/CodeWalkthrough.test.tsx",
+        "remotion-project/src/__tests__/compositions/PRSummary.test.tsx",
+        "remotion-project/src/__tests__/compositions/IssueExplainer.test.tsx",
+        "remotion-project/src/__tests__/compositions/ChangelogVideo.test.tsx"
+      ],
+      "states": {
+        "files": [
+          "remotion-project/src/scenes/TitleScene.tsx",
+          "remotion-project/src/scenes/CodeScene.tsx",
+          "remotion-project/src/scenes/DiffScene.tsx",
+          "remotion-project/src/scenes/BulletScene.tsx",
+          "remotion-project/src/scenes/ImageScene.tsx",
+          "remotion-project/src/scenes/ComparisonScene.tsx",
+          "remotion-project/src/scenes/DiagramScene.tsx",
+          "remotion-project/src/scenes/OutroScene.tsx",
+          "remotion-project/src/scenes/index.ts",
+          "remotion-project/src/compositions/CodeWalkthrough.tsx",
+          "remotion-project/src/compositions/PRSummary.tsx",
+          "remotion-project/src/compositions/IssueExplainer.tsx",
+          "remotion-project/src/compositions/ChangelogVideo.tsx",
+          "remotion-project/src/compositions/index.ts"
+        ]
+      },
+      "acceptance_criteria": [
+        "Each scene renders with mock inputProps without errors",
+        "Each composition renders a complete video sequence with multiple scenes",
+        "npx remotion lists all 4 compositions",
+        "npx remotion render <composition> produces a valid MP4",
+        "Visual review: all text is readable, layouts are correct"
+      ],
+      "output_artifacts": [
+        "8 rendered scene screenshots",
+        "4 rendered composition videos (with mock data)"
+      ]
+    },
+    {
+      "id": "slice-006",
+      "rank": 2,
+      "name": "Transitions & Captions",
+      "description": "Integration of @remotion/transitions (fade, slide, wipe, flip, crossfade) between any two scene types, and @remotion/captions for word-level overlay with current-word highlighting. Configurable timing, easing, and caption styling.",
+      "agent": "agent-remotion",
+      "dependencies": ["slice-005"],
+      "test_files": [
+        "remotion-project/src/__tests__/transitions/allTransitions.test.tsx",
+        "remotion-project/src/__tests__/captions/captionOverlay.test.tsx",
+        "remotion-project/src/__tests__/captions/timing.test.ts"
+      ],
+      "states": {
+        "files": [
+          "remotion-project/src/transitions.ts",
+          "remotion-project/src/captions/CaptionOverlay.tsx",
+          "remotion-project/src/captions/wordTiming.ts"
+        ]
+      },
+      "acceptance_criteria": [
+        "All 5 transition types render between TitleScene and CodeScene",
+        "Transition duration is configurable per-scene (range: 0.2-2.0s)",
+        "CaptionOverlay accepts words[] with word, start, end and renders highlighted current word",
+        "Caption overlay composited over any scene type",
+        "No peer-dependency warnings from @remotion/transitions or @remotion/captions"
+      ],
+      "output_artifacts": [
+        "Transition demo video (all 5 types)",
+        "Captioned scene video"
+      ]
+    },
+    {
+      "id": "slice-007",
+      "rank": 2,
+      "name": "MCP Advanced Tools",
+      "description": "Advanced MCP tools: render_pr (triggers full pipeline), render_issue, render_changelog, status (live pipeline state). Each tool accepts typed parameters, validates input, and returns job IDs for async status polling.",
+      "agent": "agent-mcp",
+      "dependencies": ["slice-002"],
+      "test_files": [
+        "tests/mcp/test_render_tools.py",
+        "tests/mcp/test_status_tool.py",
+        "tests/mcp/test_input_validation.py"
+      ],
+      "states": {
+        "files": [
+          "src/videoforge/tools/render.py",
+          "src/videoforge/tools/status.py",
+          "src/videoforge/tools/validation.py",
+          "src/videoforge/job.py",
+          "src/videoforge/state.py"
+        ]
+      },
+      "acceptance_criteria": [
+        "fact_check_script accepts script + source_diff and returns FactCheckReport",
+        "logic_check_scenes accepts scene_plan + script and returns LogicCheckReport",
+        "render_pr accepts owner, repo, pr_number and returns job_id",
+        "render_issue accepts owner, repo, issue_number and returns job_id",
+        "render_changelog accepts owner, repo, from_tag, to_tag and returns job_id",
+        "status accepts job_id and returns { phase, progress_pct, error, started_at }",
+        "Input validation rejects missing parameters with descriptive errors",
+        "All tools return valid JSON-RPC responses"
+      ],
+      "output_artifacts": [
+        "5 advanced MCP tools",
+        "Job state persistence (STATE.md)"
+      ]
+    },
+    {
+      "id": "slice-008",
+      "rank": 3,
+      "name": "Content Fetcher",
+      "description": "GitHub content ingestion module. Fetches PR diffs, issue bodies, changelog commits via gh CLI subprocess. Parses markdown to structured AST, extracts code blocks, diffs, lists, images. Handles auth via gh CLI (already authenticated).",
+      "agent": "agent-mcp",
+      "dependencies": ["slice-007"],
+      "test_files": [
+        "tests/fetcher/test_pr_fetcher.py",
+        "tests/fetcher/test_issue_fetcher.py",
+        "tests/fetcher/test_changelog_fetcher.py",
+        "tests/fetcher/test_parser.py",
+        "tests/fetcher/test_gh_cli.py"
+      ],
+      "states": {
+        "files": [
+          "src/videoforge/fetcher/__init__.py",
+          "src/videoforge/fetcher/base.py",
+          "src/videoforge/fetcher/pr.py",
+          "src/videoforge/fetcher/issue.py",
+          "src/videoforge/fetcher/changelog.py",
+          "src/videoforge/fetcher/parser.py",
+          "src/videoforge/fetcher/gh_cli.py",
+          "tests/fetcher/__init__.py"
+        ]
+      },
+      "acceptance_criteria": [
+        "fetch_pr(owner, repo, number) returns structured PR object with metadata + diff",
+        "fetch_issue(owner, repo, number) returns structured issue with body + comments",
+        "fetch_changelog(owner, repo, from_tag, to_tag) returns list of commits with messages + diffs",
+        "Parser extracts code blocks, diffs, bullet lists, images from markdown body",
+        "GhCLI class wraps all gh subprocess calls with error handling",
+        "gh auth status is verified at init; raises clear error if not authenticated"
+      ],
+      "output_artifacts": [
+        "Structured PR/Issue/Changelog objects"
+      ]
+    },
+    {
+      "id": "slice-009",
+      "rank": 3,
+      "name": "Pipeline Orchestrator",
+      "description": "Orchestrator that chains the full pipeline: content fetch → script generation (LLM prompts) → scene planning (rule-based mapping) → TTS generation → Remotion inputProps composition. Manages state transitions, error handling, and phase progress reporting.",
+      "agent": "agent-mcp",
+      "dependencies": ["slice-003", "slice-008", "slice-013", "slice-014"],
+      "test_files": [
+        "tests/orchestrator/test_pipeline.py",
+        "tests/orchestrator/test_script_writer.py",
+        "tests/orchestrator/test_scene_planner.py",
+        "tests/orchestrator/test_state_machine.py",
+        "tests/orchestrator/test_error_handler.py"
+      ],
+      "states": {
+        "files": [
+          "src/videoforge/orchestrator/__init__.py",
+          "src/videoforge/orchestrator/pipeline.py",
+          "src/videoforge/orchestrator/script_writer.py",
+          "src/videoforge/orchestrator/scene_planner.py",
+          "src/videoforge/orchestrator/state_machine.py",
+          "src/videoforge/orchestrator/errors.py",
+          "tests/orchestrator/__init__.py"
+        ]
+      },
+      "acceptance_criteria": [
+        "pipeline.run(job_id, content_type, params) executes all phases in order",
+        "Script writer generates narration from PR content using configurable LLM prompt",
+        "Fact Checker validates all factual claims against source diff before scene planning",
+        "Logic Checker validates narrative coherence after scene planning",
+        "Scene planner maps script segments to scene types with timing estimates",
+        "State machine transitions through all pipeline phases with progress reporting",
+        "Error handler catches phase failures and marks job as failed with descriptive message",
+        "Pipeline can resume from last successful phase on retry"
+      ],
+      "output_artifacts": [
+        "Rendered narration script",
+        "Scene plan with timing",
+        "Completed pipeline run"
+      ]
+    },
+    {
+      "id": "slice-013",
+      "rank": 3,
+      "name": "Fact Checker",
+      "description": "Automated fact validator that cross-references script claims against the source PR diff. Extracts function/API/behavioral claims from the narration text and verifies each one exists or is supported by the actual code changes. Runs in L1 (advisory) mode by default — reports issues without blocking the pipeline.",
+      "agent": "agent-mcp",
+      "dependencies": ["slice-009"],
+      "test_files": [
+        "tests/validation/test_fact_checker.py",
+        "tests/validation/test_claim_extraction.py",
+        "tests/validation/test_source_verification.py"
+      ],
+      "states": {
+        "files": [
+          "src/videoforge/validation/__init__.py",
+          "src/videoforge/validation/fact_checker.py",
+          "src/videoforge/validation/claim_extractor.py",
+          "src/videoforge/validation/source_verifier.py",
+          "tests/validation/__init__.py"
+        ]
+      },
+      "acceptance_criteria": [
+        "Extracts function/method names, API endpoints, and behavioral claims from script text",
+        "Verifies each claim against source diff: function names must exist in diff, API endpoints must match, behavioral claims must be supported",
+        "Returns structured report: per-claim status (verified/warning/fail) with evidence",
+        "L1 mode (default): logs warnings and continues pipeline",
+        "L2 mode (configurable): blocks pipeline on critical failures (function references to nonexistent code)",
+        "Empty script returns empty report without error",
+        "Runs in <15s for a 500-word script with 1000-line diff"
+      ],
+      "output_artifacts": [
+        "FactCheckReport (JSON)"
+      ]
+    },
+    {
+      "id": "slice-014",
+      "rank": 3,
+      "name": "Logic Checker",
+      "description": "Narrative coherence validator that checks the scene plan after scene planning is complete. Validates 4-arc narrative structure (context → problem → solution → impact), cause/effect claim grounding, scene ordering logicality, and pacing density. Runs in L1 (advisory) mode by default.",
+      "agent": "agent-mcp",
+      "dependencies": ["slice-009"],
+      "test_files": [
+        "tests/validation/test_logic_checker.py",
+        "tests/validation/test_narrative_arc.py",
+        "tests/validation/test_scene_ordering.py",
+        "tests/validation/test_pacing.py"
+      ],
+      "states": {
+        "files": [
+          "src/videoforge/validation/__init__.py",
+          "src/videoforge/validation/logic_checker.py",
+          "src/videoforge/validation/narrative.py",
+          "src/videoforge/validation/ordering.py",
+          "src/videoforge/validation/pacing.py",
+          "tests/validation/__init__.py"
+        ]
+      },
+      "acceptance_criteria": [
+        "Detects missing narrative roles (context/problem/solution/impact) in scene sequence",
+        "Validates cause/effect claims: every 'because X, Y' pattern must have a corresponding scene for X",
+        "Checks scene ordering: code is introduced before it's shown modified, concepts precede their usage",
+        "Flags pacing issues: scenes <2s or >30s, information density >1 claim/sec",
+        "Returns structured per-scene report with severity levels",
+        "L1 mode (default): logs warnings and continues pipeline",
+        "L2 mode (configurable): blocks pipeline on missing critical narrative role",
+        "Runs in <10s for a 12-scene plan"
+      ],
+      "output_artifacts": [
+        "LogicCheckReport (JSON)"
+      ]
+    },
+    {
+      "id": "slice-015",
+      "rank": 3,
+      "name": "5-Level Frame Reviewer",
+      "description": "Per-frame visual quality analyzer that runs 5 progressive checks on the rendered MP4: L1 frame integrity (no corrupt/black/frozen frames via FFmpeg filters), L2 element boundaries (no overlapping/clipped elements via Remotion metadata bounding boxes), L3 animation smoothness (no position jitter/opacity flicker/scale oscillation via frame-to-frame delta analysis), L4 transition completeness (all transitions finish correctly with no abrupt cuts where not expected via timing cross-reference), L5 temporal consistency (no element disappear/reappear, caption mismatches, scene content mismatches via pixel-change masks + inputProps cross-reference). A frame must pass L1 before L2-L5 are evaluated.",
+      "agent": "agent-integration",
+      "dependencies": ["slice-010"],
+      "test_files": [
+        "tests/review/test_frame_integrity.py",
+        "tests/review/test_element_boundaries.py",
+        "tests/review/test_animation_smoothness.py",
+        "tests/review/test_transition_completeness.py",
+        "tests/review/test_temporal_consistency.py",
+        "tests/review/test_aggregation.py"
+      ],
+      "states": {
+        "files": [
+          "src/videoforge/review/__init__.py",
+          "src/videoforge/review/frame_reviewer.py",
+          "src/videoforge/review/l1_integrity.py",
+          "src/videoforge/review/l2_boundaries.py",
+          "src/videoforge/review/l3_smoothness.py",
+          "src/videoforge/review/l4_transitions.py",
+          "src/videoforge/review/l5_consistency.py",
+          "tests/review/__init__.py"
+        ]
+      },
+      "acceptance_criteria": [
+        "L1 detects black frames, frozen frames, and corrupt frames using FFmpeg blackdetect/freezedetect filters",
+        "L2 detects element overlap (IoU >0.3) and viewport clipping using Remotion metadata bounding boxes",
+        "L3 detects position jitter (>3px frame-to-frame no easing), opacity flicker (alternating 0→1), and scale oscillation (alternating frame-to-frame)",
+        "L4 detects incomplete transitions (entering scene not fully visible by expected frame), overlapping scenes (both scenes visible beyond transition duration), and hard cuts where smooth transition was specified",
+        "L5 detects element disappear/reappear beyond 1 frame, caption word highlight mismatch against frame schedule, and scene content type mismatch (code scene without code pixels)",
+        "Aggregation: a frame failing L1 is skipped for L2-L5; overall pass/fail computed per level",
+        "Runs in <30s for a 60-second 1080p video at 30fps",
+        "Produces structured FrameReviewReport with per-level results, failing frame numbers, and issue descriptions"
+      ],
+      "output_artifacts": [
+        "FrameReviewReport (JSON)",
+        "Per-frame visualization of detected issues (PNG overlay)"
+      ]
+    },
+    {
+      "id": "slice-010",
+      "rank": 3,
+      "name": "Render Executor",
+      "description": "Subprocess wrapper around npx remotion render. Constructs inputProps JSON, invokes Remotion with correct composition ID and entry point, streams stdout/stderr, parses progress lines, enforces timeout/memory limits, and returns render artifact path.",
+      "agent": "agent-integration",
+      "dependencies": ["slice-006", "slice-009"],
+      "test_files": [
+        "tests/render/test_executor.py",
+        "tests/render/test_progress_parser.py",
+        "tests/render/test_timeout.py"
+      ],
+      "states": {
+        "files": [
+          "src/videoforge/render/__init__.py",
+          "src/videoforge/render/executor.py",
+          "src/videoforge/render/progress.py",
+          "src/videoforge/render/compose_props.py",
+          "tests/render/__init__.py"
+        ]
+      },
+      "acceptance_criteria": [
+        "Executor runs npx remotion render with correct composition ID and entry point",
+        "inputProps JSON is correctly composed from pipeline output",
+        "Progress lines (frame X/Y) are parsed and reported to state machine",
+        "Render timeout (default 10 min) kills subprocess and marks job failed",
+        "Output MP4 path is returned on success",
+        "Non-zero exit codes from Remotion are caught and reported"
+      ],
+      "output_artifacts": [
+        "Rendered MP4 video file"
+      ]
+    },
+    {
+      "id": "slice-011",
+      "rank": 4,
+      "name": "GitHub Integration & Webhook",
+      "description": "Webhook server for GitHub PR opened/updated events. Receives payloads, validates signatures, triggers pipeline, uploads rendered video as PR comment via gh CLI. Includes middleware for HMAC verification, rate limiting, and graceful shutdown.",
+      "agent": "agent-integration",
+      "dependencies": ["slice-010"],
+      "test_files": [
+        "tests/github/test_webhook.py",
+        "tests/github/test_publisher.py",
+        "tests/github/test_signature.py"
+      ],
+      "states": {
+        "files": [
+          "src/videoforge/github/__init__.py",
+          "src/videoforge/github/webhook.py",
+          "src/videoforge/github/publisher.py",
+          "src/videoforge/github/signature.py",
+          "src/videoforge/github/config.py",
+          "tests/github/__init__.py"
+        ]
+      },
+      "acceptance_criteria": [
+        "Webhook server listens on configurable port (default 8765)",
+        "HMAC-SHA256 signature verification rejects invalid payloads with 401",
+        "PR opened and synchronize events trigger pipeline execution",
+        "Publisher uploads rendered MP4 as PR comment using gh pr comment",
+        "Comment includes status link and render duration",
+        "Server handles SIGTERM with graceful shutdown (finish in-flight renders)"
+      ],
+      "output_artifacts": [
+        "PR comment with video attachment"
+      ]
+    },
+    {
+      "id": "slice-012",
+      "rank": 5,
+      "name": "E2E Integration Tests",
+      "description": "End-to-end integration tests covering the full pipeline from a mock GitHub PR to a rendered MP4. Uses fixture data (static PR diff, issue body, changelog), mocks for gh CLI and Pocket TTS, and verifies the entire production code path without external dependencies.",
+      "agent": "agent-integration",
+      "dependencies": ["slice-011"],
+      "test_files": [
+        "tests/e2e/test_full_pipeline.py",
+        "tests/e2e/test_pr_to_video.py",
+        "tests/e2e/test_issue_to_video.py",
+        "tests/e2e/test_changelog_to_video.py",
+        "tests/e2e/test_webhook_to_comment.py",
+        "tests/e2e/conftest.py"
+      ],
+      "states": {
+        "files": [
+          "tests/e2e/__init__.py",
+          "tests/e2e/conftest.py",
+          "tests/e2e/fixtures/",
+          "tests/e2e/fixtures/sample_pr_diff.diff",
+          "tests/e2e/fixtures/sample_issue.md",
+          "tests/e2e/fixtures/sample_changelog.json"
+        ]
+      },
+      "acceptance_criteria": [
+        "test_full_pipeline exercises ingest → research → script → scene → tts → compose → render → verify",
+        "test_pr_to_video produces a valid MP4 from a real PR fixture (using mock TTS)",
+        "All e2e tests pass in CI with mocked external services",
+        "Test teardown removes all generated artifacts",
+        "Tests run in <60 seconds with mocks (no real rendering or TTS)"
+      ],
+      "output_artifacts": [
+        "E2E test suite with fixtures",
+        "CI pipeline with e2e test stage"
+      ]
+    }
+  ]
+}
