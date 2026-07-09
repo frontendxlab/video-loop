@@ -40,6 +40,7 @@ def create_app(feed: EventFeed | None = None) -> FastAPI:
     app.include_router(artifacts_router)
     app.include_router(director_preview_router)
     app.include_router(recipes_router)
+    app.include_router(reports_router)
     app.include_router(sse_router)
     app.include_router(settings_router)
     app.include_router(jobs_router)
