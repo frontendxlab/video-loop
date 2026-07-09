@@ -209,8 +209,8 @@ def wizard():
     if final.exists():
         mb = final.stat().st_size / 1e6
         r2 = subprocess.run(["ffprobe", "-v", "quiet", "-print_format", "json", "-show_format", str(final)], capture_output=True, text=True)
-        info = json.loads(r2.stdout)
-        dur = float(info.get("format", {}).get("duration", 0))
+        probe_info = json.loads(r2.stdout)
+        dur = float(probe_info.get("format", {}).get("duration", 0))
         ok(f"Video: {final} ({mb:.1f}MB, {dur:.1f}s = {dur/60:.1f} min)")
 
     # Step 7: Review
