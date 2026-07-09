@@ -9,6 +9,7 @@ from videoforge.review.repair_actions import (
     build_repair_plan,
     execute_repair_plan,
 )
+from videoforge.review.rerender_orchestrator import run_orchestrated_review
 
 __all__ = [
     "FrameReviewer",
@@ -20,4 +21,5 @@ __all__ = [
     "L0_REPAIR_MAP",
     "ACTION_RERENDER",
     "ACTION_RERENDER_WITH_TOKEN_RESET",
+    "run_orchestrated_review",
 ]
