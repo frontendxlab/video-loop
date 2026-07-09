@@ -14,12 +14,13 @@ from videoforge.review.overlap_gate import OverlapGate
 
 
 class FrameReviewer:
-    def __init__(self) -> None:
+    def __init__(self, max_retries: int = 2) -> None:
         self._l0 = L0MixedEngineReview()
         self._l3 = L3Smoothness()
         self._l4 = L4Transitions()
         self._l5 = L5Consistency()
         self._overlap_gate = OverlapGate()
+        self.max_retries = max_retries
 
     def check_integrity(self, video_path: str) -> dict[str, Any]:
         issues: list[dict[str, Any]] = []
@@ -96,12 +97,39 @@ class FrameReviewer:
         }
 
     def check_mixed_engine(self, video_path: str) -> dict[str, Any]:
-        """Run L0 mixed-engine review gate standalone.
+        """Run L0 mixed-engine review with bounded retry on infrastructure failure.
 
-        Convenience method for pipeline callers that only need the frame-sampled
-        visual consistency check without running the full L1-L5 gauntlet.
+        Retries on:
+          - Exception raised by L0 engine (transient subprocess/IO errors)
+          - Infrastructure failure: no frames sampled despite video having frames
+
+        Does NOT retry on genuine quality issues (blank frames, palette drift, etc.).
+
+        Exposes structured retry metadata in result dict when retries occurred.
         """
-        return self._l0.run(video_path)
+        for attempt in range(self.max_retries + 1):
+            try:
+                result = self._l0.run(video_path)
+            except Exception:
+                if attempt < self.max_retries:
+                    continue
+                raise
+
+            # Retry on infrastructure failure only: frames exist but none sampled
+            if (
+                result.get("sampled_frames", 0) == 0
+                and result.get("total_frames", 0) > 0
+            ):
+                if attempt < self.max_retries:
+                    continue
+
+            if attempt > 0:
+                result["retry_attempts"] = attempt
+                result["retry_limit"] = self.max_retries
+            return result
+
+        # Unreachable -- either returned above or raised
+        raise RuntimeError("L0 mixed-engine review failed")  # pragma: no cover
 
     def check_layout_overlap(
         self,
@@ -150,7 +178,7 @@ class FrameReviewer:
             "levels": {},
         }
 
-        l0_result = self._l0.run(video_path)
+        l0_result = self.check_mixed_engine(video_path)
         report["levels"]["l0_mixed_engine"] = l0_result
 
         l1_result = self.check_integrity(video_path)

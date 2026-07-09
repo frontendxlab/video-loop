@@ -308,6 +308,106 @@ class TestFrameReviewerIntegration:
             assert "l0_mixed_engine" in result["levels"]
             assert result["levels"]["l0_mixed_engine"]["passed"] is True
 
+    def test_retry_on_exception_then_succeed(self) -> None:
+        """Retry on exception, second attempt succeeds."""
+        from videoforge.review.frame_reviewer import FrameReviewer
+        fr = FrameReviewer(max_retries=2)
+        with patch.object(fr._l0, "run") as mock_run:
+            mock_run.side_effect = [
+                RuntimeError("transient failure"),
+                {"passed": True, "issues": [], "sampled_frames": 6, "total_frames": 300},
+            ]
+            result = fr.check_mixed_engine("test.mp4")
+            assert result["passed"] is True
+            assert result["retry_attempts"] == 1
+            assert result["retry_limit"] == 2
+            assert mock_run.call_count == 2
+
+    def test_retry_on_infrastructure_failure(self) -> None:
+        """Retry on infrastructure failure (sampled_frames=0, total_frames>0)."""
+        from videoforge.review.frame_reviewer import FrameReviewer
+        fr = FrameReviewer(max_retries=2)
+        with patch.object(fr._l0, "run") as mock_run:
+            mock_run.side_effect = [
+                {"passed": False, "issues": [], "sampled_frames": 0, "total_frames": 300},
+                {"passed": True, "issues": [], "sampled_frames": 6, "total_frames": 300},
+            ]
+            result = fr.check_mixed_engine("test.mp4")
+            assert result["passed"] is True
+            assert result["retry_attempts"] == 1
+            assert result["retry_limit"] == 2
+            assert mock_run.call_count == 2
+
+    def test_exhaust_retries_on_exception(self) -> None:
+        """Exhaust all retries on persistent exception."""
+        from videoforge.review.frame_reviewer import FrameReviewer
+        fr = FrameReviewer(max_retries=2)
+        with patch.object(fr._l0, "run") as mock_run:
+            mock_run.side_effect = RuntimeError("persistent failure")
+            with pytest.raises(RuntimeError, match="persistent failure"):
+                fr.check_mixed_engine("test.mp4")
+            assert mock_run.call_count == 3  # 1 initial + 2 retries
+
+    def test_no_retry_on_genuine_quality_issues(self) -> None:
+        """Genuine quality issues (sampled_frames > 0) do NOT trigger retry."""
+        from videoforge.review.frame_reviewer import FrameReviewer
+        fr = FrameReviewer(max_retries=2)
+        with patch.object(fr._l0, "run") as mock_run:
+            mock_run.return_value = {
+                "passed": False,
+                "issues": [{"type": "blank_frame", "severity": "high"}],
+                "sampled_frames": 6,
+                "total_frames": 300,
+            }
+            result = fr.check_mixed_engine("test.mp4")
+            assert result["passed"] is False
+            assert "retry_attempts" not in result
+            assert "retry_limit" not in result
+            mock_run.assert_called_once_with("test.mp4")
+
+    def test_no_retry_metadata_on_first_attempt_success(self) -> None:
+        """No retry metadata when first attempt succeeds."""
+        from videoforge.review.frame_reviewer import FrameReviewer
+        fr = FrameReviewer(max_retries=2)
+        with patch.object(fr._l0, "run") as mock_run:
+            mock_run.return_value = {"passed": True, "issues": [], "sampled_frames": 6, "total_frames": 300}
+            result = fr.check_mixed_engine("test.mp4")
+            assert result["passed"] is True
+            assert "retry_attempts" not in result
+            assert "retry_limit" not in result
+            mock_run.assert_called_once_with("test.mp4")
+
+    def test_retry_metadata_shape(self) -> None:
+        """Retry metadata has correct types."""
+        from videoforge.review.frame_reviewer import FrameReviewer
+        fr = FrameReviewer(max_retries=3)
+        with patch.object(fr._l0, "run") as mock_run:
+            mock_run.side_effect = [
+                RuntimeError("transient"),
+                {"passed": True, "issues": [], "sampled_frames": 6, "total_frames": 300},
+            ]
+            result = fr.check_mixed_engine("test.mp4")
+            assert isinstance(result["retry_attempts"], int)
+            assert isinstance(result["retry_limit"], int)
+            assert result["retry_attempts"] == 1
+            assert result["retry_limit"] == 3
+
+    def test_aggregate_review_benefits_from_retry(self) -> None:
+        """aggregate_review also gets retry via check_mixed_engine."""
+        from videoforge.review.frame_reviewer import FrameReviewer
+        fr = FrameReviewer(max_retries=2)
+        with patch.object(fr._l0, "run") as mock_l0, \
+             patch.object(fr, "check_integrity") as mock_l1:
+            mock_l0.side_effect = [
+                RuntimeError("transient"),
+                {"passed": True, "issues": [], "sampled_frames": 6, "total_frames": 300},
+            ]
+            mock_l1.return_value = {"passed": True, "issues": [], "total_frames": 300}
+            result = fr.aggregate_review("test.mp4")
+            assert result["levels"]["l0_mixed_engine"]["passed"] is True
+            assert result["levels"]["l0_mixed_engine"]["retry_attempts"] == 1
+            assert mock_l0.call_count == 2
+
 
 # ── L0 configurable thresholds ────────────────────────────────────────────
 
