@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -48,15 +48,31 @@ const TAB_META: Record<TabId, { title: string; desc: string }> = {
 /* ─── Hook ─── */
 
 function useSettingsForm() {
-  const [settings, setSettings] = useState<Settings>(() => {
-    try {
-      return SettingsSchema.parse(DEFAULT_SETTINGS);
-    } catch {
-      return DEFAULT_SETTINGS;
-    }
-  });
+  const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [override, setOverride] = useState<RunOverride>({ temperature: 0.7, maxTokens: 4096 });
   const [saved, setSaved] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  /* Load persisted settings on mount */
+  useEffect(() => {
+    fetch("/api/settings")
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
+      .then((data) => {
+        const parsed = SettingsSchema.parse(data);
+        setSettings(parsed);
+        setLoading(false);
+      })
+      .catch((err: Error) => {
+        /* Fall back to defaults on error */
+        console.warn("Settings load failed, using defaults:", err.message);
+        setError(null);
+        setLoading(false);
+      });
+  }, []);
 
   const patchSettings = useCallback((patch: Partial<Settings>) => {
     setSettings((prev) => ({ ...prev, ...patch }));
@@ -76,12 +92,21 @@ function useSettingsForm() {
 
   const save = useCallback(async () => {
     SettingsSchema.parse(settings);
-    /* ponytail: POST to /api/settings when backend endpoint exists */
+    setError(null);
+    const res = await fetch("/api/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(settings),
+    });
+    if (!res.ok) {
+      const msg = `Save failed: HTTP ${res.status}`;
+      setError(msg);
+      throw new Error(msg);
+    }
     setSaved(true);
-    await Promise.resolve();
-  }, [settings, override]);
+  }, [settings]);
 
-  return { settings, override, patchSettings, patchOverride, resetAll, save, saved };
+  return { settings, override, patchSettings, patchOverride, resetAll, save, saved, loading, error };
 }
 
 /* ─── Sub-components ─── */
@@ -343,6 +368,20 @@ export function SettingsPage() {
   const form = useSettingsForm();
   const [tab, setTab] = useState<TabId>("provider");
 
+  if (form.loading) {
+    return (
+      <div className="mx-auto max-w-2xl">
+        <div className="mb-8">
+          <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
+          <p className="text-sm text-muted-foreground">Provider, model, queue, and review configuration</p>
+        </div>
+        <Card>
+          <CardContent className="py-12 text-center text-muted-foreground">Loading settings…</CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto max-w-2xl">
       <div className="mb-8">
@@ -384,6 +423,8 @@ export function SettingsPage() {
           </CardContent>
         </Card>
       </Tabs>
+
+      {form.error && <p className="mt-2 text-sm text-red-500">{form.error}</p>}
 
       <div className="mt-6 flex items-center justify-end gap-3">
         <Button variant="outline" onClick={form.resetAll}>
