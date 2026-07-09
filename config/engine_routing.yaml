@@ -1,0 +1,42 @@
+routing:
+  - kind: code
+    engine: remotion
+    reason: "Shiki syntax highlighting, React typography"
+  - kind: diff
+    engine: remotion
+    reason: "Real diff parsing with aligned line matching"
+  - kind: bullets
+    engine: remotion
+    reason: "Flexbox layout, spring physics"
+  - kind: title
+    engine: remotion
+    reason: "Typography, animated entrance"
+  - kind: comparison
+    engine: remotion
+    reason: "Split-pane, animated divider"
+  - kind: quote
+    engine: remotion
+    reason: "Typography, emphasis animation"
+  - kind: outro
+    engine: remotion
+    reason: "Call-to-action, fade out"
+  - kind: mindmap
+    engine: remotion
+    reason: "Tree layout via d3-hierarchy"
+  - kind: diagram
+    layout: math_graph
+    engine: manim
+    reason: "Real graph layout with dot/spring algorithm"
+  - kind: diagram
+    layout: default
+    engine: remotion
+    reason: "Fallback to React-based diagram"
+  - kind: chart
+    engine: manim
+    reason: "BarChart, NumberLine, Axes primitives"
+  - kind: timeline
+    engine: manim
+    reason: "MoveAlongPath, deterministic tick math"
+  - kind: map3d
+    engine: manim
+    reason: "3D geometry and camera movement"

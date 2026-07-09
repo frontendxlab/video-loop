@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from videoforge.engine.models import VideoDefinition
+from videoforge.engine.ir import Engine, VideoProject
 
 logger = logging.getLogger("videoforge.engine.render")
 
@@ -73,7 +74,7 @@ def _matches_pinned(fmt: dict[str, Any] | None) -> bool:
 
 
 def render_scenes(
-    video: VideoDefinition,
+    video: VideoDefinition | VideoProject,
     remotion_dir: str | Path,
     output_dir: str | Path,
     tmpdir: str | Path | None = None,
@@ -82,7 +83,9 @@ def render_scenes(
 ) -> list[str]:
     """Render each scene individually, return list of MP4 paths.
 
-    This is deterministic: same VideoDefinition always produces same frames.
+    Accepts either legacy VideoDefinition or new VideoProject IR. When given
+    a VideoProject, uses pick_engine() from the director to route each scene
+    to Remotion or Manim. Deterministic: same input always produces same frames.
     """
     remotion_dir = Path(remotion_dir)
     output_dir = Path(output_dir)
@@ -91,26 +94,46 @@ def render_scenes(
     if tmpdir:
         os.environ["TMPDIR"] = str(tmpdir)
 
-    # Copy audio files to Remotion's public directory
-    public_audio = remotion_dir / "public" / "audio"
-    public_audio.mkdir(parents=True, exist_ok=True)
-    for track in video.audioTracks:
-        src = Path(track.src)
-        if src.exists():
-            dest = public_audio / src.name
-            if not dest.exists():
-                import shutil
-                shutil.copy2(src, dest)
+    is_ir = isinstance(video, VideoProject)
+    from videoforge.engine.director import pick_engine
+
+    # Copy audio files to Remotion's public directory (legacy path)
+    if not is_ir:
+        public_audio = remotion_dir / "public" / "audio"
+        public_audio.mkdir(parents=True, exist_ok=True)
+        for track in video.audioTracks:
+            src = Path(track.src)
+            if src.exists():
+                dest = public_audio / src.name
+                if not dest.exists():
+                    import shutil
+                    shutil.copy2(src, dest)
 
     rendered: list[str] = []
-    for i, scene in enumerate(video.scenes):
-        scene_renderer = getattr(scene, "renderer", "remotion")
+    n_scenes = len(video.scenes)
+    for i in range(n_scenes):
         output_path = output_dir / f"scene_{i:04d}.mp4"
 
-        if scene_renderer == "manim":
-            logger.info("Rendering scene %d/%d via Manim (%s, %df)", i + 1, len(video.scenes), scene.type.value, scene.duration)
+        if is_ir:
+            node = video.scenes[i]
+            engine = pick_engine(node)
+            kind = node.kind.value
+            duration = node.duration_frames
+        else:
+            scene = video.scenes[i]
+            engine = Engine(getattr(scene, "renderer", "remotion"))
+            kind = scene.type.value
+            duration = scene.duration
+
+        if engine == Engine.MANIM:
+            logger.info("Rendering scene %d/%d via Manim (%s, %df)", i + 1, n_scenes, kind, duration)
+            if is_ir:
+                from videoforge.engine.ir_adapters import node_to_scene_definition
+                sd = node_to_scene_definition(video.scenes[i], video.fps)
+            else:
+                sd = video.scenes[i]
             from videoforge.engine.manim_renderer import render_scene as manim_render_scene
-            result = manim_render_scene(scene, output_dir, fps=video.fps, mode="direct")
+            result = manim_render_scene(sd, output_dir, fps=video.fps, mode="direct")
             if result["success"] and result["video_path"]:
                 src = Path(result["video_path"])
                 if src != output_path:
@@ -121,10 +144,13 @@ def render_scenes(
                 raise RuntimeError(f"Scene {i} Manim render failed: {result.get('log', '')[-300:]}")
             continue
 
-        # Build single-scene props for Remotion
-        scene_props = video.to_remotion_props()
-        scene_props["scenes"] = [scene_props["scenes"][i]]
-        scene_props["audioTracks"] = [video.audioTracks[i]] if i < len(video.audioTracks) else []
+        # Remotion path
+        if is_ir:
+            scene_props = _ir_scene_props(video, i)
+        else:
+            scene_props = video.to_remotion_props()
+            scene_props["scenes"] = [scene_props["scenes"][i]]
+            scene_props["audioTracks"] = [video.audioTracks[i]] if i < len(video.audioTracks) else []
 
         props_path = output_dir / f"props_{i:04d}.json"
         with open(props_path, "w") as f:
@@ -143,7 +169,7 @@ def render_scenes(
             "--fps", str(CLIP_FORMAT["fps"]),
         ]
 
-        logger.info("Rendering scene %d/%d via Remotion (%s, %df)", i + 1, len(video.scenes), scene.type.value, scene.duration)
+        logger.info("Rendering scene %d/%d via Remotion (%s, %df)", i + 1, n_scenes, kind, duration)
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout_per_scene, cwd=str(remotion_dir), env={**os.environ, "TMPDIR": str(tmpdir or output_dir / "tmp")})
 
         if result.returncode != 0 or not output_path.exists():
@@ -153,6 +179,33 @@ def render_scenes(
         rendered.append(str(output_path.resolve()))
 
     return rendered
+
+
+def _ir_scene_props(project: VideoProject, index: int) -> dict[str, Any]:
+    """Build Remotion inputProps for a single scene from a VideoProject IR."""
+    node = project.scenes[index]
+    payload = node.payload_dict()
+    scene_json: dict[str, Any] = {
+        "type": node.kind.value,
+        "duration": node.duration_frames,
+        "wordTimestamps": [
+            {"text": w.text, "startMs": w.startMs, "endMs": w.endMs}
+            for w in node.narration.words
+        ],
+        "sceneStartFrame": 0,
+    }
+    for key in ("title", "subtitle", "text", "code", "lang", "points",
+                "caption", "cta", "src", "nodeprefix", "highlightLines"):
+        if key in payload and payload[key]:
+            scene_json[key] = payload[key]
+    return {
+        "title": project.title,
+        "scenes": [scene_json],
+        "audioTracks": [],
+        "captions": [],
+        "voice": "alba",
+        "style": {"primaryColor": "#4a90d9", "font": "Inter", "codeTheme": "poimandres"},
+    }
 
 
 def concatenate_scenes(
