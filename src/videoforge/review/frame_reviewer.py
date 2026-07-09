@@ -183,20 +183,49 @@ class FrameReviewer:
     def _evaluate_by_severity(result: dict[str, Any]) -> str:
         """Shared severity-based gate policy.
 
+        Delegates to :func:`policy.evaluate_l0` for single-source-of-truth.
+
         - 0 issues → pass
         - only low → warn
         - any medium → warn
         - any high → fail
         """
-        issues = result.get("issues", [])
-        if not issues:
-            return "pass"
-        severities = {i.get("severity", "low") for i in issues}
-        if "high" in severities:
-            return "fail"
-        if "medium" in severities:
-            return "warn"
-        return "warn"  # low only
+        return _policy_evaluate_l0(result).value
+
+    @staticmethod
+    def evaluate_l1_policy(result: dict[str, Any]) -> str:
+        """Evaluate L1 integrity result against gate policy.
+
+        Delegates to :func:`policy.evaluate_l1`.
+
+        Returns:
+            One of ``"pass"``, ``"fail"``, ``"retry"``.
+        """
+        return _policy_evaluate_l1(result).value
+
+    @classmethod
+    def evaluate(
+        cls,
+        l0_result: dict[str, Any] | None = None,
+        l1_result: dict[str, Any] | None = None,
+        l2_result: dict[str, Any] | None = None,
+        coherence_result: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Convenience wrapper around :func:`policy.aggregate`.
+
+        Single entry point for CLI/pipeline to evaluate all review levels
+        and get a unified decision (pass/warn/fail/retry/repair).
+
+        Returns:
+            Dict with ``verdict``, ``levels``, ``retry_suggested``,
+            ``repair_suggested``, and optionally ``repair_plan``.
+        """
+        return aggregate_policy(
+            l0_result=l0_result,
+            l1_result=l1_result,
+            l2_result=l2_result,
+            coherence_result=coherence_result,
+        )
 
     def aggregate_review(
         self, video_path: str, input_props: dict | None = None
@@ -375,17 +404,20 @@ def run_review(
     content_hash: str = "",
     engine_mix: list[str] | None = None,
     reviewer: FrameReviewer | None = None,
+    elements: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    """Run L0 + L1 review, generate and write report artifact.
+    """Run L0 + L1 + L2b review, generate and write report artifact.
 
     Args:
         video_path: Path to video file to review.
         content_hash: Optional content hash for report.
         engine_mix: Optional list of render engines used.
         reviewer: Optional FrameReviewer instance (created fresh if omitted).
+        elements: Optional element layout metadata for L2b overlap gate.
 
     Returns:
-        Dict with keys: l0_result, l0_status, l1_result, report, report_path.
+        Dict with keys: l0_result, l0_status, l1_result, l2_result, l2_status,
+                        report, report_path.
     """
     if reviewer is None:
         reviewer = FrameReviewer()
@@ -394,6 +426,21 @@ def run_review(
     l0_status = reviewer.evaluate_l0_policy(l0_result)
     l1_result = reviewer.check_integrity(video_path)
 
+    # L2b: Layout overlap (passes trivially when no elements provided)
+    if elements:
+        l2_result = reviewer.check_layout_overlap(elements)
+        l2_status = reviewer.evaluate_overlap_policy(l2_result)
+    else:
+        l2_result = {"issues": [], "passed": True}
+        l2_status = "pass"
+
+    # Unified policy decision across all levels
+    decision = reviewer.evaluate(
+        l0_result=l0_result,
+        l1_result=l1_result,
+        l2_result=l2_result,
+    )
+
     report = generate_video_report(
         video_path=video_path,
         content_hash=content_hash,
@@ -401,6 +448,8 @@ def run_review(
         l0_result=l0_result,
         l1_result=l1_result,
         l0_status=l0_status,
+        l2_result=l2_result,
+        l2_status=l2_status,
     )
     report_path = write_video_report(report, video_path)
 
@@ -408,8 +457,11 @@ def run_review(
         "l0_result": l0_result,
         "l0_status": l0_status,
         "l1_result": l1_result,
+        "l2_result": l2_result,
+        "l2_status": l2_status,
         "report": report,
         "report_path": report_path,
+        "decision": decision,
     }
 
 

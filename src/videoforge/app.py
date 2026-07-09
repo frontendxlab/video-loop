@@ -148,21 +148,31 @@ def report_summary(
     """
     report_path = Path(video).with_suffix(".mp4.report.json")
     if not report_path.exists():
-        logger.error("Report not found: %s", report_path)
+        typer.echo(f"Error: Report not found: {report_path}")
         raise typer.Exit(1)
 
     report = json.loads(report_path.read_text())
     l0 = report.get("l0_summary", {})
     l1 = report.get("l1_summary", {})
+    l2 = report.get("l2_layout_overlap_summary", {})
 
     if json_output:
         print(json.dumps(report, indent=2))
     else:
-        overall = "FAIL" if l0.get("status") == "fail" or not l1.get("passed", True) else "PASS"
+        l0_s = l0.get("status", "?")
+        l1_p = l1.get("passed", False)
+        l2_s = l2.get("status", "pass")
+        if l0_s == "fail" or not l1_p or l2_s == "fail":
+            overall = "FAIL"
+        elif l0_s == "warn" or l2_s == "warn":
+            overall = "WARN"
+        else:
+            overall = "PASS"
         print(f"REPORT_status={overall}")
         print(f"REPORT_video={report.get('video_path', '')}")
         print(f"REPORT_content_hash={report.get('content_hash', '')}")
-        print(f"REPORT_engines={\",\".join(report.get('engine_mix', []))}")
+        engines = ",".join(report.get("engine_mix", []))
+        print(f"REPORT_engines={engines}")
         print(f"REPORT_l0_status={l0.get('status', '?')}")
         print(f"REPORT_l0_issues={l0.get('total_issues', 0)}")
         for sev in ("high", "medium", "low"):
@@ -172,11 +182,13 @@ def report_summary(
         print(f"REPORT_l1_passed={str(l1.get('passed', False)).lower()}")
         print(f"REPORT_l1_issues={l1.get('total_issues', 0)}")
         print(f"REPORT_l1_total_frames={l1.get('total_frames', 0)}")
+        print(f"REPORT_l2b_status={l2.get('status', 'pass')}")
+        print(f"REPORT_l2b_issues={l2.get('total_issues', 0)}")
 
         if scenes:
             _print_scene_artifacts(report_path.parent)
 
-    all_pass = l0.get("status") != "fail" and l1.get("passed", False)
+    all_pass = l0.get("status") != "fail" and l1.get("passed", False) and l2.get("status", "pass") != "fail"
     if not all_pass:
         raise typer.Exit(1)
 
@@ -192,13 +204,21 @@ def _print_scene_artifacts(directory: Path) -> None:
 @app.command()
 def review(
     video: Annotated[str, typer.Argument(help="Video file path")],
+    elements: Annotated[str, typer.Option(help="Elements layout metadata JSON file")] = "",
 ):
-    """Review video quality (L0 mixed-engine + L1 frame check)."""
+    """Review video quality (L0 mixed-engine + L1 frame integrity + L2b layout overlap)."""
     from videoforge.review.frame_reviewer import run_review
-    r = run_review(video)
+
+    elements_data = None
+    if elements:
+        elements_data = json.loads(Path(elements).read_text())
+
+    r = run_review(video, elements=elements_data)
     l0_result = r["l0_result"]
     l0_status = r["l0_status"]
     l1_result = r["l1_result"]
+    l2_result = r["l2_result"]
+    l2_status = r["l2_status"]
 
     logger.info("L0 Mixed-Engine: status=%s issues=%d sampled=%d total=%d",
                 l0_status, len(l0_result.get("issues", [])),
@@ -209,16 +229,28 @@ def review(
     logger.info("L1 Frame Integrity: %s — %d frames, %d issues",
                 l1_label, l1_result.get("total_frames", 0), len(l1_result.get("issues", [])))
 
+    l2_issues = l2_result.get("issues", [])
+    if elements:
+        logger.info("L2b Layout Overlap: status=%s issues=%d",
+                    l2_status, len(l2_issues))
+        for issue in l2_issues:
+            logger.warning("  [%s] %s: %s",
+                           issue.get("severity", "?"),
+                           issue.get("type", "?"),
+                           issue.get("detail", ""))
+    else:
+        logger.info("L2b Layout Overlap: skipped (no element metadata)")
+
     # Combine results
-    all_passed = l0_status == "pass" and l1_passed
-    all_issues = l0_result.get("issues", []) + l1_result.get("issues", [])
+    all_passed = l0_status == "pass" and l1_passed and l2_status == "pass"
+    all_issues = l0_result.get("issues", []) + l1_result.get("issues", []) + l2_issues
 
     if all_passed:
         logger.info("Review: PASSED — 0 issues across all gates")
     else:
-        logger.warning("Review: %s — %d total issues (L0=%s, L1=%s)",
+        logger.warning("Review: %s — %d total issues (L0=%s, L1=%s, L2b=%s)",
                        "FAIL" if l0_status == "fail" else "WARN",
-                       len(all_issues), l0_status, l1_label)
+                       len(all_issues), l0_status, l1_label, l2_status)
         for issue in all_issues:
             sev = issue.get("severity", "?")
             typ = issue.get("type", "?")
@@ -226,8 +258,8 @@ def review(
 
     logger.info("Review report: %s", r["report_path"])
 
-    # Fail CLI on L0 high-severity issues
-    if l0_status == "fail":
+    # Fail CLI on L0 or L2b high-severity issues
+    if l0_status == "fail" or l2_status == "fail":
         raise typer.Exit(1)
 
 
@@ -238,8 +270,9 @@ def pipeline(
     scenes_json: Annotated[str, typer.Option(help="Scene plan JSON")] = "/tmp/scenes.json",
     voice: Annotated[str, typer.Option(help="TTS voice")] = "alba",
     tts_url: Annotated[str, typer.Option(help="TTS URL")] = "http://localhost:8000",
+    elements: Annotated[str, typer.Option(help="Elements layout metadata JSON file")] = "",
 ):
-    """Full pipeline: plan → TTS → render → review."""
+    """Full pipeline: plan → TTS → render → review (L0 + L1 + L2b)."""
     # Step 1: Plan
     plan.callback(topic=topic, output=scenes_json, voice=voice)
 
@@ -265,17 +298,29 @@ def pipeline(
     Path(video_json).write_text(json.dumps(video_def.to_remotion_props(), indent=2))
     render.callback(video=video_json, output=output)
 
-    # Step 5: Review (L0 mixed-engine + L1 frame integrity)
+    # Step 5: Review (L0 mixed-engine + L1 frame integrity + L2b layout overlap)
     from videoforge.review.frame_reviewer import run_review
+    elements_data = None
+    if elements:
+        elements_data = json.loads(Path(elements).read_text())
     engines = list({s.renderer for s in video_def.scenes if s.renderer})
-    r = run_review(output, content_hash=video_def.content_hash(), engine_mix=engines)
+    r = run_review(output, content_hash=video_def.content_hash(), engine_mix=engines, elements=elements_data)
     l0_result = r["l0_result"]
     l0_status = r["l0_status"]
     l1_result = r["l1_result"]
+    l2_result = r["l2_result"]
+    l2_status = r["l2_status"]
     l1_passed = l1_result.get("passed", False)
-    logger.info("Pipeline Review — L0=%s (%d issues), L1=%s (%d issues)",
-                l0_status, len(l0_result.get("issues", [])),
-                "PASSED" if l1_passed else "FAILED", len(l1_result.get("issues", [])))
+    l2_issues = l2_result.get("issues", [])
+    if elements:
+        logger.info("Pipeline Review — L0=%s (%d issues), L1=%s (%d issues), L2b=%s (%d issues)",
+                    l0_status, len(l0_result.get("issues", [])),
+                    "PASSED" if l1_passed else "FAILED", len(l1_result.get("issues", [])),
+                    l2_status, len(l2_issues))
+    else:
+        logger.info("Pipeline Review — L0=%s (%d issues), L1=%s (%d issues)",
+                    l0_status, len(l0_result.get("issues", [])),
+                    "PASSED" if l1_passed else "FAILED", len(l1_result.get("issues", [])))
     logger.info("Pipeline report: %s", r["report_path"])
 
 

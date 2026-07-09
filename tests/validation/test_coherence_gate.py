@@ -272,3 +272,56 @@ class TestFullReport:
         issues_str = " ".join(report["issues"])
         assert "Duplicate" in issues_str or "duplicate" in issues_str
         assert "order" in issues_str
+
+
+class TestHelpers:
+    def test_extract_script_from_scenes(self):
+        from videoforge.validation.coherence_gate import extract_script_from_scenes
+        data = [
+            {"title": "Intro", "text": "Welcome"},
+            {"type": "code", "code": "def f(): pass"},
+            {"title": "Outro"},
+        ]
+        result = extract_script_from_scenes(data)
+        assert "Intro" in result
+        assert "Welcome" in result
+        assert "def f(): pass" in result
+
+    def test_extract_script_empty_scenes(self):
+        from videoforge.validation.coherence_gate import extract_script_from_scenes
+        assert extract_script_from_scenes([]) == ""
+
+    def test_run_coherence_gate_includes_metadata(self):
+        from videoforge.validation.coherence_gate import run_coherence_gate
+        plan = {"scenes": [{"type": "title"}, {"type": "bullet"},
+                           {"type": "code"}, {"type": "outro"}]}
+        result = run_coherence_gate("test script", plan, plan_path="/tmp/test.json")
+        assert "timestamp" in result
+        assert result["plan_path"] == "/tmp/test.json"
+        assert "narrative_arc" in result
+        assert "coherent" in result
+
+    def test_write_coherence_report(self, tmp_path):
+        from videoforge.validation.coherence_gate import write_coherence_report
+        plan_file = tmp_path / "scenes.json"
+        plan_file.write_text("[]")
+        report = {"coherent": True, "issues": [], "timestamp": "now"}
+        path = write_coherence_report(report, str(plan_file))
+        report_file = tmp_path / "scenes.coherence.json"
+        assert report_file.exists()
+        assert path == str(report_file.resolve())
+
+    def test_log_coherence_results_passed(self, caplog):
+        from videoforge.validation.coherence_gate import log_coherence_results
+        import logging
+        caplog.set_level(logging.INFO)
+        log_coherence_results({"coherent": True, "issues": []})
+        assert "PASSED" in caplog.text
+
+    def test_log_coherence_results_failed(self, caplog):
+        from videoforge.validation.coherence_gate import log_coherence_results
+        import logging
+        caplog.set_level(logging.WARNING)
+        log_coherence_results({"coherent": False, "issues": ["Missing phase"]})
+        assert "FAILED" in caplog.text
+        assert "Missing phase" in caplog.text

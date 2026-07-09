@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from unittest.mock import MagicMock
+
+import pytest
 
 from videoforge.review.frame_reviewer import (
     generate_scene_report,
@@ -160,6 +163,37 @@ class TestGenerateVideoReport:
         assert l1["total_frames"] == 300
         assert l1["total_issues"] == 0
 
+    def test_l2_default_pass(self) -> None:
+        """L2b default is pass with 0 issues when no result provided."""
+        report = generate_video_report(video_path="test.mp4")
+        l2 = report["l2_layout_overlap_summary"]
+        assert l2["status"] == "pass"
+        assert l2["passed"] is True
+        assert l2["total_issues"] == 0
+        assert l2["severity_counts"] == {"high": 0, "medium": 0, "low": 0}
+
+    def test_l2_issues_in_report(self) -> None:
+        """L2b issues and severity counts appear in report."""
+        l2_result = {
+            "issues": [
+                {"element": "a", "type": "clipped", "severity": "medium", "detail": "Clipped"},
+                {"element_a": "b", "element_b": "c", "type": "overlap", "iou": 0.9,
+                 "severity": "high", "detail": "Overlap"},
+            ],
+            "passed": False,
+        }
+        report = generate_video_report(
+            video_path="test.mp4",
+            l2_result=l2_result,
+            l2_status="fail",
+        )
+        l2 = report["l2_layout_overlap_summary"]
+        assert l2["status"] == "fail"
+        assert l2["passed"] is False
+        assert l2["total_issues"] == 2
+        assert l2["severity_counts"] == {"high": 1, "medium": 1, "low": 0}
+        assert len(l2["issues"]) == 2
+
 
 class TestWriteVideoReport:
     def test_writes_to_dot_report_json(self, temp_dir: Path) -> None:
@@ -223,7 +257,12 @@ class TestRunReview:
         """Result dict contains all expected keys."""
         from videoforge.review.frame_reviewer import run_review
         result = run_review("test.mp4", reviewer=mock_reviewer)
-        assert set(result.keys()) == {"l0_result", "l0_status", "l1_result", "report", "report_path"}
+        expected_keys = {
+            "l0_result", "l0_status", "l1_result",
+            "l2_result", "l2_status",
+            "report", "report_path", "decision",
+        }
+        assert set(result.keys()) == expected_keys
 
     def test_runs_l0_and_l1(self, mock_reviewer: MagicMock) -> None:
         """Both L0 and L1 checks called."""
@@ -272,9 +311,12 @@ class TestReportShapeIntegration:
     def test_all_expected_keys_present(self) -> None:
         """Top-level and nested keys match spec."""
         report = generate_video_report(video_path="/tmp/v.mp4")
-        top_keys = {"artifact", "version", "video_path", "report_timestamp",
-                     "content_hash", "engine_mix", "render_format",
-                     "l0_summary", "l1_summary"}
+        top_keys = {
+            "artifact", "version", "video_path", "report_timestamp",
+            "content_hash", "engine_mix", "render_format",
+            "l0_summary", "l1_summary",
+            "l2_layout_overlap_summary",
+        }
         assert set(report.keys()) == top_keys
 
         rf_keys = {"fps", "width", "height", "pixel_format", "video_codec", "audio_codec"}
@@ -286,6 +328,9 @@ class TestReportShapeIntegration:
 
         l1_keys = {"passed", "total_frames", "total_issues", "issues"}
         assert set(report["l1_summary"].keys()) == l1_keys
+
+        l2_keys = {"status", "passed", "total_issues", "severity_counts", "issues"}
+        assert set(report["l2_layout_overlap_summary"].keys()) == l2_keys
 
 
 class TestGenerateSceneReport:

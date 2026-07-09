@@ -26,6 +26,12 @@ import typer
 from typing_extensions import Annotated
 
 from videoforge.design_tokens import remotion_style_defaults
+from videoforge.validation.coherence_gate import (
+    extract_script_from_scenes,
+    log_coherence_results,
+    run_coherence_gate,
+    write_coherence_report,
+)
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 logger = logging.getLogger("orchestrator")
@@ -96,6 +102,13 @@ def plan(
     Path(output).write_text(json.dumps(scene_data, indent=2))
     logger.info("Scene plan: %d scenes -> %s", len(scene_data), output)
 
+    # Coherence gate
+    plan_dict: dict[str, Any] = {"scenes": scene_data}
+    script = extract_script_from_scenes(scene_data) or topic
+    coherence = run_coherence_gate(script, plan_dict, plan_path=output)
+    log_coherence_results(coherence)
+    write_coherence_report(coherence, output)
+
 
 @app.command()
 def build(
@@ -103,8 +116,9 @@ def build(
     output: Annotated[str, typer.Option(help="Output MP4 path")] = "videos/output.mp4",
     voice: Annotated[str, typer.Option(help="TTS voice")] = "alba",
     tts_url: Annotated[str, typer.Option(help="TTS server URL")] = "http://localhost:8000",
+    elements: Annotated[str, typer.Option(help="Elements layout metadata JSON file")] = "",
 ):
-    """Full deterministic build: TTS → time → render → concat → review."""
+    """Full deterministic build: TTS → time → render → concat → review (L0 + L1 + L2b)."""
     scenes_path = Path(scenes)
     if not scenes_path.exists():
         logger.error("Scene plan not found: %s", scenes)
@@ -115,6 +129,13 @@ def build(
     out_dir.mkdir(parents=True, exist_ok=True)
     build_dir = Path("/tmp/vfx-build")
     build_dir.mkdir(parents=True, exist_ok=True)
+
+    # Step 0: Coherence gate
+    plan_dict: dict[str, Any] = {"scenes": scene_data}
+    script = extract_script_from_scenes(scene_data)
+    coherence = run_coherence_gate(script, plan_dict, plan_path=str(scenes_path))
+    log_coherence_results(coherence)
+    write_coherence_report(coherence, scenes_path)
 
     # Step 1: TTS for each scene
     for i, scene in enumerate(scene_data):
@@ -208,35 +229,46 @@ def build(
     else:
         logger.error("No scenes rendered")
 
-    # Step 5: Review (L0 mixed-engine + L1 frame integrity)
+    # Step 5: Review (L0 mixed-engine + L1 frame integrity + L2b layout overlap)
     try:
-        from videoforge.review.frame_reviewer import FrameReviewer, generate_video_report, write_video_report
-        fr = FrameReviewer()
-        l0 = fr.check_mixed_engine(str(output))
-        l0_status = fr.evaluate_l0_policy(l0)
-        logger.info("L0 Mixed-Engine: status=%s, issues=%d, sampled=%d",
-                    l0_status, len(l0.get("issues", [])), l0.get("sampled_frames", 0))
-        if l0.get("issues"):
-            for issue in l0["issues"]:
-                logger.warning("  [%s] %s: %s", issue.get("severity", "?"),
-                               issue.get("type", "?"), issue.get("detail", ""))
-        l1 = fr.check_integrity(str(output))
-        logger.info("L1 Frame Integrity: passed=%s, frames=%d, issues=%d",
-                    l1.get("passed"), l1.get("total_frames", 0), len(l1.get("issues", [])))
-
-        # Generate report artifact
+        from videoforge.review.frame_reviewer import run_review
         engines = list({s.get("renderer", "remotion") for s in scene_data})
         video_hash = _compute_video_def_hash(video_def)
-        report = generate_video_report(
-            video_path=str(output),
-            content_hash=video_hash,
-            engine_mix=engines,
-            l0_result=l0,
-            l1_result=l1,
-            l0_status=l0_status,
-        )
-        report_path = write_video_report(report, str(output))
-        logger.info("Build report: %s", report_path)
+        elements_data = None
+        if elements:
+            elements_data = json.loads(Path(elements).read_text())
+        r = run_review(str(output), content_hash=video_hash, engine_mix=engines, elements=elements_data)
+        logger.info("L0 Mixed-Engine: status=%s, issues=%d, sampled=%d",
+                    r["l0_status"], len(r["l0_result"].get("issues", [])), r["l0_result"].get("sampled_frames", 0))
+        if r["l0_result"].get("issues"):
+            for issue in r["l0_result"]["issues"]:
+                logger.warning("  [%s] %s: %s", issue.get("severity", "?"),
+                               issue.get("type", "?"), issue.get("detail", ""))
+        l1 = r["l1_result"]
+        logger.info("L1 Frame Integrity: passed=%s, frames=%d, issues=%d",
+                    l1.get("passed"), l1.get("total_frames", 0), len(l1.get("issues", [])))
+        if elements:
+            l2 = r["l2_result"]
+            logger.info("L2b Layout Overlap: status=%s, issues=%d",
+                        r["l2_status"], len(l2.get("issues", [])))
+            for issue in l2.get("issues", []):
+                logger.warning("  [%s] %s: %s", issue.get("severity", "?"),
+                               issue.get("type", "?"), issue.get("detail", ""))
+        else:
+            logger.info("L2b Layout Overlap: skipped (no element metadata)")
+        logger.info("Build report: %s", r["report_path"])
+        # Append coherence summary to existing report
+        try:
+            report_path = Path(r["report_path"])
+            report_data = json.loads(report_path.read_text())
+            report_data["coherence"] = {
+                "coherent": coherence.get("coherent", False),
+                "total_issues": len(coherence.get("issues", [])),
+                "issues": coherence.get("issues", []),
+            }
+            report_path.write_text(json.dumps(report_data, indent=2, default=str))
+        except Exception:
+            pass
     except Exception as e:
         logger.warning("Review skipped: %s", e)
 

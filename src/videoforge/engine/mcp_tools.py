@@ -202,30 +202,54 @@ def engine_generate_manim(
 @video_mcp.tool()
 def engine_review_video(
     video_path: str,
+    elements_json: str = "",
 ) -> dict:
-    """Run full video review (L0 mixed-engine + L1 frame integrity).
+    """Run full video review (L0 + L1 + L2b layout overlap).
 
     L0 samples N frames from the video and checks for blank frames,
     resolution mismatches, palette drift, and freeze. L1 runs ffprobe
-    black/frozen frame detection.
+    black/frozen frame detection. L2b checks element layout overlap
+    and viewport clipping.
 
     Args:
         video_path: Path to the video file.
+        elements_json: Optional JSON string or file path with element
+            layout metadata (list of dicts with x, y, width, height, id).
 
     Returns:
         Review results with pass/fail per check level.
     """
     from videoforge.review.frame_reviewer import FrameReviewer, generate_video_report, write_video_report
+    from videoforge.review.policy import aggregate
+
     fr = FrameReviewer()
     l0_result = fr.check_mixed_engine(video_path)
     l0_status = fr.evaluate_l0_policy(l0_result)
     l1_result = fr.check_integrity(video_path)
+
+    # L2b: Layout overlap
+    l2_result = None
+    l2_status = "pass"
+    if elements_json:
+        import json as _json
+        from pathlib import Path as _Path
+        if _Path(elements_json).exists():
+            elements = _json.loads(_Path(elements_json).read_text())
+        else:
+            elements = _json.loads(elements_json)
+        l2_result = fr.check_layout_overlap(elements)
+        l2_status = fr.evaluate_overlap_policy(l2_result)
+
+    # Unified policy decision (includes L2 when provided)
+    decision = aggregate(l0_result=l0_result, l1_result=l1_result, l2_result=l2_result)
 
     report = generate_video_report(
         video_path=video_path,
         l0_result=l0_result,
         l1_result=l1_result,
         l0_status=l0_status,
+        l2_result=l2_result or {"issues": [], "passed": True},
+        l2_status=l2_status,
     )
     report_path = write_video_report(report, video_path)
 
@@ -243,7 +267,15 @@ def engine_review_video(
             "issues": len(l1_result.get("issues", [])),
             "details": l1_result.get("issues", []),
         },
-        "passed": l0_status == "pass" and l1_result.get("passed", False),
+        "l2_layout_overlap": {
+            "status": l2_status,
+            "issues": len((l2_result or {"issues": []}).get("issues", [])),
+            "details": (l2_result or {"issues": []}).get("issues", []),
+        },
+        "passed": l0_status == "pass" and l1_result.get("passed", False) and l2_status == "pass",
+        "verdict": decision["verdict"],
+        "retry_suggested": decision["retry_suggested"],
+        "repair_suggested": decision["repair_suggested"],
         "report_path": report_path,
     }
 

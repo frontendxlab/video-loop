@@ -6,7 +6,13 @@ No LLM. Deterministic only.
 
 from __future__ import annotations
 
+import json
+import logging
+from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
+
+logger = logging.getLogger("videoforge.coherence")
 
 
 class CoherenceGate:
@@ -264,3 +270,63 @@ class CoherenceGate:
             "issues": issues,
             "coherent": len(issues) == 0,
         }
+
+
+def extract_script_from_scenes(scene_data: list[dict]) -> str:
+    """Build narration script text from scene titles, text, and code fields."""
+    parts: list[str] = []
+    for scene in scene_data:
+        for key in ("title", "text", "code"):
+            val = scene.get(key, "")
+            if val:
+                parts.append(str(val))
+    return " ".join(parts)
+
+
+def run_coherence_gate(
+    script: str,
+    scene_plan: dict,
+    plan_path: str | Path | None = None,
+) -> dict[str, Any]:
+    """Run all coherence checks and return structured report with metadata.
+
+    Convenience wrapper — instantiates CoherenceGate, runs all checks,
+    and adds timestamp/plan_path metadata.
+
+    Args:
+        script: Narration script text.
+        scene_plan: Scene plan dict with ``"scenes"`` list.
+        plan_path: Optional path to plan file (included in output).
+
+    Returns:
+        Coherence report dict with all check sections plus metadata.
+    """
+    gate = CoherenceGate()
+    result = gate.check_scenes(script, scene_plan)
+    result["timestamp"] = datetime.now(timezone.utc).isoformat()
+    if plan_path:
+        result["plan_path"] = str(plan_path)
+    return result
+
+
+def write_coherence_report(report: dict[str, Any], plan_path: str | Path) -> str:
+    """Write coherence report JSON to ``<plan_path>.coherence.json``.
+
+    Returns path to written report file.
+    """
+    p = Path(plan_path)
+    report_path = p.with_stem(p.stem + ".coherence")
+    report_path.write_text(json.dumps(report, indent=2, default=str))
+    return str(report_path.resolve())
+
+
+def log_coherence_results(report: dict[str, Any]) -> None:
+    """Log coherence gate results to logger (INFO if coherent, WARNING if not)."""
+    if report["coherent"]:
+        logger.info("Coherence Gate: PASSED — narrative arc intact")
+    else:
+        logger.warning(
+            "Coherence Gate: FAILED — %d issue(s)", len(report["issues"])
+        )
+        for issue in report["issues"]:
+            logger.warning("  • %s", issue)
