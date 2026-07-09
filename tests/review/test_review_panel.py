@@ -255,9 +255,11 @@ class TestReviewPanelActions:
 
         app = TestApp()
         async with app.run_test() as pilot:
+            await pilot.pause()
             panel = app.query_one(ReviewPanel)
             btn = panel.query_one("#btn-retry", Button)
             await pilot.click(btn)
+            await pilot.pause()
             assert len(calls) == 1
 
     async def test_stop_button_fires_callback(self, sample_report, sample_aggregate) -> None:
@@ -276,9 +278,11 @@ class TestReviewPanelActions:
 
         app = TestApp()
         async with app.run_test() as pilot:
+            await pilot.pause()
             panel = app.query_one(ReviewPanel)
             btn = panel.query_one("#btn-stop", Button)
             await pilot.click(btn)
+            await pilot.pause()
             assert calls == ["stopped"]
 
     async def test_reroute_button_fires_callback(self, sample_report, sample_aggregate) -> None:
@@ -297,9 +301,11 @@ class TestReviewPanelActions:
 
         app = TestApp()
         async with app.run_test() as pilot:
+            await pilot.pause()
             panel = app.query_one(ReviewPanel)
             btn = panel.query_one("#btn-reroute", Button)
             await pilot.click(btn)
+            await pilot.pause()
             assert len(calls) == 1
             assert calls[0] == ("current", "remotion")
 

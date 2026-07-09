@@ -83,11 +83,20 @@ class TestReviewCommandIntegration:
         with patch("videoforge.review.frame_reviewer.FrameReviewer") as m:
             instance = MagicMock()
             instance.evaluate_l0_policy.return_value = "pass"
+            instance.evaluate_overlap_policy.return_value = "pass"
             instance.check_mixed_engine.return_value = {
                 "issues": [], "passed": True, "sampled_frames": 6, "total_frames": 300,
             }
             instance.check_integrity.return_value = {
                 "issues": [], "passed": True, "total_frames": 300,
+            }
+            instance.check_layout_overlap.return_value = {"issues": [], "passed": True}
+            instance.evaluate.return_value = {
+                "verdict": "pass",
+                "levels": {"l0": "pass", "l1": "pass", "l2": "pass"},
+                "details": {},
+                "retry_suggested": False,
+                "repair_suggested": False,
             }
             m.return_value = instance
             yield instance
@@ -110,6 +119,13 @@ class TestReviewCommandIntegration:
     def test_review_command_fails_on_l0_high(self, mock_fr: MagicMock, temp_dir: Path) -> None:
         """High-severity L0 issues cause non-zero exit."""
         mock_fr.evaluate_l0_policy.return_value = "fail"
+        mock_fr.evaluate.return_value = {
+            "verdict": "fail",
+            "levels": {"l0": "fail", "l1": "pass", "l2": "pass"},
+            "details": {},
+            "retry_suggested": False,
+            "repair_suggested": False,
+        }
 
         from typer.testing import CliRunner
         from videoforge.app import app
@@ -349,6 +365,13 @@ class TestReviewCommandL2b:
                 "issues": [], "passed": True, "total_frames": 300,
             }
             instance.check_layout_overlap.return_value = {"issues": [], "passed": True}
+            instance.evaluate.return_value = {
+                "verdict": "pass",
+                "levels": {"l0": "pass", "l1": "pass", "l2": "pass"},
+                "details": {},
+                "retry_suggested": False,
+                "repair_suggested": False,
+            }
             m.return_value = instance
             yield instance
 
@@ -372,6 +395,13 @@ class TestReviewCommandL2b:
         mock_fr.evaluate_overlap_policy.return_value = "fail"
         mock_fr.check_layout_overlap.return_value = {
             "issues": [{"severity": "high", "type": "overlap", "iou": 0.9}], "passed": False,
+        }
+        mock_fr.evaluate.return_value = {
+            "verdict": "fail",
+            "levels": {"l0": "pass", "l1": "pass", "l2": "fail"},
+            "details": {},
+            "retry_suggested": False,
+            "repair_suggested": False,
         }
 
         from typer.testing import CliRunner
