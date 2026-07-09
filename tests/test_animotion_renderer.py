@@ -168,7 +168,7 @@ class TestAnimotionAdapter:
         assert tokens.get("deckBackground", "") in html
 
     def test_scene_to_html_different_kinds(self):
-        kinds = ["title", "outro", "bullets", "code", "diff", "diagram", "chart", "bar-chart", "comparison"]
+        kinds = ["title", "outro", "bullets", "code", "diff", "diagram", "chart", "bar-chart", "comparison", "timeline"]
         for kind in kinds:
             html = scene_to_html(
                 title=f"Test {kind}",
@@ -268,6 +268,119 @@ class TestAnimotionAdapter:
         assert "data-anim=\"grow-up\"" in html
         # JS must handle grow-up animation
         assert "grow-up" in html
+
+
+class TestTimelineScene:
+    """Timeline scene — horizontal milestone track with frame-progress reveal."""
+
+    def test_timeline_html_structure(self):
+        """Timeline produces expected HTML skeleton with track + milestones."""
+        html = scene_to_html(
+            title="Roadmap",
+            kind="timeline",
+            payload={
+                "milestones": [
+                    {"date": "Q1 2024", "title": "Alpha", "description": "Internal build"},
+                    {"date": "Q2 2024", "title": "Beta", "description": "Feature complete"},
+                    {"date": "Q3 2024", "title": "RC", "description": "Stabilization"},
+                ],
+            },
+            duration_frames=120,
+        )
+        assert "Roadmap" in html
+        assert "Q1 2024" in html
+        assert "Alpha" in html
+        assert "Beta" in html
+        assert "RC" in html
+        assert "window.setFrame" in html
+        assert 'data-anim="expand"' in html
+        assert 'data-anim="progress"' in html
+
+    def test_timeline_milestones_rendered(self):
+        """All milestone entries (date, title, description) appear in output."""
+        milestones = [
+            {"date": "Jan", "title": "Start", "description": "Kick off"},
+            {"date": "Feb", "title": "Dev", "description": "Development"},
+            {"date": "Mar", "title": "Ship", "description": "Launch"},
+        ]
+        html = scene_to_html(
+            title="Milestones",
+            kind="timeline",
+            payload={"milestones": milestones},
+            duration_frames=90,
+        )
+        for ms in milestones:
+            assert ms["date"] in html
+            assert ms["title"] in html
+            assert ms["description"] in html
+
+    def test_timeline_token_usage(self):
+        """Timeline uses shared theme tokens (fonts, colors)."""
+        tokens = animotion_theme_stub()
+        html = scene_to_html(
+            title="Token Check",
+            kind="timeline",
+            payload={"milestones": [{"date": "V1", "title": "Launch"}]},
+            duration_frames=60,
+        )
+        assert tokens.get("bodyFont", "Inter") in html
+        assert tokens.get("monoFont", "JetBrains Mono") in html
+        assert tokens.get("accentColor", "#4A90D9") in html
+
+    def test_timeline_frame_attributes(self):
+        """Timeline elements have data-start/data-end for frame-driven visibility."""
+        html = scene_to_html(
+            title="Frames",
+            kind="timeline",
+            payload={
+                "milestones": [
+                    {"date": "A", "title": "One"},
+                    {"date": "B", "title": "Two"},
+                    {"date": "C", "title": "Three"},
+                ],
+            },
+            duration_frames=100,
+        )
+        count_start = html.count("data-start")
+        assert count_start >= 5, f"Expected >=5 anim-elements, got {count_start}"
+        assert html.count("data-anim") == count_start
+
+    def test_timeline_empty_milestones(self):
+        """Timeline with no milestones renders gracefully."""
+        html = scene_to_html(
+            title="Empty Timeline",
+            kind="timeline",
+            payload={},
+            duration_frames=60,
+        )
+        assert "Empty Timeline" in html
+        assert "window.setFrame" in html
+        assert "No timeline data" in html
+
+    def test_timeline_max_milestones(self):
+        """Timeline caps at 10 milestones; excess ignored."""
+        many = [{"date": f"M{i}", "title": f"Milestone {i}"} for i in range(15)]
+        html = scene_to_html(
+            title="Many",
+            kind="timeline",
+            payload={"milestones": many},
+            duration_frames=120,
+        )
+        for i in range(10):
+            assert f"M{i}" in html
+        assert "M10" not in html
+
+    def test_timeline_recognized_kind(self):
+        """Timeline is a recognized kind that does not fall back to generic."""
+        html = scene_to_html(
+            title="Route Check",
+            kind="timeline",
+            payload={"milestones": [{"date": "D1", "title": "T1"}]},
+            duration_frames=60,
+        )
+        assert 'data-anim="expand"' in html
+        assert "D1" in html
+        assert "T1" in html
 
 
 class TestAnimotionRenderer:

@@ -582,6 +582,13 @@ def _build_animation_js(duration_frames: int) -> str:
       }} else if (anim === 'grow-up') {{
         el.style.opacity = 1;
         el.style.transform = 'scaleY(' + t + ')';
+      }} else if (anim === 'expand') {{
+        el.style.opacity = 1;
+        el.style.width = (t * 100) + '%';
+      }} else if (anim === 'progress') {{
+        el.style.opacity = 1;
+        el.style.display = '';
+        el.style.left = (t * 100) + '%';
       }} else {{
         el.style.opacity = t;
         el.style.transform = '';
