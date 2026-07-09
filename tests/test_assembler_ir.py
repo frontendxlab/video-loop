@@ -86,6 +86,104 @@ def test_director_routes_interactive_diagram_to_animotion():
 # ── Audio mux for Animotion scenes ──────────────────────────────────────────
 
 
+def test_legacy_remotion_serializes_audio_track_in_props(tmp_path: Path):
+    """Legacy Remotion path serializes AudioTrack to dict for json.dump.
+
+    Before fix, raw AudioTrack dataclass objects were placed in scene_props,
+    causing TypeError: Object of type AudioTrack is not JSON serializable.
+    """
+    scene = SceneDefinition(
+        type=SceneType.TITLE, duration=30, title="Legacy Remotion",
+    )
+    track = AudioTrack(src="/fake/audio.wav", startFrame=0, durationFrames=30)
+    video = VideoDefinition(
+        title="Test", scenes=[scene], audioTracks=[track],
+        captions=[], fps=30,
+    )
+
+    # Patch subprocess.run to avoid actual remotion call
+    with patch("subprocess.run") as mock_run:
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_run.return_value = mock_result
+
+        # Also patch output_path.exists to return True (remotion creates it)
+        # trigger the success path after subprocess.run
+        with patch("pathlib.Path.exists", return_value=True):
+            rendered = render_scenes(
+                video, remotion_dir=tmp_path / "remotion",
+                output_dir=tmp_path / "out", tmpdir=tmp_path / "tmp",
+            )
+
+    # Verify props file was written with valid JSON containing audio track
+    props_file = tmp_path / "out" / "props_0000.json"
+    assert props_file.exists(), "Props JSON should exist"
+    props = json.loads(props_file.read_text())
+    assert len(props["audioTracks"]) == 1
+    assert props["audioTracks"][0]["src"] == "/fake/audio.wav"
+    assert props["audioTracks"][0]["startFrame"] == 0
+    assert props["audioTracks"][0]["durationFrames"] == 30
+
+
+def test_legacy_remotion_serializes_no_audio_tracks_as_empty(tmp_path: Path):
+    """Legacy Remotion path with no audio tracks — audioTracks is empty list."""
+    scene = SceneDefinition(
+        type=SceneType.TITLE, duration=30, title="No Audio",
+    )
+    video = VideoDefinition(
+        title="Test", scenes=[scene], audioTracks=[],
+        captions=[], fps=30,
+    )
+
+    with patch("subprocess.run") as mock_run:
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_run.return_value = mock_result
+        with patch("pathlib.Path.exists", return_value=True):
+            rendered = render_scenes(
+                video, remotion_dir=tmp_path / "remotion",
+                output_dir=tmp_path / "out", tmpdir=tmp_path / "tmp",
+            )
+
+    props_file = tmp_path / "out" / "props_0000.json"
+    assert props_file.exists()
+    props = json.loads(props_file.read_text())
+    assert props["audioTracks"] == []
+    assert props["scenes"][0]["type"] == "title"
+
+
+def test_legacy_remotion_multiple_scenes_audio_tracks(tmp_path: Path):
+    """Each scene gets its own audio track in legacy Remotion path."""
+    s0 = SceneDefinition(type=SceneType.TITLE, duration=30, title="Scene 0")
+    s1 = SceneDefinition(type=SceneType.CODE, duration=60, title="Scene 1")
+    t0 = AudioTrack(src="/audio0.wav", startFrame=0, durationFrames=30)
+    t1 = AudioTrack(src="/audio1.wav", startFrame=0, durationFrames=60)
+    video = VideoDefinition(
+        title="Multi", scenes=[s0, s1], audioTracks=[t0, t1],
+        captions=[], fps=30,
+    )
+
+    with patch("subprocess.run") as mock_run:
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_run.return_value = mock_result
+        with patch("pathlib.Path.exists", return_value=True):
+            render_scenes(
+                video, remotion_dir=tmp_path / "remotion",
+                output_dir=tmp_path / "out", tmpdir=tmp_path / "tmp",
+            )
+
+    # Check props for scene 0
+    p0 = json.loads((tmp_path / "out" / "props_0000.json").read_text())
+    assert p0["audioTracks"][0]["src"] == "/audio0.wav"
+    assert p0["scenes"][0]["type"] == "title"
+
+    # Check props for scene 1
+    p1 = json.loads((tmp_path / "out" / "props_0001.json").read_text())
+    assert p1["audioTracks"][0]["src"] == "/audio1.wav"
+    assert p1["scenes"][0]["type"] == "code"
+
+
 def test_mux_audio_track_muxes_real_audio(tmp_path: Path):
     """_mux_audio_track replaces silent track with real audio via FFmpeg."""
     video = tmp_path / "scene.mp4"
