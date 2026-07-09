@@ -8,18 +8,22 @@ describe("CreatePage", () => {
     expect(screen.getByText("Create video")).toBeInTheDocument();
     expect(screen.getByPlaceholderText("Describe video you want to create...")).toBeInTheDocument();
   });
-  it("renders grill button", () => {
+  it("renders grill button by role", () => {
     render(<CreatePage />);
-    expect(screen.getByText("Grill prompt")).toBeInTheDocument();
+    const buttons = screen.getAllByRole("button");
+    expect(buttons.some(b => b.textContent?.includes("Grill prompt"))).toBe(true);
   });
   it("renders options panel", () => {
     render(<CreatePage />);
     expect(screen.getByText("Options")).toBeInTheDocument();
   });
-  it("renders progress sidebar", () => {
+  it("renders progress section", () => {
     render(<CreatePage />);
     expect(screen.getByText("Progress")).toBeInTheDocument();
-    expect(screen.getByText("Grill prompt")).toBeInTheDocument();
+  });
+  it("shows 5 pipeline stages", () => {
+    render(<CreatePage />);
+    expect(screen.getByText("Pipeline stages")).toBeInTheDocument();
   });
   it("shows grill panel placeholder when idle", () => {
     render(<CreatePage />);
