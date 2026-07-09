@@ -36,6 +36,10 @@ from videoforge.review.repair_actions import (
     execute_repair_plan,
 )
 from videoforge.review.rerender_orchestrator import run_orchestrated_review
+from videoforge.review.review_panel import (
+    ReviewPanel,
+    make_review_panel_from_report,
+)
 
 __all__ = [
     "FrameReviewer",
@@ -44,6 +48,7 @@ __all__ = [
     "OverlapGate",
     "RepairAction",
     "RepairHook",
+    "ReviewPanel",
     "ReviewVerdict",
     "aggregate",
     "build_provenance_scenes",
@@ -63,6 +68,7 @@ __all__ = [
     "layout_metadata_to_element_dicts",
     "ACTION_RERENDER",
     "ACTION_RERENDER_WITH_TOKEN_RESET",
+    "make_review_panel_from_report",
     "run_orchestrated_review",
     "scene_payload_to_layout_metadata",
     "should_repair",

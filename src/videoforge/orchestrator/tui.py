@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 import time
 from pathlib import Path
+from typing import Any
 
 from textual import work
 from textual.app import App, ComposeResult
@@ -20,6 +21,9 @@ from textual.screen import Screen
 from textual.widgets import Footer, Header, Input, ProgressBar, RichLog, Static
 
 from videoforge.orchestrator.runner import AgentLog, AgentStatus, Stage, StageState
+
+# Import review panel for integration into TUI screens
+from videoforge.review.review_panel import ReviewPanel, make_review_panel_from_report
 
 
 def status_color(status: AgentStatus) -> str:
@@ -68,6 +72,7 @@ class MainScreen(Screen):
             Horizontal(
                 VerticalScroll(id="pipeline-col", classes="panel"),
                 VerticalScroll(id="agents-col", classes="panel"),
+                VerticalScroll(id="review-col", classes="panel"),
                 id="top-row",
             ),
             RichLog(id="log-panel", highlight=True, markup=True, max_lines=1000),
@@ -81,6 +86,7 @@ class MainScreen(Screen):
         self._cmd = self.query_one("#cmd-input", Input)
         self._render_pipeline()
         self._render_agents()
+        self._render_review_column()
         self.title = "VideoForge Orchestrator v1.0"
         self._log("System", "Ready. Press p to start pipeline, q to quit.")
 
@@ -110,6 +116,81 @@ class MainScreen(Screen):
                 Static("idle", id=f"agent-status-{name}"),
                 id=f"agent-card-{name}", classes="agent-card",
             ))
+
+    def _render_review_column(self):
+        """Mount ReviewPanel in the review column (empty by default)."""
+        col = self.query_one("#review-col", VerticalScroll)
+        col.remove_children()
+        col.mount(Static("[bold]Review Controls[/]", classes="section-title"))
+        self._review_panel = ReviewPanel(
+            id="review-controls",
+            on_retry=self._on_review_retry,
+            on_reroute=self._on_review_reroute,
+            on_stop=self._on_review_stop,
+            on_repair=self._on_review_repair,
+        )
+        col.mount(self._review_panel)
+
+    def _update_review_panel(self, report_path: str | None = None, coherence_path: str | None = None):
+        """Update ReviewPanel from report JSON files.
+
+        Called during review stage — loads report artifact and refreshes
+        the review panel widget tree.
+        """
+        if not report_path:
+            self._review_panel.refresh_from(report={}, coherence={}, aggregate={})
+            return
+
+        from pathlib import Path
+
+        rp = Path(report_path)
+        if not rp.exists():
+            self._log("review", f"Report not found: {report_path}", "WARN")
+            return
+
+        import json
+        try:
+            with open(rp) as f:
+                report = json.load(f)
+        except (json.JSONDecodeError, OSError) as exc:
+            self._log("review", f"Failed to load report: {exc}", "ERROR")
+            return
+
+        coherence: dict[str, Any] = {}
+        if coherence_path:
+            cp = Path(coherence_path)
+            if cp.exists():
+                try:
+                    with open(cp) as f:
+                        coherence = json.load(f)
+                except (json.JSONDecodeError, OSError):
+                    pass
+
+        from videoforge.review.policy import aggregate as aggregate_verdict
+
+        agg = aggregate_verdict(
+            l0_result=report.get("l0_summary"),
+            l1_result=report.get("l1_summary"),
+            l2_result=report.get("l2_layout_overlap_summary"),
+            coherence_result=coherence or None,
+        )
+
+        self._review_panel.refresh_from(report=report, coherence=coherence, aggregate=agg)
+
+    # ── Review action callbacks ──
+
+    def _on_review_retry(self, scene_id: str) -> None:
+        self._log("review", f"Retry requested for scene {scene_id}", "WARN")
+
+    def _on_review_reroute(self, scene_id: str, engine: str) -> None:
+        self._log("review", f"Reroute scene {scene_id} to {engine}", "WARN")
+
+    def _on_review_stop(self) -> None:
+        self._log("review", "Stop requested", "ERROR")
+        self.action_cancel_pipeline()
+
+    def _on_review_repair(self, action: dict) -> None:
+        self._log("review", f"Repair action: {action}", "WARN")
 
     def _update_stage(self, stage: Stage, status: AgentStatus, progress: float = 0, msg: str = ""):
         w = self.query_one(f"#stage-{stage.value}", Static)
@@ -202,11 +283,25 @@ class MainScreen(Screen):
 
             # Review
             self.call_from_thread(self._log, "review-agent", "L1 Frame Review: 0 issues")
-            self.call_from_thread(self._update_stage, Stage.REVIEW, AgentStatus.RUNNING, 0.5, "Checking...")
+            self.call_from_thread(self._update_stage, Stage.REVIEW, AgentStatus.RUNNING, 0.3, "Loading report...")
             self.call_from_thread(self._update_agent, "review-agent", AgentStatus.RUNNING, "checking")
-            await asyncio.sleep(1)
-            self.call_from_thread(self._update_stage, Stage.REVIEW, AgentStatus.COMPLETE, 1.0, "Passed ✓")
-            self.call_from_thread(self._update_agent, "review-agent", AgentStatus.COMPLETE, "passed")
+
+            # Load report into review panel
+            report_path = str(Path("test.mp4.report.json").resolve())
+            coherence_path = str(Path("videos/claude-architect-fundamentals.mp4.report.json").resolve())
+            self.call_from_thread(self._update_review_panel, report_path, coherence_path)
+            await asyncio.sleep(0.5)
+
+            self.call_from_thread(self._log, "review-agent", "L0 Visual: 2 issues found")
+            self.call_from_thread(self._update_stage, Stage.REVIEW, AgentStatus.RUNNING, 0.7, "Issues found")
+            await asyncio.sleep(0.5)
+
+            self.call_from_thread(self._log, "review-agent", "Repair plan built: rerender blank frames")
+            self.call_from_thread(self._update_stage, Stage.REVIEW, AgentStatus.RUNNING, 0.9, "Repairing...")
+            await asyncio.sleep(0.5)
+
+            self.call_from_thread(self._update_stage, Stage.REVIEW, AgentStatus.COMPLETE, 1.0, "Review complete")
+            self.call_from_thread(self._update_agent, "review-agent", AgentStatus.COMPLETE, "done")
 
             # Done
             self.call_from_thread(self._update_stage, Stage.DONE, AgentStatus.COMPLETE, 1.0, "Video ready!")
@@ -229,13 +324,16 @@ class VideoForgeTUI(App):
         margin-bottom: 1;
     }
     .panel {
-        width: 50%;
+        width: 33%;
         border: solid #4a90d9;
         padding: 0 1;
         overflow-y: auto;
     }
     #agents-col {
         border: solid #7c5cbf;
+    }
+    #review-col {
+        border: solid #2d8a4e;
     }
     .section-title {
         text-align: center;
@@ -270,6 +368,125 @@ class VideoForgeTUI(App):
     }
     Header { background: #0f0f23; }
     Footer { background: #0f0f23; }
+
+    /* ── Review panel styling ────────────────────────────── */
+    #review-controls {
+        height: 100%;
+    }
+    #verdict-banner {
+        border: solid #4a90d9;
+        padding: 1;
+        margin-bottom: 1;
+        text-align: center;
+    }
+    .verdict-text {
+        text-style: bold;
+        text-align: center;
+    }
+    .verdict-levels {
+        text-align: center;
+        margin-top: 1;
+    }
+    .verdict-extras {
+        text-align: center;
+        margin-top: 1;
+    }
+    .level-cards {
+        margin-bottom: 1;
+    }
+    .level-card {
+        border: solid #3a3a5e;
+        padding: 0 1;
+        margin-bottom: 1;
+    }
+    .card-header {
+        height: 1;
+    }
+    .card-title {
+        width: 70%;
+    }
+    .status-badge {
+        width: 30%;
+        text-align: right;
+    }
+    .severity-tag {
+        width: 8;
+    }
+    .card-issue {
+        height: 1;
+        margin-left: 1;
+    }
+    .card-issue-text {
+        width: 1fr;
+    }
+    .card-meta, .card-more, .card-severity {
+        margin-left: 1;
+    }
+    .card-issues-label {
+        margin-top: 1;
+    }
+    .repair-plan {
+        margin-bottom: 1;
+    }
+    .repair-action-card {
+        border: solid #5a3a3e;
+        padding: 0 1;
+        margin-bottom: 1;
+    }
+    .repair-action-desc {
+        margin-bottom: 1;
+    }
+    .repair-btn {
+        width: 100%;
+    }
+    .action-bar-buttons {
+        height: 3;
+        margin-bottom: 1;
+    }
+    .action-bar-buttons Button {
+        width: 1fr;
+        margin: 0 1;
+    }
+    .scene-artifacts {
+        margin-bottom: 1;
+    }
+    .scene-ref {
+        height: 1;
+        margin-left: 1;
+    }
+    .scene-ref-status {
+        width: 10;
+        text-align: right;
+    }
+    .empty-state {
+        text-align: center;
+        color: #666;
+        margin: 1 0;
+    }
+    .count-badge {
+        margin-left: 1;
+    }
+    .artifact-count {
+        margin-left: 1;
+    }
+
+    /* ── Responsive collapse for narrow terminals ────────── */
+    @media (max-width: 120) {
+        .panel {
+            width: 50%;
+        }
+        #review-col {
+            display: none;
+        }
+    }
+    @media (max-width: 80) {
+        .panel {
+            width: 100%;
+        }
+        #agents-col {
+            display: none;
+        }
+    }
     """
 
     def on_mount(self):
