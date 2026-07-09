@@ -1,5 +1,6 @@
+import { useState, useCallback } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowLeft, RefreshCw } from "lucide-react";
+import { ArrowLeft, RefreshCw, Square, RotateCcw } from "lucide-react";
 import { getJob } from "@/data/mock";
 import { useSSE } from "@/hooks/useSSE";
 import { JobStatusBadge } from "@/components/jobs/JobStatusBadge";
@@ -11,6 +12,7 @@ import { StageTimeline } from "@/components/job-detail/StageTimeline";
 import { EventLog } from "@/components/job-detail/EventLog";
 import { SubagentCard } from "@/components/job-detail/SubagentCard";
 import { SceneTable } from "@/components/job-detail/SceneTable";
+import { stopJob, retryJob } from "@/lib/api";
 
 export const Route = createFileRoute("/jobs/$jobId")({
   component: JobDetailPage,
@@ -20,6 +22,21 @@ function JobDetailPage() {
   const { jobId } = Route.useParams();
   const job = getJob(jobId);
   const { events, connected } = useSSE(jobId, { enabled: job?.status === "running" });
+  const [actionState, setActionState] = useState<string | null>(null);
+
+  const handleStop = useCallback(async () => {
+    setActionState("stopping");
+    const res = await stopJob(jobId);
+    setActionState(res ? "stopped" : "error");
+    if (res) setTimeout(() => setActionState(null), 3000);
+  }, [jobId]);
+
+  const handleRetry = useCallback(async () => {
+    setActionState("retrying");
+    const res = await retryJob(jobId);
+    setActionState(res ? "retried" : "error");
+    if (res) setTimeout(() => setActionState(null), 3000);
+  }, [jobId]);
 
   if (!job) {
     return (
@@ -34,6 +51,9 @@ function JobDetailPage() {
   }
 
   const allEvents = [...job.events, ...events];
+
+  const isRunning = job.status === "running";
+  const isFailed = job.status === "failed";
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
@@ -94,13 +114,36 @@ function JobDetailPage() {
 
       <Card>
         <CardHeader><CardTitle className="text-sm">Scenes</CardTitle></CardHeader>
-        <CardContent><SceneTable scenes={job.scenes} /></CardContent>
+        <CardContent><SceneTable scenes={job.scenes} jobId={jobId} /></CardContent>
       </Card>
 
       <div className="flex gap-3">
         <button onClick={() => window.location.reload()} className="inline-flex items-center gap-1 rounded-md border px-3 py-1.5 text-sm hover:bg-accent">
           <RefreshCw className="h-4 w-4" /> Refresh
         </button>
+
+        {isRunning && (
+          <button
+            onClick={handleStop}
+            disabled={actionState === "stopping"}
+            className="inline-flex items-center gap-1 rounded-md border border-destructive/50 px-3 py-1.5 text-sm text-destructive hover:bg-destructive/10 disabled:opacity-50"
+          >
+            <Square className="h-4 w-4" />
+            {actionState === "stopping" ? "Stopping..." : actionState === "stopped" ? "Stopped" : "Stop"}
+          </button>
+        )}
+
+        {isFailed && (
+          <button
+            onClick={handleRetry}
+            disabled={actionState === "retrying"}
+            className="inline-flex items-center gap-1 rounded-md border border-amber-500/50 px-3 py-1.5 text-sm text-amber-500 hover:bg-amber-500/10 disabled:opacity-50"
+          >
+            <RotateCcw className="h-4 w-4" />
+            {actionState === "retrying" ? "Retrying..." : actionState === "retried" ? "Retried" : "Retry"}
+          </button>
+        )}
+
         <span className="self-center text-xs text-muted-foreground">{allEvents.length} events captured</span>
       </div>
     </div>

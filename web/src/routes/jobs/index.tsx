@@ -1,9 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { PlusCircle } from "lucide-react";
-import { useState } from "react";
-import type { JobStatus } from "@/types/job";
-import { getJobs } from "@/data/mock";
+import { useEffect, useState } from "react";
+import type { Job, JobStatus } from "@/types/job";
+import { fetchJobs } from "@/lib/api";
 import { JobCard } from "@/components/jobs/JobCard";
 import { Badge } from "@/components/ui/badge";
 
@@ -14,8 +14,17 @@ export const Route = createFileRoute("/jobs/")({
 });
 
 function JobsPage() {
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<JobStatus | "all">("all");
-  const jobs = getJobs();
+
+  useEffect(() => {
+    fetchJobs().then((data) => {
+      setJobs(data);
+      setLoading(false);
+    });
+  }, []);
+
   const filtered = filter === "all" ? jobs : jobs.filter((j) => j.status === filter);
 
   return (
@@ -23,9 +32,11 @@ function JobsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Jobs</h1>
-          <p className="text-sm text-muted-foreground">
-            {jobs.length} total · {jobs.filter((j) => j.status === "running").length} active
-          </p>
+          {!loading && (
+            <p className="text-sm text-muted-foreground">
+              {jobs.length} total · {jobs.filter((j) => j.status === "running").length} active
+            </p>
+          )}
         </div>
         <Button><PlusCircle className="mr-1 h-4 w-4" /> New Job</Button>
       </div>
@@ -38,7 +49,9 @@ function JobsPage() {
           </button>
         ))}
       </div>
-      {filtered.length === 0 ? (
+      {loading ? (
+        <div className="rounded-lg border p-8 text-center text-sm text-muted-foreground">Loading jobs…</div>
+      ) : filtered.length === 0 ? (
         <div className="rounded-lg border p-8 text-center text-sm text-muted-foreground">No jobs yet.</div>
       ) : (
         <div className="space-y-3">{filtered.map((job) => <JobCard key={job.id} job={job} />)}</div>
