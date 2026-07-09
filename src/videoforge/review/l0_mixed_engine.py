@@ -100,7 +100,7 @@ class L0MixedEngineReview:
 
         if not video_streams:
             return {
-                "issues": [{"type": "no_video_stream", "detail": "No video stream found in file"}],
+                "issues": [{"type": "no_video_stream", "detail": "No video stream found in file", "severity": "high"}],
                 "passed": False,
                 "sampled_frames": 0,
                 "total_frames": total_frames,

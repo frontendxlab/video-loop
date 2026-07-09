@@ -99,6 +99,29 @@ class FrameReviewer:
         """
         return self._l0.run(video_path)
 
+    @staticmethod
+    def evaluate_l0_policy(result: dict[str, Any]) -> str:
+        """Evaluate L0 issues against severity-based gate policy.
+
+        Policy:
+            - 0 issues                              → "pass"
+            - only "low" severity issues             → "warn"
+            - any "medium" severity issues           → "warn"
+            - any "high" severity issues             → "fail"
+
+        Returns:
+            One of "pass", "warn", "fail".
+        """
+        issues = result.get("issues", [])
+        if not issues:
+            return "pass"
+        severities = {i.get("severity", "low") for i in issues}
+        if "high" in severities:
+            return "fail"
+        if "medium" in severities:
+            return "warn"
+        return "warn"  # low only
+
     def aggregate_review(
         self, video_path: str, input_props: dict | None = None
     ) -> dict[str, Any]:

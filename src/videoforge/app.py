@@ -112,16 +112,42 @@ def render(
 def review(
     video: Annotated[str, typer.Argument(help="Video file path")],
 ):
-    """Review video quality (L1 frame check)."""
+    """Review video quality (L0 mixed-engine + L1 frame check)."""
     from videoforge.review.frame_reviewer import FrameReviewer
     fr = FrameReviewer()
-    result = fr.check_integrity(video)
-    if result.get("passed"):
-        logger.info("L1 Review: PASSED — %d frames, 0 issues", result.get("total_frames", 0))
+
+    # L0: Mixed-engine review
+    l0_result = fr.check_mixed_engine(video)
+    l0_status = fr.evaluate_l0_policy(l0_result)
+    logger.info("L0 Mixed-Engine: status=%s issues=%d sampled=%d total=%d",
+                l0_status, len(l0_result.get("issues", [])),
+                l0_result.get("sampled_frames", 0), l0_result.get("total_frames", 0))
+
+    # L1: Frame integrity
+    l1_result = fr.check_integrity(video)
+    l1_passed = l1_result.get("passed", False)
+    l1_label = "PASSED" if l1_passed else "FAILED"
+    logger.info("L1 Frame Integrity: %s — %d frames, %d issues",
+                l1_label, l1_result.get("total_frames", 0), len(l1_result.get("issues", [])))
+
+    # Combine results
+    all_passed = l0_status == "pass" and l1_passed
+    all_issues = l0_result.get("issues", []) + l1_result.get("issues", [])
+
+    if all_passed:
+        logger.info("Review: PASSED — 0 issues across all gates")
     else:
-        logger.error("L1 Review: FAILED — %d issues", len(result.get("issues", [])))
-        for issue in result.get("issues", []):
-            logger.error("  %s", issue)
+        logger.warning("Review: %s — %d total issues (L0=%s, L1=%s)",
+                       "FAIL" if l0_status == "fail" else "WARN",
+                       len(all_issues), l0_status, l1_label)
+        for issue in all_issues:
+            sev = issue.get("severity", "?")
+            typ = issue.get("type", "?")
+            logger.warning("  [%s] %s: %s", sev, typ, issue.get("detail", ""))
+
+    # Fail CLI on L0 high-severity issues
+    if l0_status == "fail":
+        raise typer.Exit(1)
 
 
 @app.command()
@@ -152,8 +178,16 @@ def pipeline(
     Path(video_json).write_text(json.dumps(video_def.to_remotion_props(), indent=2))
     render.callback(video=video_json, output=output)
 
-    # Step 5: Review
-    review.callback(video=output)
+    # Step 5: Review (L0 mixed-engine + L1 frame integrity)
+    from videoforge.review.frame_reviewer import FrameReviewer
+    fr = FrameReviewer()
+    l0_result = fr.check_mixed_engine(output)
+    l0_status = fr.evaluate_l0_policy(l0_result)
+    l1_result = fr.check_integrity(output)
+    l1_passed = l1_result.get("passed", False)
+    logger.info("Pipeline Review — L0=%s (%d issues), L1=%s (%d issues)",
+                l0_status, len(l0_result.get("issues", [])),
+                "PASSED" if l1_passed else "FAILED", len(l1_result.get("issues", [])))
 
 
 def _load_video_def(path: str | Path) -> VideoDefinition:

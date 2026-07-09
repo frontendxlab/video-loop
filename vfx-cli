@@ -254,17 +254,31 @@ def wizard():
         dur = float(probe_info.get("format", {}).get("duration", 0))
         ok(f"Video: {final} ({mb:.1f}MB, {dur:.1f}s = {dur/60:.1f} min)")
 
-    # Step 7: Review
+    # Step 7: Review (L0 mixed-engine + L1 frame integrity)
     print(f"\n  {B}── Step 6: Quality Review ──{N}")
-    log("review-agent", "Running L1 Frame Review...")
+    log("review-agent", "Running L0 Mixed-Engine + L1 Frame Review...")
     try:
         from videoforge.review.frame_reviewer import FrameReviewer
         fr = FrameReviewer()
+
+        l0 = fr.check_mixed_engine(str(final))
+        l0_st = fr.evaluate_l0_policy(l0)
+        l0_issues = l0.get("issues", [])
+        if l0_st == "pass":
+            ok(f"L0 Mixed-Engine: {l0.get('sampled_frames', 0)} frames sampled — clean")
+        else:
+            w = warn if l0_st == "warn" else lambda m: (warn(m), None)
+            w(f"L0 Mixed-Engine: {l0_st.upper()} — {len(l0_issues)} issues")
+            for iss in l0_issues:
+                info(f"  [{iss.get('severity','?')}] {iss.get('type','?')}: {iss.get('detail','')}")
+            if l0_st == "fail":
+                warn("L0 gate FAILED — video may have visual defects")
+
         l1 = fr.check_integrity(str(final))
         if l1.get("passed"):
-            ok(f"L1 Review: PASSED — {l1.get('total_frames', 0)} frames, 0 issues")
+            ok(f"L1 Frame Review: {l1.get('total_frames', 0)} frames — passed")
         else:
-            warn(f"L1 Review: FAILED — {len(l1.get('issues', []))} issues")
+            warn(f"L1 Frame Review: FAILED — {len(l1.get('issues', []))} issues")
     except Exception as e:
         warn(f"Review error: {e}")
 

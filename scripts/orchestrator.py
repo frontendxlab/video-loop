@@ -208,12 +208,21 @@ def build(
     else:
         logger.error("No scenes rendered")
 
-    # Step 5: Review
+    # Step 5: Review (L0 mixed-engine + L1 frame integrity)
     try:
         from videoforge.review.frame_reviewer import FrameReviewer
         fr = FrameReviewer()
+        l0 = fr.check_mixed_engine(str(output))
+        l0_status = fr.evaluate_l0_policy(l0)
+        logger.info("L0 Mixed-Engine: status=%s, issues=%d, sampled=%d",
+                    l0_status, len(l0.get("issues", [])), l0.get("sampled_frames", 0))
+        if l0.get("issues"):
+            for issue in l0["issues"]:
+                logger.warning("  [%s] %s: %s", issue.get("severity", "?"),
+                               issue.get("type", "?"), issue.get("detail", ""))
         l1 = fr.check_integrity(str(output))
-        logger.info("L1 Review: passed=%s, frames=%d, issues=%d", l1.get("passed"), l1.get("total_frames", 0), len(l1.get("issues", [])))
+        logger.info("L1 Frame Integrity: passed=%s, frames=%d, issues=%d",
+                    l1.get("passed"), l1.get("total_frames", 0), len(l1.get("issues", [])))
     except Exception as e:
         logger.warning("Review skipped: %s", e)
 

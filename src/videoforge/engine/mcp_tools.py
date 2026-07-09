@@ -175,22 +175,38 @@ def engine_generate_manim(
 def engine_review_video(
     video_path: str,
 ) -> dict:
-    """Run L1 Frame Review on a rendered video.
+    """Run full video review (L0 mixed-engine + L1 frame integrity).
+
+    L0 samples N frames from the video and checks for blank frames,
+    resolution mismatches, palette drift, and freeze. L1 runs ffprobe
+    black/frozen frame detection.
 
     Args:
         video_path: Path to the video file.
 
     Returns:
-        Review results with pass/fail per check.
+        Review results with pass/fail per check level.
     """
     from videoforge.review.frame_reviewer import FrameReviewer
     fr = FrameReviewer()
-    result = fr.check_integrity(video_path)
+    l0_result = fr.check_mixed_engine(video_path)
+    l0_status = fr.evaluate_l0_policy(l0_result)
+    l1_result = fr.check_integrity(video_path)
     return {
-        "passed": result.get("passed", False),
-        "total_frames": result.get("total_frames", 0),
-        "issues": len(result.get("issues", [])),
-        "details": result.get("issues", []),
+        "l0_mixed_engine": {
+            "status": l0_status,
+            "issues": len(l0_result.get("issues", [])),
+            "sampled_frames": l0_result.get("sampled_frames", 0),
+            "total_frames": l0_result.get("total_frames", 0),
+            "details": l0_result.get("issues", []),
+        },
+        "l1_frame_integrity": {
+            "passed": l1_result.get("passed", False),
+            "total_frames": l1_result.get("total_frames", 0),
+            "issues": len(l1_result.get("issues", [])),
+            "details": l1_result.get("issues", []),
+        },
+        "passed": l0_status == "pass" and l1_result.get("passed", False),
     }
 
 

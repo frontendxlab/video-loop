@@ -164,11 +164,18 @@ def build_video(
     if not out.exists():
         raise RuntimeError("Render completed but no output file found")
 
-    # Run L1 Frame Review
+    # Run L0 Mixed-Engine + L1 Frame Review
     try:
         sys.path.insert(0, str(Path(__file__).parent.parent))
         from videoforge.review.frame_reviewer import FrameReviewer
         fr = FrameReviewer()
+        l0 = fr.check_mixed_engine(str(out))
+        l0_st = fr.evaluate_l0_policy(l0)
+        print(f"L0 Mixed-Engine: status={l0_st}, {len(l0.get('issues',[]))} issues, "
+              f"{l0.get('sampled_frames',0)} frames sampled")
+        if l0.get("issues"):
+            for iss in l0["issues"]:
+                print(f"  [{iss.get('severity','?')}] {iss.get('type','?')}: {iss.get('detail','')}")
         review = fr.check_integrity(str(out))
         if not review.get("passed", False):
             print(f"WARNING: L1 Frame Review failed: {review.get('issues', [])}")

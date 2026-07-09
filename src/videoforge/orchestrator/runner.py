@@ -126,12 +126,31 @@ class PipelineRunner:
         if self._cancel_flag: return
         self._set_stage(Stage.CONCAT, AgentStatus.COMPLETE, 1.0, "Video assembled")
 
-        # Stage 7: Review
+        # Stage 7: Review (L0 mixed-engine + L1 frame integrity)
         self._set_stage(Stage.REVIEW, AgentStatus.RUNNING, message="Running quality checks...")
-        self._log("review-agent", "Running L1 Frame Review...")
-        await asyncio.sleep(1)
+        self._log("review-agent", "Running L0 Mixed-Engine + L1 Frame Review...")
+        try:
+            from videoforge.review.frame_reviewer import FrameReviewer
+            fr = FrameReviewer()
+            output_path = f"/tmp/vfx-{topic.lower().replace(' ', '-')[:32]}/output.mp4"
+            l0_result = fr.check_mixed_engine(output_path)
+            l0_status = fr.evaluate_l0_policy(l0_result)
+            self._log("review-agent",
+                      f"L0: {l0_status}, {len(l0_result.get('issues',[]))} issues, "
+                      f"{l0_result.get('sampled_frames',0)} frames sampled")
+            l1_result = fr.check_integrity(output_path)
+            l1_passed = l1_result.get("passed", False)
+            self._log("review-agent",
+                      f"L1: {'PASSED' if l1_passed else 'FAILED'}, "
+                      f"{l1_result.get('total_frames',0)} frames")
+            if l0_status == "fail":
+                self._log("review-agent", "L0 gate FAILED — visual defects detected", "WARN")
+            self._set_stage(Stage.REVIEW, AgentStatus.COMPLETE, 1.0,
+                            f"L0={l0_status}, L1={'ok' if l1_passed else 'issues'}")
+        except Exception as e:
+            self._log("review-agent", f"Review error: {e}", "ERROR")
+            self._set_stage(Stage.REVIEW, AgentStatus.COMPLETE, 1.0, "Checks skipped (error)")
         if self._cancel_flag: return
-        self._set_stage(Stage.REVIEW, AgentStatus.COMPLETE, 1.0, "All checks passed")
 
         # Done
         self._set_stage(Stage.DONE, AgentStatus.COMPLETE, 1.0, "Video generation complete")
