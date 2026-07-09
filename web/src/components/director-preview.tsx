@@ -36,7 +36,7 @@ export function DirectorPreview({ project }: DirectorPreviewProps) {
   const engineCounts = useMemo(() => {
     const counts: Record<string, number> = { [Engine.REMOTION]: 0, [Engine.MANIM]: 0, [Engine.ANIMOTION]: 0 }
     let total = 0
-    for (const s of scenesWithHash) { counts[pickEngine(s)]++; total++ }
+    for (const s of scenesWithHash) { counts[s.routedEngine ?? pickEngine(s)]++; total++ }
     return { counts, total }
   }, [scenesWithHash])
 

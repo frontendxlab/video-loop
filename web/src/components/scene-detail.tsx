@@ -19,7 +19,7 @@ export function SceneDetail({ scene }: SceneDetailProps) {
     return <div className="flex items-center justify-center h-full min-h-[300px] text-muted-foreground text-sm">Select a scene from the graph to view details</div>
   }
 
-  const engine = pickEngine(scene)
+  const engine = scene.routedEngine ?? pickEngine(scene)
   const engineMeta = ENGINE_META[engine]
   const reason = getRoutingReason(scene)
   const seconds = Math.round(scene.duration_frames / 30)

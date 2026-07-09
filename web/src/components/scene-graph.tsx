@@ -32,7 +32,7 @@ export function SceneGraph({ scenes, selectedId, onSelect }: SceneGraphProps) {
   return (
     <div className="space-y-1.5" role="list" aria-label="Scene graph">
       {scenes.map((scene, idx) => {
-        const engine = pickEngine(scene)
+        const engine = scene.routedEngine ?? pickEngine(scene)
         const kindMeta = KIND_META[scene.kind] ?? KIND_META[SceneKind.TITLE]
         const engineMeta = ENGINE_META[engine]
         const seconds = Math.round(scene.duration_frames / 30)

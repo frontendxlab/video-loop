@@ -47,6 +47,7 @@ export interface SceneNode {
   duration_frames: number
   narration: NarrationSpec
   contentHash?: string
+  routedEngine?: Engine
 }
 
 export interface VideoProject {

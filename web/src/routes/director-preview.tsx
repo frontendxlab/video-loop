@@ -1,10 +1,11 @@
+import { useEffect, useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { DirectorPreview } from '@/components/director-preview'
 import { Engine, SceneKind, type VideoProject } from '@/lib/ir-types'
 
 export const Route = createFileRoute('/director-preview')({ component: DirectorPreviewRoute })
 
-const SAMPLE_DATA: VideoProject = {
+const FALLBACK_DATA: VideoProject = {
   title: 'Introduction to Quantum Computing', fps: 30, width: 1920, height: 1080,
   audio_tracks: [{ src: 'tts/output.wav', startFrame: 0, durationFrames: 540 }],
   scenes: [
@@ -17,14 +18,74 @@ const SAMPLE_DATA: VideoProject = {
 }
 
 function DirectorPreviewRoute() {
+  const [project, setProject] = useState<VideoProject | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    setError(null)
+
+    fetch('/api/director/preview')
+      .then(res => {
+        if (!res.ok) throw new Error(`Backend returned ${res.status}`)
+        return res.json() as Promise<VideoProject>
+      })
+      .then(data => { if (!cancelled) setProject(data) })
+      .catch(err => {
+        if (cancelled) return
+        console.warn('Director preview backend unavailable, using fallback:', err)
+        setProject(FALLBACK_DATA)
+        setError('Using local sample data — backend preview endpoint unavailable')
+      })
+      .finally(() => { if (!cancelled) setLoading(false) })
+
+    return () => { cancelled = true }
+  }, [])
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background p-4 md:p-6">
+        <div className="max-w-6xl mx-auto">
+          <div className="mb-6">
+            <h1 className="text-2xl font-bold text-foreground">Director Preview</h1>
+          </div>
+          <div className="flex items-center justify-center h-64 text-muted-foreground">
+            <div className="flex flex-col items-center gap-2">
+              <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+              <p className="text-sm">Loading preview from backend...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (!project) {
+    return (
+      <div className="min-h-screen bg-background p-4 md:p-6">
+        <div className="max-w-6xl mx-auto">
+          <div className="mb-6">
+            <h1 className="text-2xl font-bold text-foreground">Director Preview</h1>
+          </div>
+          <div className="flex items-center justify-center h-64 text-muted-foreground">
+            <p>No preview data available.</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-background p-4 md:p-6">
       <div className="max-w-6xl mx-auto">
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-foreground">Director Preview</h1>
           <p className="text-sm text-muted-foreground mt-1">Scene graph, engine routing, and scene detail inspection</p>
+          {error && <p className="text-xs text-amber-500 mt-1">{error}</p>}
         </div>
-        <DirectorPreview project={SAMPLE_DATA} />
+        <DirectorPreview project={project} />
       </div>
     </div>
   )
