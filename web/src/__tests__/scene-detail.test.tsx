@@ -25,7 +25,7 @@ describe('SceneDetail', () => {
   it('renders scene id and kind', () => {
     render(<SceneDetail scene={makeScene()} />)
     expect(screen.getByText('scene_test')).toBeInTheDocument()
-    expect(screen.getByText('code')).toBeInTheDocument()
+    expect(screen.getByText(/^code/)).toBeInTheDocument()
   })
 
   it('renders content hash', () => {
@@ -40,7 +40,7 @@ describe('SceneDetail', () => {
 
   it('renders engine routing info', () => {
     render(<SceneDetail scene={makeScene()} />)
-    expect(screen.getByText(/Remotion/)).toBeInTheDocument()
+    expect(screen.getAllByText(/Remotion/).length).toBeGreaterThanOrEqual(1)
   })
 
   it('renders narration text', () => {

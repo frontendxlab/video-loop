@@ -1,11 +1,20 @@
-import { describe, it, expect } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { render, screen, waitFor } from "@testing-library/react";
 import { SettingsPage } from "@/lib/contracts/settings-page";
 import {
   DEFAULT_SETTINGS,
   SettingsSchema,
   RunOverrideSchema,
 } from "@/lib/contracts/settings";
+import type { Settings } from "@/lib/contracts/settings";
+
+/* Mock fetch so SettingsPage loads data immediately */
+function mockFetchSettings(data?: Partial<Settings>) {
+  return vi.spyOn(globalThis, "fetch").mockResolvedValue({
+    ok: true,
+    json: () => Promise.resolve({ ...DEFAULT_SETTINGS, ...data }),
+  } as Response);
+}
 
 /* ─── Contract validation ─── */
 
@@ -134,43 +143,49 @@ describe("RunOverrideSchema", () => {
 /* ─── UI rendering ─── */
 
 describe("SettingsPage", () => {
-  it("renders heading", () => {
-    render(<SettingsPage />);
-    expect(screen.getByText("Settings")).toBeInTheDocument();
+  beforeEach(() => {
+    mockFetchSettings();
   });
 
-  it("renders all four tab triggers", () => {
+  it("renders heading", async () => {
     render(<SettingsPage />);
-    expect(screen.getByText("Queue")).toBeInTheDocument();
+    expect(await screen.findByText("Settings")).toBeInTheDocument();
+  });
+
+  it("renders all four tab triggers", async () => {
+    render(<SettingsPage />);
+    expect(await screen.findByText("Queue")).toBeInTheDocument();
     expect(screen.getByText("Retry")).toBeInTheDocument();
     expect(screen.getByText("Review")).toBeInTheDocument();
   });
 
-  it("renders provider and model controls", () => {
+  it("renders provider and model controls", async () => {
     render(<SettingsPage />);
-    expect(screen.getByLabelText("LLM Provider")).toBeInTheDocument();
+    expect(await screen.findByLabelText("LLM Provider")).toBeInTheDocument();
     expect(screen.getByLabelText("Model")).toBeInTheDocument();
   });
 
-  it("renders save and reset buttons", () => {
+  it("renders save and reset buttons", async () => {
     render(<SettingsPage />);
-    expect(screen.getByText("Save Settings")).toBeInTheDocument();
+    expect(await screen.findByText("Save Settings")).toBeInTheDocument();
     expect(screen.getByText("Reset to Defaults")).toBeInTheDocument();
   });
 
-  it("renders API key placeholder", () => {
+  it("renders API key placeholder", async () => {
     render(<SettingsPage />);
-    expect(screen.getByLabelText("API Key")).toBeInTheDocument();
+    expect(await screen.findByLabelText("API Key")).toBeInTheDocument();
   });
 
-  it("renders temperature slider", () => {
+  it("renders temperature slider", async () => {
     render(<SettingsPage />);
-    const slider = document.querySelector('[id="temperature"]');
-    expect(slider).toBeInTheDocument();
+    await waitFor(() => {
+      const slider = document.querySelector('[id="temperature"]');
+      expect(slider).toBeInTheDocument();
+    });
   });
 
-  it("renders max tokens input", () => {
+  it("renders max tokens input", async () => {
     render(<SettingsPage />);
-    expect(screen.getByLabelText(/max tokens/i)).toBeInTheDocument();
+    expect(await screen.findByLabelText(/max tokens/i)).toBeInTheDocument();
   });
 });

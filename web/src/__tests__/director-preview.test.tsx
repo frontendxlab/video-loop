@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { Engine, SceneKind, computeSceneHash, computeProjectHash, type SceneNode, type VideoProject } from '@/lib/ir-types'
 import { pickEngine, getRoutingReason } from '@/lib/director'
@@ -92,6 +92,22 @@ describe('SceneDetail', () => {
     expect(screen.getByText(/Test/)).toBeDefined()
   })
   it('renders copy hash button', () => { render(<SceneDetail scene={{ ...makeScene(), contentHash: 'aabbccdd11223344' }} />); expect(screen.getByLabelText('Copy hash')).toBeDefined() })
+  it('shows load report button when jobId provided', () => { render(<SceneDetail scene={makeScene()} jobId="job_001" />); expect(screen.getByText('Load Report')).toBeDefined() })
+  it('hides no-image text when jobId provided', () => { render(<SceneDetail scene={makeScene()} jobId="job_001" />); expect(screen.queryByText('No image endpoint available yet')).toBeNull() })
+  it('shows no-image text when jobId absent', () => { render(<SceneDetail scene={makeScene()} />); expect(screen.getByText('No image endpoint available yet')).toBeDefined() })
+  it('loads and displays report on button click', async () => {
+    const fakeReport = { artifact: 'videoforge-scene-report', engine: 'remotion' }
+    globalThis.fetch = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve(fakeReport) })
+    render(<SceneDetail scene={makeScene()} jobId="job_001" />)
+    fireEvent.click(screen.getByText('Load Report'))
+    await screen.findByText(/"engine": "remotion"/)
+  })
+  it('shows report fallback when fetch fails', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({ ok: false })
+    render(<SceneDetail scene={makeScene()} jobId="job_001" />)
+    fireEvent.click(screen.getByText('Load Report'))
+    await screen.findByText('Report not yet generated')
+  })
 })
 
 describe('DirectorPreview', () => {

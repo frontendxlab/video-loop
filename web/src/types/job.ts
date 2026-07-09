@@ -26,6 +26,9 @@ export interface SceneInfo {
   status: 'pending' | 'rendering' | 'completed' | 'failed'
   reviewIssues: number
   retryCount: number
+  thumbnailUrl?: string
+  frameUrl?: string
+  reportUrl?: string
 }
 
 export interface Job {
