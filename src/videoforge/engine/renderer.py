@@ -76,8 +76,25 @@ def _matches_pinned(fmt: dict[str, Any] | None) -> bool:
     )
 
 
+def _track_count(video: VideoDefinition | VideoProject) -> int:
+    """Number of audio tracks — works for both legacy VideoDefinition and VideoProject IR."""
+    if isinstance(video, VideoProject):
+        return len(video.audio_tracks)
+    return len(video.audioTracks)
+
+
+def _get_track(video: VideoDefinition | VideoProject, index: int) -> Any | None:
+    """Get audio track by index — works for both legacy and IR."""
+    if isinstance(video, VideoProject):
+        if index < len(video.audio_tracks):
+            return video.audio_tracks[index]
+    elif index < len(video.audioTracks):
+        return video.audioTracks[index]
+    return None
+
+
 def _mux_audio_track(
-    track: Any,  # AudioTrack (avoid import cycle)
+    track: Any,  # AudioTrack or AudioTrackIR
     output_path: Path,
     output_dir: Path,
     index: int,
@@ -134,17 +151,19 @@ def render_scenes(
     is_ir = isinstance(video, VideoProject)
     from videoforge.engine.director import pick_engine
 
-    # Copy audio files to Remotion's public directory (legacy path)
-    if not is_ir:
-        public_audio = remotion_dir / "public" / "audio"
-        public_audio.mkdir(parents=True, exist_ok=True)
-        for track in video.audioTracks:
-            src = Path(track.src)
-            if src.exists():
-                dest = public_audio / src.name
-                if not dest.exists():
-                    import shutil
-                    shutil.copy2(src, dest)
+    # Copy audio files to Remotion's public directory (both legacy and IR)
+    public_audio = remotion_dir / "public" / "audio"
+    public_audio.mkdir(parents=True, exist_ok=True)
+    for idx in range(_track_count(video)):
+        track = _get_track(video, idx)
+        if track is None:
+            continue
+        src = Path(track.src)
+        if src.exists():
+            dest = public_audio / src.name
+            if not dest.exists():
+                import shutil
+                shutil.copy2(src, dest)
 
     rendered: list[str] = []
     n_scenes = len(video.scenes)
@@ -177,9 +196,10 @@ def render_scenes(
                     import shutil
                     shutil.copy2(str(src), str(output_path))
 
-                # Mux real narration audio over silent track (legacy path only)
-                if not is_ir and i < len(video.audioTracks):
-                    _mux_audio_track(video.audioTracks[i], output_path, output_dir, i)
+                # Mux real narration audio over silent track (both legacy and IR)
+                track = _get_track(video, i)
+                if track is not None:
+                    _mux_audio_track(track, output_path, output_dir, i)
 
                 rendered.append(str(output_path.resolve()))
             else:
@@ -201,9 +221,10 @@ def render_scenes(
                     import shutil
                     shutil.copy2(str(src), str(output_path))
 
-                # Mux real narration audio over silent track (legacy path only)
-                if not is_ir and i < len(video.audioTracks):
-                    _mux_audio_track(video.audioTracks[i], output_path, output_dir, i)
+                # Mux real narration audio over silent track (both legacy and IR)
+                track = _get_track(video, i)
+                if track is not None:
+                    _mux_audio_track(track, output_path, output_dir, i)
 
                 rendered.append(str(output_path.resolve()))
             else:
@@ -264,10 +285,13 @@ def _ir_scene_props(project: VideoProject, index: int) -> dict[str, Any]:
                 "caption", "cta", "src", "nodeprefix", "highlightLines"):
         if key in payload and payload[key]:
             scene_json[key] = payload[key]
+    audio_tracks_list: list[dict[str, Any]] = []
+    if index < len(project.audio_tracks):
+        audio_tracks_list.append(asdict(project.audio_tracks[index]))
     return {
         "title": project.title,
         "scenes": [scene_json],
-        "audioTracks": [],
+        "audioTracks": audio_tracks_list,
         "captions": [],
         "voice": "alba",
         "style": STYLE_DEFAULTS,

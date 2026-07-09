@@ -11,7 +11,7 @@ import pytest
 
 from videoforge.engine.renderer import render_scenes, _ir_scene_props, _mux_audio_track
 from videoforge.engine.ir import (
-    Engine, NarrationSpec, SceneKind, SceneNode, VideoProject, WordTiming,
+    AudioTrackIR, Engine, NarrationSpec, SceneKind, SceneNode, VideoProject, WordTiming,
 )
 from videoforge.engine.director import pick_engine
 from videoforge.engine.models import AudioTrack, SceneDefinition, SceneType, VideoDefinition
@@ -431,4 +431,455 @@ def test_render_scenes_legacy_manim_no_audio(tmp_path: Path):
     assert len(mux_calls) == 0, "No audio mux should happen when no audio tracks exist"
 
 
+# ── IR Audio path — Remotion ──────────────────────────────────────────────────
 
+
+def test_ir_remotion_includes_audio_tracks_in_props():
+    """IR Remotion path serializes AudioTrackIR into props JSON."""
+    n0 = SceneNode(
+        id="s0", kind=SceneKind.TITLE,
+        payload='{"title":"Hi","text":"hello"}',
+        engine_hint=Engine.REMOTION, duration_frames=90,
+        narration=NarrationSpec("hello", (WordTiming("hello", 0, 400),), "estimated"),
+    )
+    project = VideoProject(
+        "T", (n0,), 30, 1920, 1080,
+        audio_tracks=(AudioTrackIR("audio.wav", 0, 90),),
+    )
+    props = _ir_scene_props(project, 0)
+    assert len(props["audioTracks"]) == 1
+    assert props["audioTracks"][0]["src"] == "audio.wav"
+    assert props["audioTracks"][0]["startFrame"] == 0
+    assert props["audioTracks"][0]["durationFrames"] == 90
+
+
+def test_ir_remotion_no_audio_tracks_gives_empty_list():
+    """IR Remotion path with no audio tracks — audioTracks is empty list."""
+    n0 = SceneNode(
+        id="s0", kind=SceneKind.TITLE,
+        payload='{"title":"Hi"}',
+        engine_hint=Engine.REMOTION, duration_frames=90,
+        narration=NarrationSpec("hi", (), "estimated"),
+    )
+    project = VideoProject("T", (n0,), 30, 1920, 1080)
+    props = _ir_scene_props(project, 0)
+    assert props["audioTracks"] == []
+
+
+def test_ir_remotion_audio_out_of_range_gives_empty():
+    """IR Remotion path with index beyond audio_tracks len — no crash, empty list."""
+    n0 = SceneNode(
+        id="s0", kind=SceneKind.TITLE,
+        payload='{"title":"Hi"}',
+        engine_hint=Engine.REMOTION, duration_frames=90,
+        narration=NarrationSpec("hi", (), "estimated"),
+    )
+    project = VideoProject(
+        "T", (n0,), 30, 1920, 1080,
+        audio_tracks=(AudioTrackIR("a.wav", 0, 30), AudioTrackIR("b.wav", 30, 60)),
+    )
+    # scene 0 has 2 audio tracks but props only include matching index
+    props = _ir_scene_props(project, 0)
+    assert len(props["audioTracks"]) == 1
+    assert props["audioTracks"][0]["src"] == "a.wav"
+
+    props1 = _ir_scene_props(project, 0)
+    assert props1["audioTracks"][0]["src"] == "a.wav"
+
+
+def test_ir_remotion_render_passes_audio_tracks(tmp_path: Path):
+    """Full render_scenes with IR — verifies audio tracks in written props JSON."""
+    n0 = SceneNode(
+        id="s0", kind=SceneKind.TITLE,
+        payload='{"title":"Hi"}',
+        engine_hint=Engine.REMOTION, duration_frames=90,
+        narration=NarrationSpec("hi", (), "estimated"),
+    )
+    project = VideoProject(
+        "T", (n0,), 30, 1920, 1080,
+        audio_tracks=(AudioTrackIR("narration.wav", 0, 90),),
+    )
+
+    with (
+        patch("subprocess.run") as mock_run,
+        patch("pathlib.Path.exists", return_value=True),
+    ):
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_run.return_value = mock_result
+
+        render_scenes(
+            project, remotion_dir=tmp_path / "remotion",
+            output_dir=tmp_path / "out", tmpdir=tmp_path / "tmp",
+        )
+
+    props_file = tmp_path / "out" / "props_0000.json"
+    assert props_file.exists()
+    props = json.loads(props_file.read_text())
+    assert len(props["audioTracks"]) == 1
+    assert props["audioTracks"][0]["src"] == "narration.wav"
+    assert props["audioTracks"][0]["startFrame"] == 0
+    assert props["audioTracks"][0]["durationFrames"] == 90
+
+
+# ── IR Audio path — Animotion ────────────────────────────────────────────────
+
+
+def test_ir_animotion_muxes_audio(tmp_path: Path):
+    """render_scenes muxes narration audio into IR Animotion clips."""
+    n0 = SceneNode(
+        id="s0", kind=SceneKind.DIAGRAM,
+        payload='{"interactive": true, "title":"Interactive"}',
+        engine_hint=Engine.ANIMOTION, duration_frames=90,
+        narration=NarrationSpec("interactive", (), "estimated"),
+    )
+    audio_file = tmp_path / "scene_audio.wav"
+    audio_file.write_text("fake-audio")
+    project = VideoProject(
+        "Test", (n0,), 30, 1920, 1080,
+        audio_tracks=(AudioTrackIR(str(audio_file), 0, 90),),
+    )
+
+    with (
+        patch("subprocess.run") as mock_run,
+        patch("videoforge.engine.animotion_renderer.render_scene") as mock_anim_render,
+    ):
+        out_video = tmp_path / "out" / "scene_0000.mp4"
+        mock_anim_render.return_value = {
+            "success": True,
+            "video_path": str(out_video),
+            "log": "mocked",
+        }
+
+        def _fake_run(cmd, *a, **kw):
+            r = MagicMock()
+            r.returncode = 0
+            for token in cmd:
+                if isinstance(token, str) and token.endswith(".mp4"):
+                    Path(token).parent.mkdir(parents=True, exist_ok=True)
+                    Path(token).write_text("dummy")
+            return r
+
+        mock_run.side_effect = _fake_run
+
+        rendered = render_scenes(
+            project, remotion_dir=tmp_path / "remotion",
+            output_dir=tmp_path / "out", tmpdir=tmp_path / "tmp",
+        )
+        assert len(rendered) == 1
+
+    # Verify ffmpeg called with audio mux args
+    mux_calls = [
+        c for c in mock_run.call_args_list
+        if "-map" in c[0][0] and "1:a:0" in c[0][0]
+    ]
+    assert len(mux_calls) == 1, "Audio mux FFmpeg should be called exactly once for IR Animotion"
+    args = mux_calls[0][0][0]
+    assert "-c:v" in args and "copy" in args
+    assert "-c:a" in args and "aac" in args[args.index("-c:a") + 1]
+
+
+def test_ir_animotion_no_audio_gives_silent_track(tmp_path: Path):
+    """render_scenes for IR Animotion with no audio — no mux call."""
+    n0 = SceneNode(
+        id="s0", kind=SceneKind.DIAGRAM,
+        payload='{"interactive": true, "title":"Interactive"}',
+        engine_hint=Engine.ANIMOTION, duration_frames=90,
+        narration=NarrationSpec("interactive", (), "estimated"),
+    )
+    project = VideoProject("Test", (n0,), 30, 1920, 1080)
+
+    with (
+        patch("subprocess.run") as mock_run,
+        patch("videoforge.engine.animotion_renderer.render_scene") as mock_anim_render,
+    ):
+        out_video = tmp_path / "out" / "scene_0000.mp4"
+        mock_anim_render.return_value = {
+            "success": True,
+            "video_path": str(out_video),
+            "log": "mocked",
+        }
+
+        def _fake_run(cmd, *a, **kw):
+            r = MagicMock()
+            r.returncode = 0
+            for token in cmd:
+                if isinstance(token, str) and token.endswith(".mp4"):
+                    Path(token).parent.mkdir(parents=True, exist_ok=True)
+                    Path(token).write_text("dummy")
+            return r
+
+        mock_run.side_effect = _fake_run
+
+        rendered = render_scenes(
+            project, remotion_dir=tmp_path / "remotion",
+            output_dir=tmp_path / "out", tmpdir=tmp_path / "tmp",
+        )
+        assert len(rendered) == 1
+
+    mux_calls = [
+        c for c in mock_run.call_args_list
+        if "-map" in c[0][0] and "1:a:0" in c[0][0]
+    ]
+    assert len(mux_calls) == 0, "No audio mux should happen when no audio tracks exist"
+
+
+# ── IR Audio path — Manim ────────────────────────────────────────────────────
+
+
+def test_ir_manim_muxes_audio(tmp_path: Path):
+    """render_scenes muxes narration audio into IR Manim clips."""
+    n0 = SceneNode(
+        id="s0", kind=SceneKind.CHART,
+        payload='{"title":"Chart"}',
+        engine_hint=Engine.MANIM, duration_frames=120,
+        narration=NarrationSpec("chart data", (), "estimated"),
+    )
+    audio_file = tmp_path / "manim_audio.wav"
+    audio_file.write_text("fake-audio")
+    project = VideoProject(
+        "Test", (n0,), 30, 1920, 1080,
+        audio_tracks=(AudioTrackIR(str(audio_file), 0, 120),),
+    )
+
+    with (
+        patch("subprocess.run") as mock_run,
+        patch("videoforge.engine.manim_renderer.render_scene") as mock_manim_render,
+    ):
+        out_video = tmp_path / "out" / "scene_0000.mp4"
+        mock_manim_render.return_value = {
+            "success": True,
+            "video_path": str(out_video),
+            "log": "mocked",
+        }
+
+        def _fake_run(cmd, *a, **kw):
+            r = MagicMock()
+            r.returncode = 0
+            for token in cmd:
+                if isinstance(token, str) and token.endswith(".mp4"):
+                    Path(token).parent.mkdir(parents=True, exist_ok=True)
+                    Path(token).write_text("dummy")
+            return r
+
+        mock_run.side_effect = _fake_run
+
+        rendered = render_scenes(
+            project, remotion_dir=tmp_path / "remotion",
+            output_dir=tmp_path / "out", tmpdir=tmp_path / "tmp",
+        )
+        assert len(rendered) == 1
+
+    mux_calls = [
+        c for c in mock_run.call_args_list
+        if "-map" in c[0][0] and "1:a:0" in c[0][0]
+    ]
+    assert len(mux_calls) == 1, "Audio mux FFmpeg should be called exactly once for IR Manim"
+    args = mux_calls[0][0][0]
+    assert "-c:v" in args and "copy" in args
+    assert "-c:a" in args and "aac" in args[args.index("-c:a") + 1]
+
+
+def test_ir_manim_no_audio(tmp_path: Path):
+    """render_scenes for IR Manim with no audio — no mux call."""
+    n0 = SceneNode(
+        id="s0", kind=SceneKind.CHART,
+        payload='{"title":"Chart"}',
+        engine_hint=Engine.MANIM, duration_frames=120,
+        narration=NarrationSpec("chart data", (), "estimated"),
+    )
+    project = VideoProject("Test", (n0,), 30, 1920, 1080)
+
+    with (
+        patch("subprocess.run") as mock_run,
+        patch("videoforge.engine.manim_renderer.render_scene") as mock_manim_render,
+    ):
+        out_video = tmp_path / "out" / "scene_0000.mp4"
+        mock_manim_render.return_value = {
+            "success": True,
+            "video_path": str(out_video),
+            "log": "mocked",
+        }
+
+        def _fake_run(cmd, *a, **kw):
+            r = MagicMock()
+            r.returncode = 0
+            for token in cmd:
+                if isinstance(token, str) and token.endswith(".mp4"):
+                    Path(token).parent.mkdir(parents=True, exist_ok=True)
+                    Path(token).write_text("dummy")
+            return r
+
+        mock_run.side_effect = _fake_run
+
+        rendered = render_scenes(
+            project, remotion_dir=tmp_path / "remotion",
+            output_dir=tmp_path / "out", tmpdir=tmp_path / "tmp",
+        )
+        assert len(rendered) == 1
+
+    mux_calls = [
+        c for c in mock_run.call_args_list
+        if "-map" in c[0][0] and "1:a:0" in c[0][0]
+    ]
+    assert len(mux_calls) == 0, "No audio mux should happen when no audio tracks exist"
+
+
+# ── IR Mixed engine with audio ───────────────────────────────────────────────
+
+
+def test_ir_mixed_engine_all_three_with_audio(tmp_path: Path):
+    """IR project with all 3 engines and audio tracks — each engine gets audio."""
+    n0 = SceneNode(
+        id="s0", kind=SceneKind.TITLE,
+        payload='{"title":"Remotion Scene"}',
+        engine_hint=Engine.REMOTION, duration_frames=90,
+        narration=NarrationSpec("Hello", (), "estimated"),
+    )
+    n1 = SceneNode(
+        id="s1", kind=SceneKind.CHART,
+        payload='{"title":"Chart Scene"}',
+        engine_hint=Engine.MANIM, duration_frames=120,
+        narration=NarrationSpec("chart data", (), "estimated"),
+    )
+    n2 = SceneNode(
+        id="s2", kind=SceneKind.DIAGRAM,
+        payload='{"interactive": true, "title":"Interactive"}',
+        engine_hint=Engine.ANIMOTION, duration_frames=60,
+        narration=NarrationSpec("interactive bit", (), "estimated"),
+    )
+
+    a0 = tmp_path / "audio0.wav"
+    a1 = tmp_path / "audio1.wav"
+    a2 = tmp_path / "audio2.wav"
+    a0.write_text("dummy0")
+    a1.write_text("dummy1")
+    a2.write_text("dummy2")
+
+    project = VideoProject(
+        "Mixed Audio",
+        (n0, n1, n2),
+        30, 1920, 1080,
+        audio_tracks=(
+            AudioTrackIR(str(a0), 0, 90),
+            AudioTrackIR(str(a1), 0, 120),
+            AudioTrackIR(str(a2), 0, 60),
+        ),
+    )
+
+    with (
+        patch("subprocess.run") as mock_run,
+        patch("videoforge.engine.manim_renderer.render_scene") as mock_manim,
+        patch("videoforge.engine.animotion_renderer.render_scene") as mock_anim,
+    ):
+        out_dir = tmp_path / "out"
+
+        def _mock_manim(sd, output_dir, **kw):
+            vp = Path(str(output_dir)) / "scene_0001.mp4"
+            vp.parent.mkdir(parents=True, exist_ok=True)
+            vp.write_text("dummy")
+            return {"success": True, "video_path": str(vp), "log": "mocked_manim"}
+
+        def _mock_anim(sd, output_dir, **kw):
+            vp = Path(str(output_dir)) / "scene_0002.mp4"
+            vp.parent.mkdir(parents=True, exist_ok=True)
+            vp.write_text("dummy")
+            return {"success": True, "video_path": str(vp), "log": "mocked_anim"}
+
+        mock_manim.side_effect = _mock_manim
+        mock_anim.side_effect = _mock_anim
+
+        def _fake_run(cmd, *a, **kw):
+            r = MagicMock()
+            r.returncode = 0
+            for token in cmd:
+                if isinstance(token, str) and token.endswith(".mp4") and not token.startswith("-"):
+                    Path(token).parent.mkdir(parents=True, exist_ok=True)
+                    Path(token).write_text("dummy")
+            return r
+
+        mock_run.side_effect = _fake_run
+
+        with patch("pathlib.Path.exists", return_value=True):
+            rendered = render_scenes(
+                project,
+                remotion_dir=tmp_path / "remotion",
+                output_dir=out_dir,
+                tmpdir=tmp_path / "tmp",
+            )
+
+    assert len(rendered) == 3
+
+    # Remotion scene 0 — audio in props JSON
+    props_file = tmp_path / "out" / "props_0000.json"
+    assert props_file.exists()
+    props = json.loads(props_file.read_text())
+    assert len(props["audioTracks"]) == 1
+    assert props["audioTracks"][0]["src"] == str(a0)
+
+    # Manim scene 1 — audio mux via ffmpeg
+    manim_mux = [
+        c for c in mock_run.call_args_list
+        if "-map" in c[0][0] and "1:a:0" in c[0][0]
+        and str(a1) in str(c[0][0])
+    ]
+    assert len(manim_mux) == 1, "Manim scene should mux audio"
+
+    # Animotion scene 2 — audio mux via ffmpeg
+    anim_mux = [
+        c for c in mock_run.call_args_list
+        if "-map" in c[0][0] and "1:a:0" in c[0][0]
+        and str(a2) in str(c[0][0])
+    ]
+    assert len(anim_mux) == 1, "Animotion scene should mux audio"
+
+
+# ── _track_count and _get_track helpers ──────────────────────────────────────
+
+
+def test_track_count_ir():
+    project = VideoProject("T", (), 30, 1920, 1080,
+                           audio_tracks=(AudioTrackIR("a.wav", 0, 30), AudioTrackIR("b.wav", 30, 60)))
+    from videoforge.engine.renderer import _track_count, _get_track
+    assert _track_count(project) == 2
+
+
+def test_track_count_ir_empty():
+    project = VideoProject("T", (), 30, 1920, 1080)
+    from videoforge.engine.renderer import _track_count, _get_track
+    assert _track_count(project) == 0
+
+
+def test_track_count_legacy():
+    video = VideoDefinition(title="T", scenes=[], audioTracks=[AudioTrack("a.wav", 0, 30)], captions=[])
+    from videoforge.engine.renderer import _track_count, _get_track
+    assert _track_count(video) == 1
+
+
+def test_get_track_ir():
+    project = VideoProject("T", (), 30, 1920, 1080,
+                           audio_tracks=(AudioTrackIR("a.wav", 0, 30), AudioTrackIR("b.wav", 30, 60)))
+    from videoforge.engine.renderer import _track_count, _get_track
+    t = _get_track(project, 1)
+    assert t is not None
+    assert t.src == "b.wav"
+
+
+def test_get_track_ir_out_of_range():
+    project = VideoProject("T", (), 30, 1920, 1080)
+    from videoforge.engine.renderer import _get_track
+    assert _get_track(project, 0) is None
+
+
+def test_get_track_legacy():
+    video = VideoDefinition(title="T", scenes=[], audioTracks=[AudioTrack("a.wav", 0, 30)], captions=[])
+    from videoforge.engine.renderer import _get_track
+    t = _get_track(video, 0)
+    assert t is not None
+    assert t.src == "a.wav"
+
+
+def test_get_track_legacy_out_of_range():
+    video = VideoDefinition(title="T", scenes=[], audioTracks=[], captions=[])
+    from videoforge.engine.renderer import _get_track
+    assert _get_track(video, 0) is None

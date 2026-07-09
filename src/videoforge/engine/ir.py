@@ -90,8 +90,9 @@ class VideoProject:
             f"{a.src}:{a.startFrame}:{a.durationFrames}"
             for a in self.audio_tracks
         )
+        header = f"{self.title}|{self.fps}|{self.width}|{self.height}"
         return hashlib.sha256(
-            (self.title + "".join(s.content_hash() for s in self.scenes) + audio).encode()
+            (header + "".join(s.content_hash() for s in self.scenes) + audio).encode()
         ).hexdigest()[:16]
 
     @classmethod
