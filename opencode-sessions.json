@@ -1,0 +1,86 @@
+{
+  "project": "videoforge",
+  "exported": "2026-07-09T13:40:20.268759",
+  "sessions": [
+    {
+      "id": "ses_0bd8c6b59ffeDP65e4zGTI1T08",
+      "title": "TTS Tester",
+      "slug": "sunny-island",
+      "created": "2026-07-08T21:28:18.790000",
+      "agent": "build",
+      "model": "{\"id\":\"deepseek-v4-flash\",\"providerID\":\"opencode-go\",\"variant\":\"max\"}",
+      "messages": 375,
+      "parts": 1449
+    },
+    {
+      "id": "ses_0bd5f5739ffegFsE016rzILt0z",
+      "title": "Refine podcast script 5x (@fm-opus subagent)",
+      "slug": "glowing-comet",
+      "created": "2026-07-08T22:17:33.063000",
+      "agent": "fm-opus",
+      "model": "{\"id\":\"claude-opus-4-6\",\"providerID\":\"freemodel\",\"variant\":\"default\"}",
+      "messages": 4,
+      "parts": 11
+    },
+    {
+      "id": "ses_0ba954ac3ffeq5JDxLxFK6S5hC",
+      "title": "Research agentic engineering content (@explore subagent)",
+      "slug": "stellar-harbor",
+      "created": "2026-07-09T11:17:28.956000",
+      "agent": "explore",
+      "model": "{\"id\":\"deepseek-v4-flash\",\"providerID\":\"opencode-go\",\"variant\":\"max\"}",
+      "messages": 17,
+      "parts": 75
+    },
+    {
+      "id": "ses_0ba2ac0c9ffegc1FBqHwrsL2wN",
+      "title": "Write CCA-F audiobook script (@fm-opus subagent)",
+      "slug": "silent-panda",
+      "created": "2026-07-09T13:13:51.094000",
+      "agent": "fm-opus",
+      "model": "{\"id\":\"claude-opus-4-6\",\"providerID\":\"freemodel\",\"variant\":\"default\"}",
+      "messages": 3,
+      "parts": 4
+    },
+    {
+      "id": "ses_0ba2a05bbffe00jyLsEQPN35TG",
+      "title": "Write CCA-F audiobook script (@general subagent)",
+      "slug": "eager-meadow",
+      "created": "2026-07-09T13:14:38.980000",
+      "agent": "general",
+      "model": "{\"id\":\"deepseek-v4-flash\",\"providerID\":\"opencode-go\",\"variant\":\"max\"}",
+      "messages": 4,
+      "parts": 13
+    },
+    {
+      "id": "ses_0ba26e5b8ffe0LdKmaz0oeFy7u",
+      "title": "Research & write CCA-F audiobook (@general subagent)",
+      "slug": "gentle-circuit",
+      "created": "2026-07-09T13:18:03.783000",
+      "agent": "general",
+      "model": "{\"id\":\"deepseek-v4-flash\",\"providerID\":\"opencode-go\",\"variant\":\"max\"}",
+      "messages": 144,
+      "parts": 622
+    },
+    {
+      "id": "ses_0ba1e4e05ffei835SbdS9j3ajt",
+      "title": "Turn folders into knowledge graphs",
+      "slug": "lucky-river",
+      "created": "2026-07-09T13:27:26.906000",
+      "agent": "build",
+      "model": "{\"id\":\"deepseek-v4-flash\",\"providerID\":\"opencode-go\",\"variant\":\"max\"}",
+      "messages": 28,
+      "parts": 123
+    },
+    {
+      "id": "ses_0ba1d3248ffe23oXSz6iK7fTS3",
+      "title": "Semantic extraction chunk 1/1 (@general subagent)",
+      "slug": "quick-circuit",
+      "created": "2026-07-09T13:28:39.543000",
+      "agent": "general",
+      "model": "{\"id\":\"deepseek-v4-flash\",\"providerID\":\"opencode-go\",\"variant\":\"max\"}",
+      "messages": 8,
+      "parts": 38
+    }
+  ]
+}
