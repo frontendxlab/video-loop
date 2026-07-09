@@ -1,11 +1,19 @@
 import React from "react";
-import { AbsoluteFill, Audio, Sequence, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
+import { AbsoluteFill, Audio, Sequence, staticFile, useCurrentFrame } from "remotion";
 import { CaptionOverlay } from "../captions/CaptionOverlay";
 import { TitleScene } from "../scenes/TitleScene";
 import { CodeScene } from "../scenes/CodeScene";
 import { BulletScene } from "../scenes/BulletScene";
 import { ImageScene } from "../scenes/ImageScene";
 import { OutroScene } from "../scenes/OutroScene";
+import { AnimatedMindMap, MindMapNode } from "../components/AnimatedMindMap";
+import { AnimatedCodeLines } from "../components/AnimatedCodeLines";
+
+interface WordTimingData {
+  text: string;
+  startMs: number;
+  endMs: number;
+}
 
 interface SceneData {
   type: string;
@@ -17,7 +25,12 @@ interface SceneData {
   src?: string;
   caption?: string;
   cta?: string;
+  text?: string;
+  nodeprefix?: string;
   duration: number;
+  wordTimestamps?: WordTimingData[];
+  sceneStartFrame?: number;
+  root?: MindMapNode;
 }
 
 interface AudioTrack {
@@ -41,19 +54,25 @@ interface VideoCompositionProps {
   style: { primaryColor: string; font: string; codeTheme: string };
 }
 
-const SceneRenderer: React.FC<{ scene: SceneData }> = ({ scene }) => {
+const SceneRenderer: React.FC<{ scene: SceneData; frameOffset: number }> = ({ scene, frameOffset }) => {
   const dur = scene.duration;
+  const ts = scene.wordTimestamps;
+  const sf = frameOffset;
   switch (scene.type) {
     case "title":
-      return <TitleScene title={scene.title || ""} subtitle={scene.subtitle} duration={dur} />;
+      return <TitleScene title={scene.title || ""} subtitle={scene.subtitle} duration={dur} wordTimestamps={ts} sceneStartFrame={sf} />;
     case "code":
-      return <CodeScene code={scene.code || ""} lang={scene.lang || "text"} highlightLines={[]} caption={scene.caption} duration={dur} />;
+      return <CodeScene code={scene.code || ""} lang={scene.lang || "text"} highlightLines={[]} caption={scene.caption} duration={dur} wordTimestamps={ts} sceneStartFrame={sf} />;
     case "bullet":
-      return <BulletScene points={scene.points || []} title={scene.title} duration={dur} />;
+      return <BulletScene points={scene.points || []} title={scene.title || scene.caption} duration={dur} wordTimestamps={ts} sceneStartFrame={sf} />;
     case "image":
-      return <ImageScene src={scene.src || ""} caption={scene.caption} duration={dur} />;
+      return <ImageScene src={scene.src || ""} caption={scene.caption} duration={dur} wordTimestamps={ts} sceneStartFrame={sf} />;
     case "outro":
-      return <OutroScene title={scene.title || "Thank You"} cta={scene.cta} duration={dur} />;
+      return <OutroScene title={scene.title || "Thank You"} cta={scene.cta} duration={dur} wordTimestamps={ts} sceneStartFrame={sf} />;
+    case "mindmap":
+      return <AnimatedMindMap root={scene.root || { id: "root", label: scene.title || "", children: [], timing: ts?.[0] }} wordTimestamps={ts || []} sceneStartFrame={sf} />;
+    case "code-walkthrough":
+      return <AnimatedCodeLines code={scene.code || ""} lang={scene.lang || "text"} wordTimestamps={ts || []} sceneStartFrame={sf} title={scene.title} />;
     default:
       return (
         <AbsoluteFill style={{ background: "linear-gradient(135deg, #0f0f23, #1a1a3e)", justifyContent: "center", alignItems: "center", color: "white", fontSize: 32 }}>
@@ -63,7 +82,6 @@ const SceneRenderer: React.FC<{ scene: SceneData }> = ({ scene }) => {
   }
 };
 
-/** Scoped caption overlay — only shows words for the current scene range. */
 const ScopedCaption: React.FC<{ words: CaptionWord[]; sceneStartFrame: number; sceneEndFrame: number }> = ({
   words, sceneStartFrame, sceneEndFrame,
 }) => {
@@ -76,8 +94,6 @@ const ScopedCaption: React.FC<{ words: CaptionWord[]; sceneStartFrame: number; s
 };
 
 export const VideoComposition: React.FC<VideoCompositionProps> = ({ scenes, audioTracks, captions }) => {
-  const { fps } = useVideoConfig();
-
   if (!scenes || scenes.length === 0) {
     return <AbsoluteFill style={{ background: "#000" }} />;
   }
@@ -91,14 +107,12 @@ export const VideoComposition: React.FC<VideoCompositionProps> = ({ scenes, audi
     const dur = scenes[i].duration;
     if (dur <= 0) continue;
 
-    // Scene rendered inside Sequence — properly scoped
     sceneElements.push(
       <Sequence key={`scene-${i}`} from={frameOffset} durationInFrames={dur}>
-        <SceneRenderer scene={scenes[i]} />
+        <SceneRenderer scene={scenes[i]} frameOffset={frameOffset} />
       </Sequence>
     );
 
-    // Audio — each audio is rendered INSIDE its own Sequence so it only plays during that window
     const audioTrack = audioTracks[i];
     if (audioTrack) {
       audioElements.push(
@@ -108,7 +122,6 @@ export const VideoComposition: React.FC<VideoCompositionProps> = ({ scenes, audi
       );
     }
 
-    // Captions — scoped to this scene only
     captionElements.push(
       <ScopedCaption
         key={`cap-${i}`}

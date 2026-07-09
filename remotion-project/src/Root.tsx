@@ -2,6 +2,12 @@ import { Composition } from "remotion";
 import { z } from "zod";
 import { VideoComposition } from "./compositions/VideoComposition";
 
+const WordTimingSchema = z.object({
+  text: z.string(),
+  startMs: z.number(),
+  endMs: z.number(),
+});
+
 const SceneSchema = z.object({
   type: z.string(),
   title: z.string().optional(),
@@ -12,7 +18,11 @@ const SceneSchema = z.object({
   src: z.string().optional(),
   caption: z.string().optional(),
   cta: z.string().optional(),
+  text: z.string().optional(),
+  nodeprefix: z.string().optional(),
   duration: z.number(),
+  wordTimestamps: z.array(WordTimingSchema).optional(),
+  sceneStartFrame: z.number().optional().default(0),
 });
 
 const AudioTrackSchema = z.object({
