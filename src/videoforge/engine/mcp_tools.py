@@ -139,12 +139,26 @@ def engine_render_video(
 
     info = get_media_info(final)
     fmt = info.get("format", {})
+
+    # Generate report artifact
+    engines = list({s.renderer for s in video.scenes if s.renderer})
+    from videoforge.review.frame_reviewer import generate_video_report, write_video_report
+    report = generate_video_report(
+        video_path=str(final),
+        content_hash=video.content_hash(),
+        engine_mix=engines,
+        render_format={"fps": video.fps, "width": video.width, "height": video.height,
+                       "pixel_format": "yuv420p", "video_codec": "h264", "audio_codec": "aac"},
+    )
+    report_path = write_video_report(report, str(final))
+
     return {
         "video_path": str(Path(final).resolve()),
         "duration_seconds": round(float(fmt.get("duration", 0)), 1),
         "file_size_mb": round(float(fmt.get("size", 0)) / 1e6, 1),
         "scenes": len(scene_paths),
         "frames": video.total_frames(),
+        "report_path": report_path,
     }
 
 
@@ -187,11 +201,20 @@ def engine_review_video(
     Returns:
         Review results with pass/fail per check level.
     """
-    from videoforge.review.frame_reviewer import FrameReviewer
+    from videoforge.review.frame_reviewer import FrameReviewer, generate_video_report, write_video_report
     fr = FrameReviewer()
     l0_result = fr.check_mixed_engine(video_path)
     l0_status = fr.evaluate_l0_policy(l0_result)
     l1_result = fr.check_integrity(video_path)
+
+    report = generate_video_report(
+        video_path=video_path,
+        l0_result=l0_result,
+        l1_result=l1_result,
+        l0_status=l0_status,
+    )
+    report_path = write_video_report(report, video_path)
+
     return {
         "l0_mixed_engine": {
             "status": l0_status,
@@ -207,6 +230,7 @@ def engine_review_video(
             "details": l1_result.get("issues", []),
         },
         "passed": l0_status == "pass" and l1_result.get("passed", False),
+        "report_path": report_path,
     }
 
 

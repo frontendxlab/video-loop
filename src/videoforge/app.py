@@ -145,6 +145,17 @@ def review(
             typ = issue.get("type", "?")
             logger.warning("  [%s] %s: %s", sev, typ, issue.get("detail", ""))
 
+    # Generate and write report artifact
+    from videoforge.review.frame_reviewer import generate_video_report, write_video_report
+    report = generate_video_report(
+        video_path=video,
+        l0_result=l0_result,
+        l1_result=l1_result,
+        l0_status=l0_status,
+    )
+    report_path = write_video_report(report, video)
+    logger.info("Review report: %s", report_path)
+
     # Fail CLI on L0 high-severity issues
     if l0_status == "fail":
         raise typer.Exit(1)
@@ -179,7 +190,7 @@ def pipeline(
     render.callback(video=video_json, output=output)
 
     # Step 5: Review (L0 mixed-engine + L1 frame integrity)
-    from videoforge.review.frame_reviewer import FrameReviewer
+    from videoforge.review.frame_reviewer import FrameReviewer, generate_video_report, write_video_report
     fr = FrameReviewer()
     l0_result = fr.check_mixed_engine(output)
     l0_status = fr.evaluate_l0_policy(l0_result)
@@ -188,6 +199,19 @@ def pipeline(
     logger.info("Pipeline Review — L0=%s (%d issues), L1=%s (%d issues)",
                 l0_status, len(l0_result.get("issues", [])),
                 "PASSED" if l1_passed else "FAILED", len(l1_result.get("issues", [])))
+
+    # Step 6: Generate report artifact
+    engines = list({s.renderer for s in video_def.scenes if s.renderer})
+    report = generate_video_report(
+        video_path=output,
+        content_hash=video_def.content_hash(),
+        engine_mix=engines,
+        l0_result=l0_result,
+        l1_result=l1_result,
+        l0_status=l0_status,
+    )
+    report_path = write_video_report(report, output)
+    logger.info("Pipeline report: %s", report_path)
 
 
 def _load_video_def(path: str | Path) -> VideoDefinition:

@@ -210,7 +210,7 @@ def build(
 
     # Step 5: Review (L0 mixed-engine + L1 frame integrity)
     try:
-        from videoforge.review.frame_reviewer import FrameReviewer
+        from videoforge.review.frame_reviewer import FrameReviewer, generate_video_report, write_video_report
         fr = FrameReviewer()
         l0 = fr.check_mixed_engine(str(output))
         l0_status = fr.evaluate_l0_policy(l0)
@@ -223,6 +223,20 @@ def build(
         l1 = fr.check_integrity(str(output))
         logger.info("L1 Frame Integrity: passed=%s, frames=%d, issues=%d",
                     l1.get("passed"), l1.get("total_frames", 0), len(l1.get("issues", [])))
+
+        # Generate report artifact
+        engines = list({s.get("renderer", "remotion") for s in scene_data})
+        video_hash = _compute_video_def_hash(video_def)
+        report = generate_video_report(
+            video_path=str(output),
+            content_hash=video_hash,
+            engine_mix=engines,
+            l0_result=l0,
+            l1_result=l1,
+            l0_status=l0_status,
+        )
+        report_path = write_video_report(report, str(output))
+        logger.info("Build report: %s", report_path)
     except Exception as e:
         logger.warning("Review skipped: %s", e)
 
@@ -286,6 +300,13 @@ def _wav_duration(path: Path) -> float:
         ch = wf.getnchannels()
     db = path.stat().st_size - 44
     return db / (sw * ch) / fr if db > 0 else 0
+
+
+def _compute_video_def_hash(video_def: dict) -> str:
+    """Compute deterministic sha256 hash of video definition dict."""
+    import hashlib
+    data = json.dumps(video_def, sort_keys=True, default=str)
+    return hashlib.sha256(data.encode()).hexdigest()[:16]
 
 
 def _estimate_timestamps(words: list[str], dur: float) -> list[dict]:
