@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as DirectorPreviewRouteImport } from './routes/director-preview'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SettingsIndexRouteImport } from './routes/settings/index'
 import { Route as ReportsIndexRouteImport } from './routes/reports/index'
@@ -17,6 +18,11 @@ import { Route as JobsIndexRouteImport } from './routes/jobs/index'
 import { Route as CreateIndexRouteImport } from './routes/create/index'
 import { Route as JobsJobIdRouteImport } from './routes/jobs/$jobId'
 
+const DirectorPreviewRoute = DirectorPreviewRouteImport.update({
+  id: '/director-preview',
+  path: '/director-preview',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -55,6 +61,7 @@ const JobsJobIdRoute = JobsJobIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/director-preview': typeof DirectorPreviewRoute
   '/jobs/$jobId': typeof JobsJobIdRoute
   '/create/': typeof CreateIndexRoute
   '/jobs/': typeof JobsIndexRoute
@@ -64,6 +71,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/director-preview': typeof DirectorPreviewRoute
   '/jobs/$jobId': typeof JobsJobIdRoute
   '/create': typeof CreateIndexRoute
   '/jobs': typeof JobsIndexRoute
@@ -74,6 +82,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/director-preview': typeof DirectorPreviewRoute
   '/jobs/$jobId': typeof JobsJobIdRoute
   '/create/': typeof CreateIndexRoute
   '/jobs/': typeof JobsIndexRoute
@@ -85,6 +94,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/director-preview'
     | '/jobs/$jobId'
     | '/create/'
     | '/jobs/'
@@ -94,6 +104,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/director-preview'
     | '/jobs/$jobId'
     | '/create'
     | '/jobs'
@@ -103,6 +114,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/director-preview'
     | '/jobs/$jobId'
     | '/create/'
     | '/jobs/'
@@ -113,6 +125,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  DirectorPreviewRoute: typeof DirectorPreviewRoute
   JobsJobIdRoute: typeof JobsJobIdRoute
   CreateIndexRoute: typeof CreateIndexRoute
   JobsIndexRoute: typeof JobsIndexRoute
@@ -123,6 +136,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/director-preview': {
+      id: '/director-preview'
+      path: '/director-preview'
+      fullPath: '/director-preview'
+      preLoaderRoute: typeof DirectorPreviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -177,6 +197,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  DirectorPreviewRoute: DirectorPreviewRoute,
   JobsJobIdRoute: JobsJobIdRoute,
   CreateIndexRoute: CreateIndexRoute,
   JobsIndexRoute: JobsIndexRoute,

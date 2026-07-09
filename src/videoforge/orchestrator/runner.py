@@ -126,47 +126,37 @@ class PipelineRunner:
         if self._cancel_flag: return
         self._set_stage(Stage.CONCAT, AgentStatus.COMPLETE, 1.0, "Video assembled")
 
-        # Stage 7: Review (L0 mixed-engine + L1 frame integrity)
+        # Stage 7: Review with rerender orchestration
         self._set_stage(Stage.REVIEW, AgentStatus.RUNNING, message="Running quality checks...")
-        self._log("review-agent", "Running L0 Mixed-Engine + L1 Frame Review...")
+        self._log("review-agent", "Running L0 review with rerender orchestration...")
         try:
             from videoforge.review.frame_reviewer import FrameReviewer
+            from videoforge.review.repair_actions import RepairAction
+            from videoforge.review.rerender_orchestrator import run_orchestrated_review
+
             fr = FrameReviewer()
             output_path = f"/tmp/vfx-{topic.lower().replace(' ', '-')[:32]}/output.mp4"
-            l0_result = fr.check_mixed_engine(output_path)
+
+            def rerender_hook(action: RepairAction) -> bool:
+                self._log("render-agent", f"Rerender: {action.description}")
+                return True
+
+            orc_result = run_orchestrated_review(
+                video_path=output_path,
+                review_fn=fr.check_mixed_engine,
+                render_hook=rerender_hook,
+                max_rounds=2,
+            )
+
+            l0_result = orc_result["final_review"]
             l0_status = fr.evaluate_l0_policy(l0_result)
-            self._log("review-agent",
-                      f"L0: {l0_status}, {len(l0_result.get('issues',[]))} issues, "
-                      f"{l0_result.get('sampled_frames',0)} frames sampled")
             l1_result = fr.check_integrity(output_path)
             l1_passed = l1_result.get("passed", False)
             self._log("review-agent",
-                      f"L1: {'PASSED' if l1_passed else 'FAILED'}, "
-                      f"{l1_result.get('total_frames',0)} frames")
-            if l0_status == "fail":
-                self._log("review-agent", "L0 gate FAILED — visual defects detected", "WARN")
-                # Wire in rerender orchestration for auto-repair
-                from videoforge.review.repair_actions import RepairAction
-                from videoforge.review.rerender_orchestrator import run_orchestrated_review
-
-                def rerender_hook(action: RepairAction) -> bool:
-                    self._log("render-agent", f"Rerender: {action.description}")
-                    # In production: re-render affected scene, re-concat, return True on success
-                    return True  # Simulated — video unchanged, re-review will re-detect
-
-                orc_result = run_orchestrated_review(
-                    video_path=output_path,
-                    review_fn=fr.check_mixed_engine,
-                    render_hook=rerender_hook,
-                    max_rounds=2,
-                )
-                # Use orchestrated result as final
-                l0_result = orc_result["final_review"]
-                l0_status = fr.evaluate_l0_policy(l0_result)
-                self._log("review-agent",
-                          f"Rerender outcome={orc_result['outcome']}, "
-                          f"{len(orc_result['rounds'])} rounds, "
-                          f"final issues={orc_result['total_issues_final']}")
+                      f"Outcome={orc_result['outcome']}, "
+                      f"{len(orc_result['rounds'])} rounds, "
+                      f"L0={l0_status} ({len(l0_result.get('issues',[]))} issues), "
+                      f"L1={'PASSED' if l1_passed else 'FAILED'} ({l1_result.get('total_frames',0)} frames)")
             self._set_stage(Stage.REVIEW, AgentStatus.COMPLETE, 1.0,
                             f"L0={l0_status}, L1={'ok' if l1_passed else 'issues'}")
         except Exception as e:
