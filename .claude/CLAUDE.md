@@ -11,16 +11,14 @@
 > (documentation, ownership, history, decisions). **Always verify against
 > actual source files before making changes** — the index may be stale.
 
-Last indexed: 2026-07-09 (commit 64ddeae). Confidence: 100%.
+Last indexed: 2026-07-09 (commit bc4169e). Confidence: 100%.
 ### Architecture
-**repo is a full‑stack video‑generation platform:** it ingests source assets (media files, JSON/TOML configuration, and Remotion composition scripts), orchestrates a **fetch → render → review → compress** pipeline, and emits high‑resolution video files, a FastAPI‑served web UI, and a Remotion‑based composition editor for downstream consumption. The monorepo bundles a Python‑centric rendering engine (videoforge) with a TypeScript‑based Remotion front‑end (remotion‑project), plus auxiliary tooling (e.g., the caveman‑compress skill) that together enable end‑to‑end video creation, validation, and delivery. ---
-*The repository also contains a small JavaScript utility package (.opencode) and a suite of Python unit‑tests covering the engine, fetcher, renderer, and validation logic.*
----
-*Additional internal entry points (e.g., src/videoforge/engine/models.py, src/videoforge/engine/manim_renderer.py) are imported by the above scripts during request handling.*
+**Repo is a video generation and review platform: it ingests source‑code repositories and associated media assets, fetches pull‑request metadata, renders animated scenes with Remotion and Manim, compresses the resulting footage via the *caveman‑compress* skill, and finally serves the polished videos together with an interactive review UI through a FastAPI‑based server.**  
+The monorepo orchestrates this end‑to‑end pipeline across a Python backend, a TypeScript/JavaScript front‑end, and a collection of reusable scripts, enabling developers to produce, validate, and share programmatically generated video content with minimal friction. ---
 ---
 ---
 ---  
-*Happy coding!
+*This overview provides the high‑level mental model new contributors need to navigate the repo, understand the end‑to‑end video generation pipeline, and locate the primary entry points for development or debugging.*
 ### Key Modules
 | Module | Purpose |
 |--------|---------|
@@ -54,25 +52,25 @@ Last indexed: 2026-07-09 (commit 64ddeae). Confidence: 100%.
 ### Hotspots (High Churn)
 | File | Churn | 90d Commits | Owner |
 |------|-------|-------------|-------|
-| `vfx-cli` | 99.7th %ile | 6 | Rashid |
-| `remotion-project/src/scenes/CodeScene.tsx` | 99.4th %ile | 3 | Rashid |
+| `remotion-project/src/scenes/CodeScene.tsx` | 99.4th %ile | 4 | Rashid |
+| `vfx-cli` | 99.2th %ile | 6 | Rashid |
 | `remotion-project/src/scenes/BulletScene.tsx` | 97.0th %ile | 3 | Rashid |
 | `src/videoforge/app.py` | 95.8th %ile | 3 | Rashid |
-| `remotion-project/src/scenes/OutroScene.tsx` | 95.2th %ile | 3 | Rashid |
+| `remotion-project/src/scenes/OutroScene.tsx` | 95.3th %ile | 3 | Rashid |
 
 ## Code health
 Three signals: **defect risk** (the overall score), **maintainability** (smells that hurt readability/change-cost without predicting bugs), and **performance** (static performance RISK: I/O-in-loop / N+1 shapes that waste work, high-precision/low-recall). Maintainability and performance are co-equal views, never blended into the defect headline. See `docs/CODE_HEALTH.md`.
 
-Defect risk, Hotspot health: 7.05/10 (stable) ·
+Defect risk, Hotspot health: 7.19/10 (stable) ·
 Average: 9.57/10 ·
 Worst: 4.04/10 (`vfx-cli`)
-Maintainability, Average: 9.73/10
+Maintainability, Average: 9.71/10
 Performance risk, Average: 9.93/10
 
 ### Critical biomarkers
-- `remotion-project/src/compositions/VideoComposition.tsx` — change entropy — impact −3.0
 - `vfx-cli` — function hotspot (wizard) — impact −2.3
 - `vfx-cli` — complex method (wizard) — impact −0.9
+- `src/videoforge/engine/renderer.py` — brain method (render_scenes) — impact −0.6
 - `src/videoforge/engine/manim_renderer.py` — brain method (scene_to_manim_code) — impact −0.3
 
 ### Repowise MCP Tools

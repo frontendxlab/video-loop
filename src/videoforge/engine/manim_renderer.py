@@ -247,3 +247,193 @@ def render_scene(scene: SceneDefinition, output_dir: str | Path, fps: int = 30, 
         return asyncio.run(render_via_mcp(code))
 
     return render_direct(code, output_dir)
+
+
+def _escape(s: str) -> str:
+    return s.replace("\\", "\\\\").replace("'", "\\'")
+
+
+def generate_graph_scene(
+    nodes: list[dict[str, Any]],
+    edges: list[tuple[str, str]] | list[list[str]],
+    layout: str = "dot",
+    fps: int = 30,
+    duration_sec: float = 8.0,
+) -> str:
+    """Generate Manim code for a graph/diagram scene using manim.Graph.
+
+    Args:
+        nodes: [{"id": "a", "label": "Node A"}, ...]
+        edges: [["a", "b"], ...] or list of tuples
+        layout: "dot" | "spring" | "circular" | "random" | "partite"
+        fps: frame rate pin
+        duration_sec: total scene duration in seconds
+    """
+    node_ids = [str(n["id"]) for n in nodes]
+    labels = {str(n["id"]): _escape(str(n.get("label", n["id"]))) for n in nodes}
+    edge_pairs = [(str(a), str(b)) for a, b in edges]
+
+    lines = [
+        "from manim import *",
+        "import numpy as np",
+        f"config.frame_rate = {fps}",
+        "config.pixel_width = 1920",
+        "config.pixel_height = 1080",
+        'config.quality = "high_quality"',
+        'config.background_color = "#1a1a2e"',
+        "",
+        "class GraphScene(Scene):",
+        "    def construct(self):",
+        "        bg = Rectangle(width=config.frame_width, height=config.frame_height,",
+        "                       fill_opacity=1, color=config.background_color)",
+        "        self.add(bg)",
+        f"        vertices = {node_ids!r}",
+        f"        edges = {edge_pairs!r}",
+        '        g = Graph(vertices, edges, layout="' + layout + '", labels=False,',
+        "                  vertex_config={'radius': 0.35, 'color': '#4a90d9', 'fill_opacity': 0.9},",
+        "                  edge_config={'color': '#7c5cbf', 'stroke_width': 3})",
+        "        self.play(Create(g), run_time=2.0)",
+    ]
+    for vid in node_ids:
+        lines.append(f"        g.add_labels({{{vid!r}: Text({labels[vid]!r}, font_size=24)}})")
+    lines.append("        self.play(g.animate.scale(0.9).move_to(ORIGIN), run_time=0.5)")
+    lines.append(f"        self.wait({max(duration_sec - 3.0, 1.0):.1f})")
+    return "\n".join(lines) + "\n"
+
+
+def generate_chart_scene(
+    data: list[dict[str, Any]],
+    chart_type: str = "bar",
+    fps: int = 30,
+    duration_sec: float = 8.0,
+    title: str = "",
+) -> str:
+    """Generate Manim code for bar/line charts using BarChart / NumberLine.
+
+    Args:
+        data: [{"label": "A", "value": 10}, ...]
+        chart_type: "bar" | "line"
+        fps: frame rate pin
+        duration_sec: total scene duration
+        title: optional chart title
+    """
+    labels = [_escape(str(d.get("label", ""))) for d in data]
+    values = [float(d.get("value", 0)) for d in data]
+    title_esc = _escape(title)
+
+    if chart_type == "line":
+        return textwrap.dedent(f"""\
+            from manim import *
+            import numpy as np
+            config.frame_rate = {fps}
+            config.pixel_width = 1920
+            config.pixel_height = 1080
+            config.quality = "high_quality"
+            config.background_color = "#1a1a2e"
+
+            class LineChartScene(Scene):
+                def construct(self):
+                    bg = Rectangle(width=config.frame_width, height=config.frame_height,
+                                   fill_opacity=1, color=config.background_color)
+                    self.add(bg)
+                    values = {values!r}
+                    max_val = max(values) if values else 1
+                    axis = NumberLine(x_range=[0, len(values) + 1, 1], length=10,
+                                      color=WHITE, include_numbers=True).shift(DOWN * 0.5)
+                    y_axis = NumberLine(x_range=[0, max_val * 1.1, max_val / 5], length=5,
+                                        rotation=PI / 2, color=WHITE).shift(LEFT * 5)
+                    self.play(Create(axis), Create(y_axis), run_time=1.0)
+                    dots = VGroup()
+                    for i, v in enumerate(values):
+                        p = Dot().move_to(axis.n2p(i + 1) + UP * (v / max_val) * 4)
+                        dots.add(p)
+                    self.play(Create(dots), run_time=1.5)
+                    if len(dots) > 1:
+                        lines = VGroup(*[
+                            Line(dots[i].get_center(), dots[i + 1].get_center(), color='#4a90d9')
+                            for i in range(len(dots) - 1)
+                        ])
+                        self.play(Create(lines), run_time=1.0)
+                    self.wait({max(duration_sec - 3.5, 1.0):.1f})
+        """)
+
+    return textwrap.dedent(f"""\
+        from manim import *
+        import numpy as np
+        config.frame_rate = {fps}
+        config.pixel_width = 1920
+        config.pixel_height = 1080
+        config.quality = "high_quality"
+        config.background_color = "#1a1a2e"
+
+        class BarChartScene(Scene):
+            def construct(self):
+                bg = Rectangle(width=config.frame_width, height=config.frame_height,
+                               fill_opacity=1, color=config.background_color)
+                self.add(bg)
+                values = {values!r}
+                labels = {labels!r}
+                max_val = max(values) if values else 1
+                chart = BarChart(values=values, y_range=[0, max_val * 1.1, max_val / 5],
+                                 bar_colors=['#4a90d9', '#7c5cbf', '#3ec6a0', '#e0a860', '#d96a6a'],
+                                 x_labels=[Text(l, font_size=24) for l in labels],
+                                 bar_width=0.6).scale(0.8)
+                self.play(Create(chart), run_time=2.0)
+                {f"title = Text('{title_esc}', font_size=36).to_edge(UP); self.play(Write(title), run_time=0.5)" if title_esc else "pass"}
+                self.wait({max(duration_sec - 3.0, 1.0):.1f})
+    """)
+
+
+def generate_timeline_scene(
+    events: list[dict[str, Any]],
+    fps: int = 30,
+    duration_sec: float = 8.0,
+    title: str = "",
+) -> str:
+    """Generate Manim code for a timeline using NumberLine + MoveAlongPath.
+
+    Args:
+        events: [{"label": "Start", "date": "2020"}, ...]
+        fps: frame rate pin
+        duration_sec: total scene duration
+        title: optional title
+    """
+    labels = [_escape(str(e.get("label", ""))) for e in events]
+    dates = [_escape(str(e.get("date", ""))) for e in events]
+    title_esc = _escape(title)
+    n = len(events)
+
+    return textwrap.dedent(f"""\
+        from manim import *
+        import numpy as np
+        config.frame_rate = {fps}
+        config.pixel_width = 1920
+        config.pixel_height = 1080
+        config.quality = "high_quality"
+        config.background_color = "#1a1a2e"
+
+        class TimelineScene(Scene):
+            def construct(self):
+                bg = Rectangle(width=config.frame_width, height=config.frame_height,
+                               fill_opacity=1, color=config.background_color)
+                self.add(bg)
+                labels = {labels!r}
+                dates = {dates!r}
+                n = {n}
+                axis = NumberLine(x_range=[0, max(n, 1), 1], length=12, color=WHITE,
+                                  include_numbers=False).shift(DOWN * 0.3)
+                self.play(Create(axis), run_time=1.0)
+                {f"title_t = Text('{title_esc}', font_size=36).to_edge(UP); self.play(Write(title_t), run_time=0.5)" if title_esc else "pass"}
+                for i in range(n):
+                    pos = axis.n2p(i + 1)
+                    dot = Dot(point=pos, radius=0.12, color='#7c5cbf')
+                    lbl = Text(labels[i], font_size=24).next_to(dot, UP if i % 2 == 0 else DOWN, buff=0.4)
+                    self.play(FadeIn(dot), Write(lbl), run_time=0.6)
+                    if dates[i]:
+                        d = Text(dates[i], font_size=18, color=GREY).next_to(lbl, UP if i % 2 == 0 else DOWN, buff=0.2)
+                        self.play(Write(d), run_time=0.3)
+                marker = Dot(radius=0.18, color='#4a90d9')
+                marker.move_to(axis.n2p(0))
+                self.add(marker)
+                self.play(MoveAlongPath(marker, axis), run_time={max(duration_sec - 2.0, 1.0):.1f})
+    """)

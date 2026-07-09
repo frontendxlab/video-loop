@@ -28,3 +28,5 @@ WARNING:pocket_tts.models.tts_model:Chunk has 55 tokens (max 50), generation may
   [20/42]
 WARNING:pocket_tts.models.tts_model:Chunk has 51 tokens (max 50), generation may skip words: 'For the exam, understand how schema precision affe...'
 WARNING:pocket_tts.models.tts_model:Chunk has 64 tokens (max 50), generation may skip words: 'Simply defining an enum in the schema text or desc...'
+WARNING:pocket_tts.models.tts_model:Chunk has 55 tokens (max 50), generation may skip words: 'When a validation-retry loop reliably fixes malfor...'
+  [40/42]
