@@ -333,6 +333,49 @@ class TestComputeOverlaps:
         assert len(issues_relaxed) == 1
 
 
+# ── evaluate_overlap_policy tests ─────────────────────────────────────────────
+
+
+class TestEvaluateOverlapPolicy:
+    def test_policy_pass_no_issues(self) -> None:
+        from videoforge.review.frame_reviewer import FrameReviewer
+        assert FrameReviewer.evaluate_overlap_policy({"issues": []}) == "pass"
+
+    def test_policy_fail_on_high(self) -> None:
+        from videoforge.review.frame_reviewer import FrameReviewer
+        result = FrameReviewer.evaluate_overlap_policy({
+            "issues": [{"severity": "high", "type": "overlap", "iou": 0.9}],
+        })
+        assert result == "fail"
+
+    def test_policy_warn_on_medium(self) -> None:
+        from videoforge.review.frame_reviewer import FrameReviewer
+        result = FrameReviewer.evaluate_overlap_policy({
+            "issues": [{"severity": "medium", "type": "clipped"}],
+        })
+        assert result == "warn"
+
+    def test_policy_warn_on_mixed_low_medium(self) -> None:
+        from videoforge.review.frame_reviewer import FrameReviewer
+        result = FrameReviewer.evaluate_overlap_policy({
+            "issues": [
+                {"severity": "low", "type": "unknown"},
+                {"severity": "medium", "type": "clipped"},
+            ],
+        })
+        assert result == "warn"
+
+    def test_policy_fail_high_overrides_medium(self) -> None:
+        from videoforge.review.frame_reviewer import FrameReviewer
+        result = FrameReviewer.evaluate_overlap_policy({
+            "issues": [
+                {"severity": "medium", "type": "clipped"},
+                {"severity": "high", "type": "overlap", "iou": 0.9},
+            ],
+        })
+        assert result == "fail"
+
+
 # ── FrameReviewer integration tests ──────────────────────────────────────────
 
 
