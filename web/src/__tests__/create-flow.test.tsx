@@ -21,7 +21,7 @@ describe("CreatePage", () => {
     expect(screen.getByText("Progress")).toBeInTheDocument();
     expect(screen.getByText("Grill prompt")).toBeInTheDocument();
   });
-  it("shows grill panel placeholder", () => {
+  it("shows grill panel placeholder when idle", () => {
     render(<CreatePage />);
     expect(screen.getByText("Submit a prompt to see grill results")).toBeInTheDocument();
   });
