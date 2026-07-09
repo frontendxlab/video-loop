@@ -19,38 +19,110 @@ import shutil
 import subprocess
 import tempfile
 import wave
+from dataclasses import dataclass
 from pathlib import Path
 
 logger = logging.getLogger("videoforge.audio.forced_align")
+
+
+@dataclass
+class AlignmentMetadata:
+    """Quality metadata for an alignment run."""
+
+    source: str
+    confidence: float
+    fallback_used: bool
+    attempted_backends: tuple[str, ...] = ()
+
+
+class AlignmentResult(list):
+    """List of word-timing dicts with attached AlignmentMetadata.
+
+    Behaves like a plain list for backward compatibility.
+    """
+
+    def __init__(self, iterable=(), *, metadata: AlignmentMetadata | None = None):
+        super().__init__(iterable)
+        self.metadata = metadata
+
+
+_SOURCE_CONFIDENCE: dict[str, float] = {
+    "aeneas": 0.95,
+    "whisper": 0.85,
+    "espeak": 0.60,
+    "punctuation_estimate": 0.40,
+    "none": 1.0,
+}
 
 
 def forced_align(
     text: str,
     wav_path: str,
     language: str = "en",
-) -> list[dict]:
-    """Return word timings [{"text","startMs","endMs"}] for text against wav.
+) -> AlignmentResult:
+    """Return word timings + alignment metadata for text against wav.
 
-    Tries real backends; falls back to punctuation-aware distribution.
-    Never raises — always returns timings (last resort is estimated).
+    Tries real backends (aeneas -> whisper -> espeak-ng); falls back to
+    punctuation-aware distribution.
+
+    Returns
+    -------
+    AlignmentResult
+        List of per-word dicts (``{"text", "startMs", "endMs"}``) with
+        a ``.metadata`` attribute carrying source, confidence, and
+        fallback info.
     """
     words = text.split()
     if not words:
-        return []
+        return AlignmentResult(
+            metadata=AlignmentMetadata(source="none", confidence=1.0, fallback_used=False),
+        )
     if not Path(wav_path).exists():
         logger.warning("forced_align: wav missing %s, estimating", wav_path)
-        return _punctuation_aware_estimate(text, _wav_duration_safe(wav_path))
+        return AlignmentResult(
+            _punctuation_aware_estimate(text, _wav_duration_safe(wav_path)),
+            metadata=AlignmentMetadata(
+                source="punctuation_estimate",
+                confidence=_SOURCE_CONFIDENCE["punctuation_estimate"],
+                fallback_used=True,
+                attempted_backends=(),
+            ),
+        )
 
-    for backend in (_align_aeneas, _align_whisper, _align_espeak):
+    backends: list[tuple[str, Any]] = [
+        ("aeneas", _align_aeneas),
+        ("whisper", _align_whisper),
+        ("espeak", _align_espeak),
+    ]
+    attempted: list[str] = []
+
+    for name, backend in backends:
+        attempted.append(name)
         try:
             result = backend(text, wav_path, language)
             if result:
-                return result
+                return AlignmentResult(
+                    result,
+                    metadata=AlignmentMetadata(
+                        source=name,
+                        confidence=_SOURCE_CONFIDENCE.get(name, 0.5),
+                        fallback_used=len(attempted) > 1,
+                        attempted_backends=tuple(attempted),
+                    ),
+                )
         except Exception as exc:
-            logger.debug("forced_align: %s failed: %s", backend.__name__, exc)
+            logger.debug("forced_align: %s failed: %s", name, exc)
 
     logger.info("forced_align: no backend, using punctuation-aware estimate")
-    return _punctuation_aware_estimate(text, _wav_duration_safe(wav_path))
+    return AlignmentResult(
+        _punctuation_aware_estimate(text, _wav_duration_safe(wav_path)),
+        metadata=AlignmentMetadata(
+            source="punctuation_estimate",
+            confidence=_SOURCE_CONFIDENCE["punctuation_estimate"],
+            fallback_used=True,
+            attempted_backends=tuple(attempted),
+        ),
+    )
 
 
 def _wav_duration_safe(path: str) -> float:

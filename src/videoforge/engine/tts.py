@@ -66,6 +66,11 @@ def generate_audio(
     # Prefer forced alignment (real word boundaries) when module available
     words = text.split()
     word_timestamps: list[WordTiming]
+    alignment_metadata: dict[str, object] = {
+        "source": "estimated",
+        "confidence": 0.2,
+        "fallback_used": True,
+    }
     try:
         from videoforge.audio.forced_align import forced_align
         aligned = forced_align(text, str(path))
@@ -73,6 +78,14 @@ def generate_audio(
             WordTiming(text=w["text"], startMs=float(w["startMs"]), endMs=float(w["endMs"]))
             for w in aligned
         ]
+        meta = aligned.metadata
+        if meta is not None:
+            alignment_metadata = {
+                "source": meta.source,
+                "confidence": meta.confidence,
+                "fallback_used": meta.fallback_used,
+                "attempted_backends": list(meta.attempted_backends),
+            }
     except Exception:
         word_timestamps = _estimate_word_timestamps(words, duration)
 
@@ -81,6 +94,7 @@ def generate_audio(
         "duration_seconds": duration,
         "sample_rate": 24000,
         "word_timestamps": [{"text": w.text, "startMs": w.startMs, "endMs": w.endMs} for w in word_timestamps],
+        "alignment_metadata": alignment_metadata,
     }
 
 
