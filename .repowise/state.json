@@ -1,6 +1,6 @@
 {
-  "last_sync_commit": "dbf663758fc9d2560efb0baa3cb88876ece7ae4c",
-  "total_pages": 99,
+  "last_sync_commit": "a292ec5cc307377a384265de6d81b235036d9965",
+  "total_pages": 121,
   "provider": "openrouter",
   "model": "openai/gpt-oss-120b",
   "docs_enabled": true,

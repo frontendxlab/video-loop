@@ -3,6 +3,7 @@ import { AbsoluteFill, useCurrentFrame, interpolate, spring, useVideoConfig, Eas
 import { z } from "zod";
 import { WordTiming } from "../captions/wordTiming";
 import { getStepProgress } from "../timing/audio-timing";
+import { ShikiCode } from "../components/ShikiCode";
 
 export const CodeSceneSchema = z.object({
   code: z.string(),
@@ -26,6 +27,18 @@ export const CodeScene: React.FC<CodeSceneProps> = ({ code, lang, highlightLines
   const captionOpacity = interpolate(frame, [0, 30], [0, 1], { extrapolateRight: "clamp" });
 
   const lines = code.split("\n");
+  const totalWords = wordTimestamps?.length ?? 0;
+  const visibleLines = (() => {
+    if (!wordTimestamps || totalWords === 0) {
+      return Math.min(lines.length, Math.max(1, Math.floor((frame / 10) + 1)));
+    }
+    const wordsPerLine = totalWords / lines.length;
+    const currentWordIdx = wordTimestamps.findIndex(
+      (w) => ((frame - sceneStartFrame) / fps) * 1000 < w.startMs,
+    );
+    const activeWord = currentWordIdx === -1 ? totalWords : currentWordIdx;
+    return Math.min(lines.length, Math.max(1, Math.ceil(activeWord / wordsPerLine)));
+  })();
 
   return (
     <AbsoluteFill style={{
@@ -45,7 +58,6 @@ export const CodeScene: React.FC<CodeSceneProps> = ({ code, lang, highlightLines
         flex: 1, borderRadius: 16, overflow: "hidden",
         background: "#161b22",
         border: "1px solid rgba(255,255,255,0.06)",
-        boxShadow: "none",
       }}>
         <div style={{
           padding: "12px 16px", background: "rgba(255,255,255,0.03)",
@@ -57,42 +69,14 @@ export const CodeScene: React.FC<CodeSceneProps> = ({ code, lang, highlightLines
           <div style={{ width: 12, height: 12, borderRadius: "50%", background: "#28c840" }} />
           <span style={{ marginLeft: 12, fontSize: 13, color: "rgba(255,255,255,0.4)" }}>{lang}</span>
         </div>
-        <div style={{ padding: 16, fontFamily: "monospace", fontSize: 16, lineHeight: "1.6", overflow: "auto" }}>
-          {lines.map((line, i) => {
-            const isHighlighted = highlightLines.includes(i + 1);
-            let lineOpacity: number;
-            if (wordTimestamps && wordTimestamps.length > 0) {
-              const totalWords = wordTimestamps.length;
-              const wordsPerLine = totalWords / lines.length;
-              const lineWordStart = Math.floor(i * wordsPerLine);
-              const lineWordEnd = Math.floor((i + 1) * wordsPerLine);
-              if (lineWordStart < totalWords) {
-                const endIdx = Math.min(lineWordEnd, totalWords - 1);
-                lineOpacity = getStepProgress(frame, fps, wordTimestamps[lineWordStart].startMs, wordTimestamps[endIdx].endMs, sceneStartFrame);
-              } else {
-                lineOpacity = 0;
-              }
-            } else {
-              const lineDelay = i * 2;
-              lineOpacity = Math.min(1, Math.max(0, (frame - lineDelay) / 10));
-            }
-            return (
-              <div key={i} style={{
-                display: "flex",
-                opacity: lineOpacity,
-                background: isHighlighted ? "rgba(74,144,217,0.12)" : "transparent",
-                borderRadius: 4, padding: "1px 0",
-                borderLeft: isHighlighted ? "3px solid #4a90d9" : "3px solid transparent",
-              }}>
-                <span style={{ width: 36, color: "rgba(255,255,255,0.3)", textAlign: "right", marginRight: 16, flexShrink: 0, fontSize: 14 }}>
-                  {i + 1}
-                </span>
-                <span style={{ color: isHighlighted ? "#fff" : "rgba(255,255,255,0.75)", whiteSpace: "pre" }}>
-                  {line || " "}
-                </span>
-              </div>
-            );
-          })}
+        <div style={{ padding: 16, overflow: "auto" }}>
+          <ShikiCode
+            code={code}
+            lang={lang || "text"}
+            theme="poimandres"
+            highlightLines={highlightLines}
+            visibleLines={visibleLines}
+          />
         </div>
       </div>
       {caption && (

@@ -11,23 +11,21 @@
 > (documentation, ownership, history, decisions). **Always verify against
 > actual source files before making changes** — the index may be stale.
 
-Last indexed: 2026-07-09 (commit 5c69052). Confidence: 100%.
+Last indexed: 2026-07-09 (commit 64ddeae). Confidence: 100%.
 ### Architecture
+**repo is a full‑stack video‑generation platform:** it ingests source assets (media files, JSON/TOML configuration, and Remotion composition scripts), orchestrates a **fetch → render → review → compress** pipeline, and emits high‑resolution video files, a FastAPI‑served web UI, and a Remotion‑based composition editor for downstream consumption. The monorepo bundles a Python‑centric rendering engine (videoforge) with a TypeScript‑based Remotion front‑end (remotion‑project), plus auxiliary tooling (e.g., the caveman‑compress skill) that together enable end‑to‑end video creation, validation, and delivery. ---
+*The repository also contains a small JavaScript utility package (.opencode) and a suite of Python unit‑tests covering the engine, fetcher, renderer, and validation logic.*
+---
+*Additional internal entry points (e.g., src/videoforge/engine/models.py, src/videoforge/engine/manim_renderer.py) are imported by the above scripts during request handling.*
+---
+---
 ---  
-**repo is a video‑production platform that ingests raw media assets, scene‑definition code, and optional audio tracks, runs them through a fetch‑→‑timing‑→‑render‑→‑review pipeline, and emits final encoded video files together with a web‑based preview UI.**  
-The pipeline can be broken down into four logical stages:  
-The end‑to‑end artefacts are:  
----  
----  
----  
----  
----  
-*Prepared for onboarding new developers – all paths are relative to the repository root.*
+*Happy coding!
 ### Key Modules
 | Module | Purpose |
 |--------|---------|
 | `remotion-project` | The **remotion‑project** module is the **rendering subsystem** of Repowise’s… |
-| `src/videoforge` | The **VideoForge subsystem** is the core video‑generation and review engine of… |
+| `src/videoforge` | The **Video Forge** module is the central *generation subsystem* of Repowise’s… |
 ### Entry Points
 - `src/videoforge/app.py`
 - `src/videoforge/server.py`
@@ -56,23 +54,26 @@ The end‑to‑end artefacts are:
 ### Hotspots (High Churn)
 | File | Churn | 90d Commits | Owner |
 |------|-------|-------------|-------|
-| `remotion-project/src/scenes/CodeScene.tsx` | 98.2th %ile | 3 | Rashid |
-| `remotion-project/src/scenes/BulletScene.tsx` | 97.3th %ile | 3 | Rashid |
-| `src/videoforge/app.py` | 93.8th %ile | 3 | Rashid |
-| `remotion-project/src/scenes/OutroScene.tsx` | 92.9th %ile | 3 | Rashid |
-| `remotion-project/src/compositions/VideoComposition.tsx` | 91.1th %ile | 3 | Rashid |
+| `vfx-cli` | 99.7th %ile | 6 | Rashid |
+| `remotion-project/src/scenes/CodeScene.tsx` | 99.4th %ile | 3 | Rashid |
+| `remotion-project/src/scenes/BulletScene.tsx` | 97.0th %ile | 3 | Rashid |
+| `src/videoforge/app.py` | 95.8th %ile | 3 | Rashid |
+| `remotion-project/src/scenes/OutroScene.tsx` | 95.2th %ile | 3 | Rashid |
 
 ## Code health
 Three signals: **defect risk** (the overall score), **maintainability** (smells that hurt readability/change-cost without predicting bugs), and **performance** (static performance RISK: I/O-in-loop / N+1 shapes that waste work, high-precision/low-recall). Maintainability and performance are co-equal views, never blended into the defect headline. See `docs/CODE_HEALTH.md`.
 
-Defect risk, Hotspot health: 8.22/10 (stable) ·
-Average: 9.44/10 ·
-Worst: 5.2/10 (`src/videoforge/review/l3_smoothness.py`)
-Maintainability, Average: 9.62/10
-Performance risk, Average: 9.91/10
+Defect risk, Hotspot health: 7.05/10 (stable) ·
+Average: 9.57/10 ·
+Worst: 4.04/10 (`vfx-cli`)
+Maintainability, Average: 9.73/10
+Performance risk, Average: 9.93/10
 
 ### Critical biomarkers
 - `remotion-project/src/compositions/VideoComposition.tsx` — change entropy — impact −3.0
+- `vfx-cli` — function hotspot (wizard) — impact −2.3
+- `vfx-cli` — complex method (wizard) — impact −0.9
+- `src/videoforge/engine/manim_renderer.py` — brain method (scene_to_manim_code) — impact −0.3
 
 ### Repowise MCP Tools
 

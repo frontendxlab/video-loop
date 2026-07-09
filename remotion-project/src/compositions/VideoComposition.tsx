@@ -8,6 +8,8 @@ import { ImageScene } from "../scenes/ImageScene";
 import { OutroScene } from "../scenes/OutroScene";
 import { AnimatedMindMap, MindMapNode } from "../components/AnimatedMindMap";
 import { AnimatedCodeLines } from "../components/AnimatedCodeLines";
+import { ChartScene } from "../components/scenes/ChartScene";
+import { TimelineScene } from "../components/scenes/TimelineScene";
 
 interface WordTimingData {
   text: string;
@@ -31,6 +33,10 @@ interface SceneData {
   wordTimestamps?: WordTimingData[];
   sceneStartFrame?: number;
   root?: MindMapNode;
+  chartType?: "bar" | "line";
+  data?: { label: string; value: number }[];
+  yAxisLabel?: string;
+  events?: { label: string; date?: string }[];
 }
 
 interface AudioTrack {
@@ -73,6 +79,10 @@ const SceneRenderer: React.FC<{ scene: SceneData; frameOffset: number }> = ({ sc
       return <AnimatedMindMap root={scene.root || { id: "root", label: scene.title || "", children: [], timing: ts?.[0] }} wordTimestamps={ts || []} sceneStartFrame={sf} />;
     case "code-walkthrough":
       return <AnimatedCodeLines code={scene.code || ""} lang={scene.lang || "text"} wordTimestamps={ts || []} sceneStartFrame={sf} title={scene.title} />;
+    case "chart":
+      return <ChartScene chartType={scene.chartType || "bar"} title={scene.title} data={scene.data || []} yAxisLabel={scene.yAxisLabel} duration={dur} wordTimestamps={ts} sceneStartFrame={sf} />;
+    case "timeline":
+      return <TimelineScene title={scene.title} events={scene.events || []} duration={dur} wordTimestamps={ts} sceneStartFrame={sf} />;
     default:
       return (
         <AbsoluteFill style={{ background: "linear-gradient(135deg, #0f0f23, #1a1a3e)", justifyContent: "center", alignItems: "center", color: "white", fontSize: 32 }}>

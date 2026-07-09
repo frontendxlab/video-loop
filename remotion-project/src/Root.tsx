@@ -86,6 +86,40 @@ export const RemotionRoot: React.FC = () => {
         schema={InputPropsSchema}
         defaultProps={DEFAULT_PROPS}
       />
+      <Composition
+        id="ChartComposition"
+        component={VideoComposition}
+        durationInFrames={300}
+        fps={30}
+        width={1920}
+        height={1080}
+        schema={InputPropsSchema}
+        defaultProps={{
+          title: "Chart",
+          scenes: [{ type: "chart", chartType: "bar" as const, title: "Demo", data: [{ label: "A", value: 10 }, { label: "B", value: 20 }], duration: 120 }],
+          audioTracks: [],
+          captions: [],
+          voice: "alba",
+          style: { primaryColor: "#4a90d9", font: "Inter", codeTheme: "poimandres" },
+        }}
+      />
+      <Composition
+        id="TimelineComposition"
+        component={VideoComposition}
+        durationInFrames={300}
+        fps={30}
+        width={1920}
+        height={1080}
+        schema={InputPropsSchema}
+        defaultProps={{
+          title: "Timeline",
+          scenes: [{ type: "timeline", title: "Demo", events: [{ label: "Start", date: "2020" }, { label: "End", date: "2024" }], duration: 120 }],
+          audioTracks: [],
+          captions: [],
+          voice: "alba",
+          style: { primaryColor: "#4a90d9", font: "Inter", codeTheme: "poimandres" },
+        }}
+      />
     </>
   );
 };

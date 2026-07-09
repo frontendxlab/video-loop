@@ -26,3 +26,5 @@ WARNING:pocket_tts.models.tts_model:Chunk has 51 tokens (max 50), generation may
   42 segments, 4247w, ~23min
 WARNING:pocket_tts.models.tts_model:Chunk has 55 tokens (max 50), generation may skip words: 'A well-designed system prompt is the single highes...'
   [20/42]
+WARNING:pocket_tts.models.tts_model:Chunk has 51 tokens (max 50), generation may skip words: 'For the exam, understand how schema precision affe...'
+WARNING:pocket_tts.models.tts_model:Chunk has 64 tokens (max 50), generation may skip words: 'Simply defining an enum in the schema text or desc...'

@@ -64,6 +64,22 @@ export const OutroSceneSchema = z.object({
   duration: z.number().positive(),
 });
 
+export const ChartSceneSchema = z.object({
+  type: z.literal("chart"),
+  chartType: z.enum(["bar", "line"]).default("bar"),
+  title: z.string().optional(),
+  data: z.array(z.object({ label: z.string(), value: z.number() })),
+  yAxisLabel: z.string().optional(),
+  duration: z.number().positive(),
+});
+
+export const TimelineSceneSchema = z.object({
+  type: z.literal("timeline"),
+  title: z.string().optional(),
+  events: z.array(z.object({ label: z.string(), date: z.string().optional() })).min(1),
+  duration: z.number().positive(),
+});
+
 export const SceneSchema = z.discriminatedUnion("type", [
   TitleSceneSchema,
   CodeSceneSchema,
@@ -73,6 +89,8 @@ export const SceneSchema = z.discriminatedUnion("type", [
   ComparisonSceneSchema,
   DiagramSceneSchema,
   OutroSceneSchema,
+  ChartSceneSchema,
+  TimelineSceneSchema,
 ]);
 
 export const AudioTrackSchema = z.object({
@@ -110,6 +128,8 @@ export type ImageScene = z.infer<typeof ImageSceneSchema>;
 export type ComparisonScene = z.infer<typeof ComparisonSceneSchema>;
 export type DiagramScene = z.infer<typeof DiagramSceneSchema>;
 export type OutroScene = z.infer<typeof OutroSceneSchema>;
+export type ChartScene = z.infer<typeof ChartSceneSchema>;
+export type TimelineScene = z.infer<typeof TimelineSceneSchema>;
 export type Scene = z.infer<typeof SceneSchema>;
 export type AudioTrack = z.infer<typeof AudioTrackSchema>;
 export type Caption = z.infer<typeof CaptionSchema>;

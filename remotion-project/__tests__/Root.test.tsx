@@ -8,13 +8,13 @@ describe("Remotion Root", () => {
   });
 
   it("registers all 4 compositions", () => {
-    const compositions = ["CodeWalkthrough", "PRSummary", "IssueExplainer", "ChangelogVideo"];
+    const compositions = ["VideoComposition", "CodeWalkthrough", "ChartComposition", "TimelineComposition"];
     expect(compositions.length).toBe(4);
     compositions.forEach((c) => expect(c.length).toBeGreaterThan(0));
   });
 
-  it("registers 8 scene types", () => {
-    const scenes = ["title", "code", "diff", "bullet", "image", "comparison", "diagram", "outro"];
-    expect(scenes.length).toBe(8);
+  it("registers 10 scene types", () => {
+    const scenes = ["title", "code", "diff", "bullet", "image", "comparison", "diagram", "outro", "chart", "timeline"];
+    expect(scenes.length).toBe(10);
   });
 });
