@@ -18,6 +18,7 @@ class SceneType(str, Enum):
     COMPARISON = "comparison"
     DIFF = "diff"
     OUTRO = "outro"
+    MANIM = "manim"  # Rendered via Manim (optional engine)
 
 
 @dataclass
@@ -71,6 +72,8 @@ class SceneDefinition:
     nodeprefix: str = ""
     root: SceneNode | None = None
     highlightLines: list[int] = field(default_factory=list)
+    renderer: str = "remotion"  # "remotion" | "manim" — which engine renders this scene
+    manim_code: str = ""  # Manim Python script (populated when renderer="manim")
 
 
 @dataclass

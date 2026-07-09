@@ -1,6 +1,7 @@
-"""Remotion renderer — deterministic video output.
+"""Multi-engine renderer — deterministic video output.
 
-Handles scene-by-scene rendering and FFmpeg concatenation.
+Handles scene-by-scene rendering across Remotion and Manim engines,
+then FFmpeg concatenation.
 """
 
 from __future__ import annotations
@@ -49,7 +50,24 @@ def render_scenes(
 
     rendered: list[str] = []
     for i, scene in enumerate(video.scenes):
-        # Build single-scene props
+        scene_renderer = getattr(scene, "renderer", "remotion")
+        output_path = output_dir / f"scene_{i:04d}.mp4"
+
+        if scene_renderer == "manim":
+            logger.info("Rendering scene %d/%d via Manim (%s, %df)", i + 1, len(video.scenes), scene.type.value, scene.duration)
+            from videoforge.engine.manim_renderer import render_scene as manim_render_scene
+            result = manim_render_scene(scene, output_dir, fps=video.fps, mode="direct")
+            if result["success"] and result["video_path"]:
+                src = Path(result["video_path"])
+                if src != output_path:
+                    import shutil
+                    shutil.copy2(str(src), str(output_path))
+                rendered.append(str(output_path.resolve()))
+            else:
+                raise RuntimeError(f"Scene {i} Manim render failed: {result.get('log', '')[-300:]}")
+            continue
+
+        # Build single-scene props for Remotion
         scene_props = video.to_remotion_props()
         scene_props["scenes"] = [scene_props["scenes"][i]]
         scene_props["audioTracks"] = [video.audioTracks[i]] if i < len(video.audioTracks) else []
@@ -58,7 +76,6 @@ def render_scenes(
         with open(props_path, "w") as f:
             json.dump(scene_props, f)
 
-        output_path = output_dir / f"scene_{i:04d}.mp4"
         cmd = [
             "npx", "remotion", "render",
             "src/index.ts", "VideoComposition",
@@ -69,12 +86,12 @@ def render_scenes(
             "--enforce-audio-track",
         ]
 
-        logger.info("Rendering scene %d/%d (%s, %df)", i + 1, len(video.scenes), scene.type.value, scene.duration)
+        logger.info("Rendering scene %d/%d via Remotion (%s, %df)", i + 1, len(video.scenes), scene.type.value, scene.duration)
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout_per_scene, cwd=str(remotion_dir), env={**os.environ, "TMPDIR": str(tmpdir or output_dir / "tmp")})
 
         if result.returncode != 0 or not output_path.exists():
             stderr = (result.stderr or "")[-500:]
-            raise RuntimeError(f"Scene {i} render failed: {stderr}")
+            raise RuntimeError(f"Scene {i} Remotion render failed: {stderr}")
 
         rendered.append(str(output_path.resolve()))
 

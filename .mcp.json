@@ -1,0 +1,27 @@
+{
+  "mcpServers": {
+    "repowise": {
+      "command": "repowise",
+      "args": [
+        "mcp",
+        "/home/rashid/projects/videoforge",
+        "--transport",
+        "stdio"
+      ],
+      "description": "repowise: codebase intelligence — docs, graph, git signals, dead code, decisions"
+    },
+    "manim-server": {
+      "command": "python3",
+      "args": [
+        "-m",
+        "manim_server"
+      ],
+      "env": {
+        "MANIM_EXECUTABLE": "manim"
+      },
+      "description": "Manim animation server — generate math/geometric animation videos"
+    }
+  }
+}
+  }
+}

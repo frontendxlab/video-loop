@@ -117,6 +117,8 @@ def engine_render_video(
             highlightLines=s.get("highlightLines", []),
             wordTimestamps=[WordTiming(**w) for w in s.get("wordTimestamps", [])],
             sceneStartFrame=s.get("sceneStartFrame", 0),
+            renderer=s.get("renderer", "remotion"),
+            manim_code=s.get("manim_code", ""),
         ))
 
     tracks = [AudioTrack(**t) for t in data.get("audioTracks", [])]
@@ -143,6 +145,29 @@ def engine_render_video(
         "file_size_mb": round(float(fmt.get("size", 0)) / 1e6, 1),
         "scenes": len(scene_paths),
         "frames": video.total_frames(),
+    }
+
+
+@video_mcp.tool()
+def engine_generate_manim(
+    code: str,
+    output_dir: str = "/tmp/vfx-build/manim",
+) -> dict:
+    """Generate a Manim animation video from Manim Python code.
+
+    Args:
+        code: Complete Manim Python script (class SceneName(Scene): ...).
+        output_dir: Directory to save the rendered video.
+
+    Returns:
+        Rendered video path and status.
+    """
+    from videoforge.engine.manim_renderer import render_direct
+    result = render_direct(code, output_dir)
+    return {
+        "success": result["success"],
+        "video_path": result["video_path"],
+        "log": result["log"][:300],
     }
 
 

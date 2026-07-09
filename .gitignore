@@ -20,3 +20,6 @@ videos/*.webm
 .ruff_cache/
 remotion-project/node_modules/
 remotion-project/dist/
+
+# repowise API keys (local)
+.repowise/.env

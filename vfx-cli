@@ -8,7 +8,7 @@ Usage:
     ./vfx-cli batch ...    # Non-interactive batch mode
 """
 
-import sys, json, time, shutil, subprocess, wave
+import os, sys, json, time, shutil, subprocess, wave
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "src"))
@@ -46,6 +46,16 @@ def estimate_timestamps(words, dur):
     pm = (dur * 1000) / len(words)
     return [{"text": w, "startMs": round(i * pm), "endMs": round((i + 1) * pm)} for i, w in enumerate(words)]
 
+
+USE_MANIM = "--use-manim" in sys.argv or os.environ.get("VFX_USE_MANIM") == "1"
+if USE_MANIM:
+    try:
+        import manim
+        from videoforge.engine.manim_renderer import scene_to_manim_code, render_direct
+        ok("Manim engine available")
+    except ImportError:
+        warn("Manim not installed, falling back to Remotion")
+        USE_MANIM = False
 
 # ── Scene templates ──
 
@@ -92,6 +102,10 @@ def wizard():
         make_bullet_scene("Production Best Practices", "Follow these best practices for deploying Claude in production.", ["Pin specific model versions in production", "Implement exponential backoff retry logic", "Monitor usage via Anthropic Console dashboard", "Use streaming for real-time applications", "Validate and sanitize all user inputs", "Cache repeated context for cost savings"]),
         make_outro_scene("Domain 1: Complete", "Proceed to Domain 2 — Application Design"),
     ]
+
+    if USE_MANIM:
+        scenes.insert(3, {"type": "manim", "title": "Claude Architecture", "text": "Claude's architecture uses transformer-based neural networks with constitutional AI training.", "duration": 120, "renderer": "manim"})
+        info("Added Manim-animated scene")
 
     info(f"Planned {len(scenes)} scenes")
     time.sleep(0.3)
@@ -170,6 +184,32 @@ def wizard():
     print(f"\n  {B}── Step 4: Render Scenes ──{N}")
     rendered = []
     for i, scene in enumerate(scenes):
+        out = BUILD / f"scene_{i:04d}.mp4"
+
+        if scene.get("renderer") == "manim" or scene.get("type") == "manim":
+            log("render-agent", f"Scene {i+1}/{len(scenes)} (manim, {scene['duration']}f)")
+            from videoforge.engine.manim_renderer import scene_to_manim_code, render_direct
+            from videoforge.engine.models import SceneDefinition, SceneType as ST
+            sd = SceneDefinition(
+                type=ST(scene.get("type", "title")),
+                duration=scene.get("duration", 90),
+                title=scene.get("title", ""),
+                subtitle=scene.get("subtitle", ""),
+                text=scene.get("text", ""),
+                renderer="manim",
+            )
+            mcode = scene_to_manim_code(sd)
+            mresult = render_direct(mcode, BUILD, quality="high_quality")
+            if mresult["success"] and mresult["video_path"]:
+                src = Path(mresult["video_path"])
+                if src != out:
+                    shutil.copy2(str(src), str(out))
+                ok(f"Manim rendered: {out.stat().st_size/1024:.0f}KB")
+                rendered.append(str(out))
+            else:
+                warn(f"Manim render failed: {(mresult.get('log') or '')[:200]}")
+            continue
+
         single = {
             "title": topic, "scenes": [scene],
             "audioTracks": [tracks[i]] if i < len(tracks) else [],
@@ -177,7 +217,6 @@ def wizard():
             "style": {"primaryColor": "#4a90d9", "font": "Inter", "codeTheme": "poimandres"},
         }
         (BUILD / f"props_{i:04d}.json").write_text(json.dumps(single))
-        out = BUILD / f"scene_{i:04d}.mp4"
 
         log("render-agent", f"Scene {i+1}/{len(scenes)} ({scene['type']}, {scene['duration']}f)")
         r = subprocess.run(
@@ -248,6 +287,7 @@ def batch():
     parser.add_argument("--output", default="videos/output.mp4")
     parser.add_argument("--voice", default="alba")
     parser.add_argument("--tts-url", default="http://localhost:8000")
+    parser.add_argument("--use-manim", action="store_true", help="Use Manim for some scenes")
     args = parser.parse_args()
     sys.argv = ["vfx-cli", "pipeline", "--topic", args.topic, "--output", args.output, "--voice", args.voice, "--tts-url", args.tts-url]
     from videoforge.app import app
