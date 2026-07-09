@@ -6,6 +6,8 @@ from unittest.mock import patch
 
 import pytest
 
+pytestmark = pytest.mark.render_smoke
+
 
 def test_render_pr_returns_job_id():
     from videoforge.server import create_app

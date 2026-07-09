@@ -10,6 +10,7 @@ import pytest
 
 class TestFullPipeline:
     @pytest.mark.slow
+    @pytest.mark.render_smoke
     def test_full_pipeline_completes(self):
         """Pipeline should complete all 12 phases in order."""
         from videoforge.orchestrator.pipeline import Pipeline

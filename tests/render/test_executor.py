@@ -9,6 +9,8 @@ from unittest.mock import patch, MagicMock
 import pytest
 from videoforge.exceptions import RenderError
 
+pytestmark = pytest.mark.render_smoke
+
 
 @pytest.fixture
 def executor():

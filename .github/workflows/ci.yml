@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  structural:
+    name: Structural tests (fast)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.10"
+      - run: uv sync --only-dev
+      - run: uv run pytest -m "not render_smoke" -v --tb=short
+        name: Run structural tests
+
+  render-smoke:
+    name: Render smoke tests (optional)
+    runs-on: ubuntu-latest
+    needs: [structural]
+    if: github.event_name == 'push' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'render-smoke'))
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.10"
+      - run: uv sync --only-dev
+      - run: uv run pytest -m render_smoke -v --tb=short
+        name: Run render smoke tests

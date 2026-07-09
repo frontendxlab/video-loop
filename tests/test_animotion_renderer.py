@@ -17,6 +17,8 @@ from videoforge.engine.animotion_adapter import get_animotion_render_config, sce
 from videoforge.engine.animotion_renderer import capture_frames, frames_to_video
 from videoforge.engine.models import SceneDefinition, SceneType
 
+pytestmark = pytest.mark.render_smoke
+
 
 class TestAnimotionAdapter:
     def test_render_config_returns_animotion(self):

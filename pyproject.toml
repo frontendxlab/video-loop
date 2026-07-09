@@ -24,6 +24,11 @@ target-version = "py310"
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 filterwarnings = ["ignore::DeprecationWarning"]
+markers = [
+    "slow: integration tests exceeding 5s; excluded via -m 'not slow'",
+    "render_smoke: render pipeline tests; candidates for optional heavy smoke suite",
+    "structural: fast structural/logic unit tests (default suite)",
+]
 
 [dependency-groups]
 dev = [

@@ -9,6 +9,8 @@ import pytest
 from videoforge.review.repair_actions import RepairAction
 from videoforge.review.rerender_orchestrator import run_orchestrated_review
 
+pytestmark = pytest.mark.render_smoke
+
 
 def _review_no_issues(path: str) -> dict[str, Any]:
     return {"issues": [], "passed": True, "sampled_frames": 6}
