@@ -1,6 +1,7 @@
 import React from "react";
 import { AbsoluteFill, useCurrentFrame, interpolate, Easing } from "remotion";
 import { z } from "zod";
+import { colors, fonts } from "../../design-tokens";
 
 export const TimelineSceneSchema = z.object({
   title: z.string().optional(),
@@ -33,11 +34,11 @@ export const TimelineScene: React.FC<TimelineSceneProps> = ({ title, events }) =
     PAD.left + (events.length === 1 ? AXIS_W / 2 : (i / (events.length - 1)) * AXIS_W);
 
   return (
-    <AbsoluteFill style={{ background: "linear-gradient(135deg, #0f0f23 0%, #1a1a3e 100%)", opacity }}>
+    <AbsoluteFill style={{ background: colors.backgroundGradient, opacity }}>
       {title && (
         <div style={{
           position: "absolute", top: 40, left: 0, right: 0, textAlign: "center",
-          fontSize: 32, fontWeight: "700", color: "rgba(255,255,255,0.95)",
+          fontSize: 32, fontWeight: "700", color: colors.text,
           opacity: titleOpacity, letterSpacing: "-0.3px",
         }}>
           {title}
@@ -45,7 +46,7 @@ export const TimelineScene: React.FC<TimelineSceneProps> = ({ title, events }) =
       )}
       <svg width={W} height={H} style={{ position: "absolute", inset: 0 }}>
         <line x1={PAD.left} y1={AXIS_Y} x2={PAD.left + AXIS_W} y2={AXIS_Y} stroke="rgba(255,255,255,0.15)" strokeWidth={4} />
-        <line x1={PAD.left} y1={AXIS_Y} x2={PAD.left + filledW} y2={AXIS_Y} stroke="#4a90d9" strokeWidth={4} strokeLinecap="round" />
+        <line x1={PAD.left} y1={AXIS_Y} x2={PAD.left + filledW} y2={AXIS_Y} stroke={colors.primary} strokeWidth={4} strokeLinecap="round" />
         {events.map((e, i) => {
           const x = xFor(i);
           const reached = x <= PAD.left + filledW + 1;
@@ -57,13 +58,13 @@ export const TimelineScene: React.FC<TimelineSceneProps> = ({ title, events }) =
           const labelY = above ? AXIS_Y - 70 : AXIS_Y + 70;
           return (
             <g key={i} opacity={labelOpacity}>
-              <circle cx={x} cy={AXIS_Y} r={10 * nodeScale} fill={reached ? "#7c5cbf" : "rgba(255,255,255,0.3)"} />
+              <circle cx={x} cy={AXIS_Y} r={10 * nodeScale} fill={reached ? colors.primary : "rgba(255,255,255,0.3)"} />
               <line x1={x} y1={AXIS_Y} x2={x} y2={labelY} stroke="rgba(255,255,255,0.3)" strokeWidth={1.5} />
-              <text x={x} y={labelY + (above ? -10 : 22)} fill="rgba(255,255,255,0.95)" fontSize={22} textAnchor="middle" fontWeight="600" fontFamily="Inter, sans-serif">
+              <text x={x} y={labelY + (above ? -10 : 22)} fill={colors.text} fontSize={22} textAnchor="middle" fontWeight="600" fontFamily={fonts.sans}>
                 {e.label}
               </text>
               {e.date && (
-                <text x={x} y={labelY + (above ? -36 : 48)} fill="rgba(255,255,255,0.5)" fontSize={16} textAnchor="middle" fontFamily="Inter, sans-serif">
+                <text x={x} y={labelY + (above ? -36 : 48)} fill={colors.textMuted} fontSize={16} textAnchor="middle" fontFamily={fonts.sans}>
                   {e.date}
                 </text>
               )}

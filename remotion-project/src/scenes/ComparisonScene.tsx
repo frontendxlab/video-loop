@@ -1,6 +1,7 @@
 import React from "react";
 import { useCurrentFrame, interpolate } from "remotion";
 import { z } from "zod";
+import { colors, spacing } from "../design-tokens";
 
 export const ComparisonSceneSchema = z.object({
   labelBefore: z.string(),
@@ -27,7 +28,7 @@ export const ComparisonScene: React.FC<ComparisonSceneProps> = ({
       style={{
         flex: 1,
         display: "flex",
-        backgroundColor: "#1a1a2e",
+        backgroundColor: colors.background,
         width: "100%",
         height: "100%",
         position: "relative",
@@ -41,7 +42,7 @@ export const ComparisonScene: React.FC<ComparisonSceneProps> = ({
           top: 0,
           bottom: 0,
           width: leftClip,
-          backgroundColor: "#16213e",
+          backgroundColor: colors.backgroundElevated,
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
@@ -85,9 +86,9 @@ export const ComparisonScene: React.FC<ComparisonSceneProps> = ({
           top: 0,
           bottom: 0,
           width: 3,
-          backgroundColor: "#ffeb3b",
+          backgroundColor: colors.highlight,
           zIndex: 10,
-          boxShadow: "0 0 8px rgba(255, 235, 59, 0.5)",
+          boxShadow: `0 0 8px ${colors.highlight}80`,
         }}
       />
 
@@ -98,7 +99,7 @@ export const ComparisonScene: React.FC<ComparisonSceneProps> = ({
           top: 0,
           bottom: 0,
           width: `${100 - sweepProgress * 50}%`,
-          backgroundColor: "#0f3460",
+          backgroundColor: colors.surface,
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
@@ -115,10 +116,10 @@ export const ComparisonScene: React.FC<ComparisonSceneProps> = ({
           <div
             style={{
               fontSize: 14,
-              color: "#8b949e",
+              color: colors.textMuted,
               textTransform: "uppercase",
               letterSpacing: 2,
-              marginBottom: 8,
+              marginBottom: spacing.sm,
             }}
           >
             After
@@ -126,7 +127,7 @@ export const ComparisonScene: React.FC<ComparisonSceneProps> = ({
           <div
             style={{
               fontSize: 28,
-              color: "#fff",
+              color: colors.text,
               fontWeight: "bold",
             }}
           >

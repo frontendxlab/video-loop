@@ -1,6 +1,7 @@
 import React from "react";
 import { useCurrentFrame } from "remotion";
 import { z } from "zod";
+import { colors, spacing } from "../design-tokens";
 
 const NodeSchema = z.object({
   id: z.string(),
@@ -46,7 +47,7 @@ export const DiagramScene: React.FC<DiagramSceneProps> = ({
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        backgroundColor: "#1a1a2e",
+        backgroundColor: colors.background,
         width: "100%",
         height: "100%",
         overflow: "hidden",
@@ -76,8 +77,8 @@ export const DiagramScene: React.FC<DiagramSceneProps> = ({
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                backgroundColor: "rgba(255, 235, 59, 0.15)",
-                border: "2px solid #ffeb3b",
+                backgroundColor: `${colors.highlight}26`,
+                border: `2px solid ${colors.highlight}`,
                 borderRadius: 8,
                 opacity: nodeProgress,
                 transform: `scale(${nodeProgress})`,
@@ -85,10 +86,10 @@ export const DiagramScene: React.FC<DiagramSceneProps> = ({
             >
               <span
                 style={{
-                  color: "#fff",
+                  color: colors.text,
                   fontSize: 14,
                   textAlign: "center",
-                  padding: "0 8px",
+                  padding: `0 ${spacing.sm}px`,
                   wordBreak: "break-word",
                 }}
               >

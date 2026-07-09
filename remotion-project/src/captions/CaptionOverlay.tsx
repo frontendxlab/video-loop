@@ -1,6 +1,7 @@
 import React from "react";
 import { useCurrentFrame } from "remotion";
 import { WordTiming, frameToMs, getCurrentWordIndex, getWordOpacity } from "./wordTiming";
+import { colors } from "../design-tokens";
 
 interface CaptionOverlayProps {
   words: WordTiming[];
@@ -50,7 +51,7 @@ export const CaptionOverlay: React.FC<CaptionOverlayProps> = ({
               key={i}
               style={{
                 fontSize: 24,
-                color: isCurrent ? "#ffeb3b" : "#fff",
+                color: isCurrent ? colors.highlight : colors.text,
                 opacity,
                 transition: "opacity 0.15s, color 0.15s",
                 textShadow: "0 1px 2px rgba(0,0,0,0.5)",

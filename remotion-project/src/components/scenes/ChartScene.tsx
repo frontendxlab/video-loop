@@ -1,6 +1,7 @@
 import React from "react";
 import { AbsoluteFill, useCurrentFrame, interpolate, useVideoConfig, Easing } from "remotion";
 import { z } from "zod";
+import { colors, fonts } from "../../design-tokens";
 
 export const ChartSceneSchema = z.object({
   chartType: z.enum(["bar", "line"]).default("bar"),
@@ -57,11 +58,11 @@ export const ChartScene: React.FC<ChartSceneProps> = ({
     .join(" ");
 
   return (
-    <AbsoluteFill style={{ background: "linear-gradient(135deg, #0f0f23 0%, #1a1a3e 100%)", opacity }}>
+    <AbsoluteFill style={{ background: colors.backgroundGradient, opacity }}>
       {title && (
         <div style={{
           position: "absolute", top: 28, left: 0, right: 0, textAlign: "center",
-          fontSize: 32, fontWeight: "700", color: "rgba(255,255,255,0.95)",
+          fontSize: 32, fontWeight: "700", color: colors.text,
           opacity: titleOpacity, letterSpacing: "-0.3px",
         }}>
           {title}
@@ -73,7 +74,7 @@ export const ChartScene: React.FC<ChartSceneProps> = ({
           return (
             <g key={i}>
               <line x1={PAD.left} y1={y} x2={W - PAD.right} y2={y} stroke="rgba(255,255,255,0.08)" strokeWidth={1} />
-              <text x={PAD.left - 16} y={y + 5} fill="rgba(255,255,255,0.5)" fontSize={20} textAnchor="end" fontFamily="Inter, sans-serif">
+              <text x={PAD.left - 16} y={y + 5} fill={colors.textMuted} fontSize={20} textAnchor="end" fontFamily={fonts.sans}>
                 {Math.round(t)}
               </text>
             </g>
@@ -89,8 +90,8 @@ export const ChartScene: React.FC<ChartSceneProps> = ({
           const barH = (d.value / niceMax) * PLOT_H * grow;
           return (
             <g key={i}>
-              <rect x={x - barW / 2} y={PAD.top + PLOT_H - barH} width={barW} height={barH} fill="#4a90d9" rx={4} opacity={0.9} />
-              <text x={x} y={PAD.top + PLOT_H + 36} fill="rgba(255,255,255,0.8)" fontSize={20} textAnchor="middle" fontFamily="Inter, sans-serif">
+              <rect x={x - barW / 2} y={PAD.top + PLOT_H - barH} width={barW} height={barH} fill={colors.primary} rx={4} opacity={0.9} />
+              <text x={x} y={PAD.top + PLOT_H + 36} fill={colors.text} fontSize={20} textAnchor="middle" fontFamily={fonts.sans}>
                 {d.label}
               </text>
             </g>
@@ -100,13 +101,13 @@ export const ChartScene: React.FC<ChartSceneProps> = ({
         {chartType === "line" && (
           <>
             {linePoints.slice(0, visibleLinePoints).map((p, i) => (
-              <circle key={i} cx={p.x} cy={p.y} r={6} fill="#7c5cbf" opacity={0.95} />
+              <circle key={i} cx={p.x} cy={p.y} r={6} fill={colors.primary} opacity={0.95} />
             ))}
             {visibleLinePoints > 1 && (
-              <path d={linePath} fill="none" stroke="#4a90d9" strokeWidth={3} opacity={0.9} />
+              <path d={linePath} fill="none" stroke={colors.primary} strokeWidth={3} opacity={0.9} />
             )}
             {data.map((d, i) => (
-              <text key={i} x={xForLinePoint(i)} y={PAD.top + PLOT_H + 36} fill="rgba(255,255,255,0.8)" fontSize={20} textAnchor="middle" fontFamily="Inter, sans-serif">
+              <text key={i} x={xForLinePoint(i)} y={PAD.top + PLOT_H + 36} fill={colors.text} fontSize={20} textAnchor="middle" fontFamily={fonts.sans}>
                 {d.label}
               </text>
             ))}
@@ -118,7 +119,7 @@ export const ChartScene: React.FC<ChartSceneProps> = ({
           position: "absolute", left: 24, top: PAD.top, height: PLOT_H,
           display: "flex", alignItems: "center",
           transform: "rotate(-90deg)", transformOrigin: "left center",
-          fontSize: 18, color: "rgba(255,255,255,0.6)", letterSpacing: 1,
+          fontSize: 18, color: colors.textMuted, letterSpacing: 1,
         }}>
           {yAxisLabel}
         </div>

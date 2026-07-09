@@ -1,6 +1,7 @@
 import React, { useMemo } from "react";
 import { useCurrentFrame, useVideoConfig, spring, interpolate } from "remotion";
 import { WordTiming, getStepProgress } from "../timing/audio-timing";
+import { colors, spacing } from "../design-tokens";
 
 export interface MindMapNode {
   id: string;
@@ -144,7 +145,7 @@ export const AnimatedMindMap: React.FC<AnimatedMindMapProps> = ({
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        background: "linear-gradient(135deg, #0f0f23 0%, #1a1a3e 100%)",
+        background: colors.backgroundGradient,
         width: "100%",
         height: "100%",
         overflow: "hidden",
@@ -226,7 +227,7 @@ export const AnimatedMindMap: React.FC<AnimatedMindMapProps> = ({
               alignItems: "center",
               justifyContent: "center",
               borderRadius: 12,
-              background: "rgba(255,255,255,0.06)",
+              background: colors.chromePanel,
               backdropFilter: "blur(8px)",
               border: `1.5px solid ${accentColor}40`,
               boxShadow: `0 0 20px ${accentColor}20, inset 0 1px 0 ${accentColor}20`,
@@ -237,12 +238,12 @@ export const AnimatedMindMap: React.FC<AnimatedMindMapProps> = ({
           >
             <span
               style={{
-                color: "#fff",
+                color: colors.text,
                 fontSize: 14,
                 fontWeight: "600",
                 textAlign: "center",
                 lineHeight: 1.2,
-                padding: "0 8px",
+                padding: `0 ${spacing.sm}px`,
               }}
             >
               {node.label}
@@ -250,11 +251,11 @@ export const AnimatedMindMap: React.FC<AnimatedMindMapProps> = ({
             {node.sublabel && (
               <span
                 style={{
-                  color: "rgba(255,255,255,0.45)",
+                  color: colors.textMuted,
                   fontSize: 11,
                   textAlign: "center",
                   marginTop: 2,
-                  padding: "0 8px",
+                  padding: `0 ${spacing.sm}px`,
                 }}
               >
                 {node.sublabel}

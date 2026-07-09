@@ -1,6 +1,7 @@
 import React from "react";
 import { useCurrentFrame, interpolate } from "remotion";
 import { z } from "zod";
+import { colors } from "../design-tokens";
 
 export const ImageSceneSchema = z.object({
   src: z.string(),
@@ -48,7 +49,7 @@ export const ImageScene: React.FC<ImageSceneProps> = ({
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        backgroundColor: "#0d1117",
+        backgroundColor: colors.background,
         width: "100%",
         height: "100%",
         overflow: "hidden",
@@ -87,7 +88,7 @@ export const ImageScene: React.FC<ImageSceneProps> = ({
         >
           <span
             style={{
-              color: "#c9d1d9",
+              color: colors.text,
               fontSize: 20,
               textAlign: "center",
               opacity: Math.min(1, (frame - 10) / 20),
