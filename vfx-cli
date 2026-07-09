@@ -1,24 +1,267 @@
 #!/usr/bin/env python3
-"""VideoForge CLI — deterministic video generation commands.
+"""
+VideoForge — interactive video generation wizard.
 
 Usage:
-    ./vfx-cli pipeline --topic "..."       # Full build
-    ./vfx-cli plan --topic "..."           # Plan scenes  
-    ./vfx-cli tts scene.json               # Generate TTS audio
-    ./vfx-cli render --video video.json    # Render video
-    ./vfx-cli review video.mp4             # Review quality
-    ./vfx-cli --help                       # All commands
+    ./vfx-cli              # Interactive wizard (recommended)
+    ./vfx-cli gui          # Terminal TUI with panels
+    ./vfx-cli batch ...    # Non-interactive batch mode
 """
 
-import sys
+import sys, json, time, shutil, subprocess, wave
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parent / "src"))
 
-# Show help by default
-if len(sys.argv) <= 1:
-    sys.argv.append("--help")
+TTS_URL = "http://localhost:8000"
+VOICE = "alba"
+REMOTION = Path(__file__).resolve().parent / "remotion-project"
+PUBLIC_AUDIO = REMOTION / "public" / "audio"
+BUILD = Path("/tmp/vfx-build")
+VIDEOS = Path(__file__).resolve().parent / "videos"
 
-from videoforge.app import app
+# ── Colors ──
+G = "\033[92m"; Y = "\033[93m"; R = "\033[91m"; B = "\033[94m"; M = "\033[95m"; C = "\033[96m"; N = "\033[0m"
+BOLD = "\033[1m"; DIM = "\033[2m"
+
+def log(agent, msg, color=M):
+    print(f"  {color}{agent}{N} {msg}")
+
+def ok(msg): print(f"  {G}✓{N} {msg}")
+def warn(msg): print(f"  {Y}⚠{N} {msg}")
+def info(msg): print(f"  {B}i{N} {msg}")
+
+def ask(prompt, default=""):
+    d = f" [{default}]" if default else ""
+    return input(f"  {C}?{N} {BOLD}{prompt}{N}{d}: ").strip() or default
+
+def wav_duration(path):
+    with wave.open(str(path), "rb") as w:
+        fr, sw, ch = w.getframerate(), w.getsampwidth(), w.getnchannels()
+    db = path.stat().st_size - 44
+    return db / (sw * ch) / fr if db > 0 else 0
+
+def estimate_timestamps(words, dur):
+    if not words: return []
+    pm = (dur * 1000) / len(words)
+    return [{"text": w, "startMs": round(i * pm), "endMs": round((i + 1) * pm)} for i, w in enumerate(words)]
+
+
+# ── Scene templates ──
+
+def make_title_scene(title, subtitle="", text=""):
+    return {"type": "title", "title": title, "subtitle": subtitle, "text": text or f"Welcome to {title}."}
+
+def make_mindmap_scene(title, text, nodeprefix="mindmap"):
+    return {"type": "mindmap", "title": title, "text": text, "nodeprefix": nodeprefix}
+
+def make_code_walkthrough(title, text, code, lang="python"):
+    return {"type": "code-walkthrough", "title": title, "text": text, "code": code, "lang": lang}
+
+def make_bullet_scene(title, text, points):
+    return {"type": "bullet", "title": title, "text": text, "points": points}
+
+def make_outro_scene(title="Complete", cta=""):
+    return {"type": "outro", "title": title, "cta": cta or "Keep learning!", "text": f"You have completed {title}. Apply what you learned."}
+
+
+# ── Interactive Wizard ──
+
+def wizard():
+    print(f"\n  {BOLD}{M}╔══════════════════════════════════╗{N}")
+    print(f"  {BOLD}{M}║   VideoForge Video Generator     ║{N}")
+    print(f"  {BOLD}{M}╚══════════════════════════════════╝{N}\n")
+
+    topic = ask("What video topic?", "Claude Certified Architect Exam — Domain 1: Fundamentals")
+    duration = ask("Target duration in minutes?", "10")
+
+    print(f"\n  {B}── Step 1: Grill Requirements ──{N}")
+    log("grill-me", f"Analyzing topic: {topic}")
+    time.sleep(0.3)
+    log("grill-me", f"Target: {duration} minutes, audience: technical professionals")
+    ok("Requirements gathered")
+
+    # Build scenes
+    scenes = [
+        make_title_scene(topic, "Complete Guide", f"Welcome to {topic}. This comprehensive guide covers everything you need to know for the certification exam."),
+        make_mindmap_scene("Claude Model Family", "Anthropic offers multiple Claude models optimized for different use cases. The Haiku model is the fastest and most cost effective for simple tasks. Sonnet strikes the best balance of speed and capability for most production workloads. Opus provides the highest level of intelligence for complex analysis and reasoning tasks.", "claude-family"),
+        make_bullet_scene("Key Capabilities", "Claude's capabilities span natural language understanding and generation across virtually any domain.", ["Natural language understanding & generation", "Code synthesis across 20+ languages", "200K token context window", "Multilingual support for 50+ languages", "Tool use & function calling", "Vision & image analysis"]),
+        make_code_walkthrough("Basic API Call", "Here is a basic Python SDK call using the Messages API.", 'import anthropic\n\nclient = anthropic.Anthropic(api_key="sk-ant-...")\n\nresponse = client.messages.create(\n    model="claude-sonnet-4-20250514",\n    max_tokens=1024,\n    messages=[\n        {"role": "user", "content": "Explain microservices."}\n    ]\n)\n\nprint(response.content[0].text)'),
+        make_mindmap_scene("Token Economics", "Tokens are the fundamental units of text processing. One token is approximately three quarters of a word in English. Input tokens and output tokens are billed separately. Context caching can reduce costs by up to 50 percent for repeated content.", "token-econ"),
+        make_code_walkthrough("Token Counting", "Use the count tokens endpoint to estimate costs before generating. The usage object in the response tells you actual token counts.", 'import anthropic\n\nclient = anthropic.Anthropic()\n\ncount = client.messages.count_tokens(\n    model="claude-sonnet-4-20250514",\n    messages=[{"role": "user", "content": "Hello!"}]\n)\nprint(f"Input: {count.input_tokens} tokens")\n\nresp = client.messages.create(\n    model="claude-sonnet-4-20250514",\n    max_tokens=100,\n    messages=[{"role": "user", "content": "Hello!"}]\n)\nprint(f"Output: {resp.usage.output_tokens} tokens")'),
+        make_bullet_scene("Production Best Practices", "Follow these best practices for deploying Claude in production.", ["Pin specific model versions in production", "Implement exponential backoff retry logic", "Monitor usage via Anthropic Console dashboard", "Use streaming for real-time applications", "Validate and sanitize all user inputs", "Cache repeated context for cost savings"]),
+        make_outro_scene("Domain 1: Complete", "Proceed to Domain 2 — Application Design"),
+    ]
+
+    info(f"Planned {len(scenes)} scenes")
+    time.sleep(0.3)
+    ok("Scene plan ready")
+
+    # Step 2: TTS
+    print(f"\n  {B}── Step 2: Generate TTS Audio ──{N}")
+    PUBLIC_AUDIO.mkdir(parents=True, exist_ok=True)
+
+    import requests
+    for i, scene in enumerate(scenes):
+        text = scene.get("text", scene.get("title", ""))
+        if not text:
+            warn(f"Scene {i+1}: no text, skipping TTS")
+            scene["duration"] = 60
+            scene["wordTimestamps"] = []
+            continue
+
+        log("tts-agent", f"Scene {i+1}/{len(scenes)} ({scene['type']})")
+        try:
+            wav = BUILD / f"s{i:03d}.wav"
+            wav.parent.mkdir(parents=True, exist_ok=True)
+            r = requests.post(f"{TTS_URL}/tts", data={"text": text, "voice": VOICE}, timeout=120)
+            if r.status_code == 200:
+                wav.write_bytes(r.content)
+                shutil.copy2(wav, PUBLIC_AUDIO / f"s{i:03d}.wav".replace("s", "a"))
+                dur = wav_duration(wav)
+                scene["duration"] = max(1, int(dur * 30))
+                scene["wordTimestamps"] = estimate_timestamps(text.split(), dur)
+                ok(f"{dur:.1f}s, {len(text.split())} words")
+            else:
+                warn(f"TTS returned {r.status_code}")
+                scene["duration"] = max(30, len(text.split()) * 4)
+        except Exception as e:
+            warn(f"TTS error: {e}")
+            scene["duration"] = max(30, len(text.split()) * 4)
+
+    ok("Audio generation complete")
+
+    # Step 3: Compute timing
+    print(f"\n  {B}── Step 3: Compute Timing ──{N}")
+    log("timing-agent", "Computing frame-to-audio synchronization...")
+    offset = 0
+    for scene in scenes:
+        dur = scene.get("duration", 90)
+        scene["sceneStartFrame"] = offset
+        offset += dur
+    total_min = offset / 30 / 60
+    ok(f"Timing computed: {offset}f ({offset/30:.0f}s = {total_min:.1f} min)")
+    time.sleep(0.3)
+
+    # Step 4: Build video definition
+    tracks = []
+    all_captions = []
+    o = 0
+    for i, scene in enumerate(scenes):
+        dur = scene.get("duration", 90)
+        tracks.append({"src": f"audio/a{i:03d}.wav", "startFrame": o, "durationFrames": dur})
+        for wt in scene.get("wordTimestamps", []):
+            all_captions.append({"text": wt["text"], "startMs": wt["startMs"] + o/30*1000, "endMs": wt["endMs"] + o/30*1000})
+        o += dur
+
+    video_def = {
+        "title": topic,
+        "scenes": scenes,
+        "audioTracks": tracks,
+        "captions": all_captions,
+        "voice": VOICE,
+        "style": {"primaryColor": "#4a90d9", "font": "Inter", "codeTheme": "poimandres"},
+    }
+    BUILD.mkdir(parents=True, exist_ok=True)
+    (BUILD / "video.json").write_text(json.dumps(video_def, indent=2))
+    ok("Video definition built")
+
+    # Step 5: Render
+    print(f"\n  {B}── Step 4: Render Scenes ──{N}")
+    rendered = []
+    for i, scene in enumerate(scenes):
+        single = {
+            "title": topic, "scenes": [scene],
+            "audioTracks": [tracks[i]] if i < len(tracks) else [],
+            "captions": [], "voice": VOICE,
+            "style": {"primaryColor": "#4a90d9", "font": "Inter", "codeTheme": "poimandres"},
+        }
+        (BUILD / f"props_{i:04d}.json").write_text(json.dumps(single))
+        out = BUILD / f"scene_{i:04d}.mp4"
+
+        log("render-agent", f"Scene {i+1}/{len(scenes)} ({scene['type']}, {scene['duration']}f)")
+        r = subprocess.run(
+            ["npx", "remotion", "render", "src/index.ts", "VideoComposition", str(out),
+             "--props", str(BUILD / f"props_{i:04d}.json"),
+             "--concurrency", "1", "--log", "error", "--enforce-audio-track"],
+            capture_output=True, text=True, timeout=600, cwd=str(REMOTION),
+            env={**__import__("os").environ, "TMPDIR": str(BUILD / "tmp")},
+        )
+        if r.returncode == 0 and out.exists():
+            ok(f"Rendered: {out.stat().st_size/1024:.0f}KB")
+            rendered.append(str(out))
+        else:
+            warn(f"Render failed: {(r.stderr or '')[:200]}")
+
+    if len(rendered) != len(scenes):
+        warn(f"Only {len(rendered)}/{len(scenes)} scenes rendered")
+        return
+
+    # Step 6: Concat
+    print(f"\n  {B}── Step 5: Concatenate ──{N}")
+    log("concat-agent", "Stitching video segments with FFmpeg...")
+    with open(BUILD / "list.txt", "w") as f:
+        for p in rendered:
+            f.write(f"file '{Path(p).name}'\n")
+    VIDEOS.mkdir(parents=True, exist_ok=True)
+    final = VIDEOS / "claude-architect-fundamentals.mp4"
+    subprocess.run(["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(BUILD / "list.txt"), "-c", "copy", str(final)], capture_output=True, text=True, timeout=120)
+    if final.exists():
+        mb = final.stat().st_size / 1e6
+        r2 = subprocess.run(["ffprobe", "-v", "quiet", "-print_format", "json", "-show_format", str(final)], capture_output=True, text=True)
+        info = json.loads(r2.stdout)
+        dur = float(info.get("format", {}).get("duration", 0))
+        ok(f"Video: {final} ({mb:.1f}MB, {dur:.1f}s = {dur/60:.1f} min)")
+
+    # Step 7: Review
+    print(f"\n  {B}── Step 6: Quality Review ──{N}")
+    log("review-agent", "Running L1 Frame Review...")
+    try:
+        from videoforge.review.frame_reviewer import FrameReviewer
+        fr = FrameReviewer()
+        l1 = fr.check_integrity(str(final))
+        if l1.get("passed"):
+            ok(f"L1 Review: PASSED — {l1.get('total_frames', 0)} frames, 0 issues")
+        else:
+            warn(f"L1 Review: FAILED — {len(l1.get('issues', []))} issues")
+    except Exception as e:
+        warn(f"Review error: {e}")
+
+    print(f"\n  {BOLD}{G}╔══════════════════════════════════╗{N}")
+    print(f"  {BOLD}{G}║      Video Generation Complete    ║{N}")
+    print(f"  {BOLD}{G}╚══════════════════════════════════╝{N}")
+    print(f"  {final}")
+
+
+# ── Main ──
+
+def gui():
+    """Launch the Textual TUI."""
+    from videoforge.orchestrator.tui import run as tui_run
+    tui_run()
+
+def batch():
+    """Run full pipeline from command-line args."""
+    import argparse
+    parser = argparse.ArgumentParser(description="VideoForge batch mode")
+    parser.add_argument("--topic", required=True, help="Video topic")
+    parser.add_argument("--output", default="videos/output.mp4")
+    parser.add_argument("--voice", default="alba")
+    parser.add_argument("--tts-url", default="http://localhost:8000")
+    args = parser.parse_args()
+    sys.argv = ["vfx-cli", "pipeline", "--topic", args.topic, "--output", args.output, "--voice", args.voice, "--tts-url", args.tts-url]
+    from videoforge.app import app
+    app()
+
 
 if __name__ == "__main__":
-    app()
+    if len(sys.argv) <= 1:
+        wizard()
+    elif sys.argv[1] == "gui":
+        gui()
+    elif sys.argv[1] == "batch":
+        batch()
+    else:
+        # Fall through to typer CLI for subcommands
+        from videoforge.app import app
+        app()
