@@ -7,6 +7,8 @@ export const DiffSceneSchema = z.object({
   newCode: z.string(),
   lang: z.string(),
   duration: z.number().positive(),
+  wordTimestamps: z.array(z.object({ text: z.string(), startMs: z.number(), endMs: z.number() })).optional(),
+  sceneStartFrame: z.number().optional().default(0),
 });
 
 export type DiffSceneProps = z.infer<typeof DiffSceneSchema>;

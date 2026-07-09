@@ -1,6 +1,8 @@
 import React from "react";
 import { AbsoluteFill, useCurrentFrame, interpolate, spring, useVideoConfig, Easing } from "remotion";
 import { z } from "zod";
+import { WordTiming } from "../captions/wordTiming";
+import { getStepProgress } from "../timing/audio-timing";
 
 export const CodeSceneSchema = z.object({
   code: z.string(),
@@ -9,11 +11,13 @@ export const CodeSceneSchema = z.object({
   title: z.string().optional(),
   caption: z.string().optional(),
   duration: z.number().positive(),
+  wordTimestamps: z.array(z.object({ text: z.string(), startMs: z.number(), endMs: z.number() })).optional(),
+  sceneStartFrame: z.number().optional().default(0),
 });
 
 export type CodeSceneProps = z.infer<typeof CodeSceneSchema>;
 
-export const CodeScene: React.FC<CodeSceneProps> = ({ code, lang, highlightLines = [], title, caption }) => {
+export const CodeScene: React.FC<CodeSceneProps> = ({ code, lang, highlightLines = [], title, caption, wordTimestamps, sceneStartFrame = 0 }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const opacity = interpolate(frame, [0, 20], [0, 1], { extrapolateRight: "clamp", easing: Easing.out(Easing.cubic) });
@@ -56,8 +60,22 @@ export const CodeScene: React.FC<CodeSceneProps> = ({ code, lang, highlightLines
         <div style={{ padding: 16, fontFamily: "monospace", fontSize: 16, lineHeight: "1.6", overflow: "auto" }}>
           {lines.map((line, i) => {
             const isHighlighted = highlightLines.includes(i + 1);
-            const lineDelay = i * 2;
-            const lineOpacity = Math.min(1, Math.max(0, (frame - lineDelay) / 10));
+            let lineOpacity: number;
+            if (wordTimestamps && wordTimestamps.length > 0) {
+              const totalWords = wordTimestamps.length;
+              const wordsPerLine = totalWords / lines.length;
+              const lineWordStart = Math.floor(i * wordsPerLine);
+              const lineWordEnd = Math.floor((i + 1) * wordsPerLine);
+              if (lineWordStart < totalWords) {
+                const endIdx = Math.min(lineWordEnd, totalWords - 1);
+                lineOpacity = getStepProgress(frame, fps, wordTimestamps[lineWordStart].startMs, wordTimestamps[endIdx].endMs, sceneStartFrame);
+              } else {
+                lineOpacity = 0;
+              }
+            } else {
+              const lineDelay = i * 2;
+              lineOpacity = Math.min(1, Math.max(0, (frame - lineDelay) / 10));
+            }
             return (
               <div key={i} style={{
                 display: "flex",

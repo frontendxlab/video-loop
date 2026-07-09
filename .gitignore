@@ -10,6 +10,9 @@ dist/
 .cache/
 public/audio/
 output/
+videos/*.mp4
+videos/*.wav
+videos/*.webm
 *.mp4
 *.wav
 *.log

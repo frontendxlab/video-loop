@@ -6,6 +6,8 @@ export const ComparisonSceneSchema = z.object({
   labelBefore: z.string(),
   labelAfter: z.string(),
   duration: z.number().positive(),
+  wordTimestamps: z.array(z.object({ text: z.string(), startMs: z.number(), endMs: z.number() })).optional(),
+  sceneStartFrame: z.number().optional().default(0),
 });
 
 export type ComparisonSceneProps = z.infer<typeof ComparisonSceneSchema>;

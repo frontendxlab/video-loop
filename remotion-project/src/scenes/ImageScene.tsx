@@ -7,6 +7,8 @@ export const ImageSceneSchema = z.object({
   caption: z.string().optional(),
   effect: z.enum(["kenBurns", "fadeIn", "zoomIn"]).optional().default("fadeIn"),
   duration: z.number().positive(),
+  wordTimestamps: z.array(z.object({ text: z.string(), startMs: z.number(), endMs: z.number() })).optional(),
+  sceneStartFrame: z.number().optional().default(0),
 });
 
 export type ImageSceneProps = z.infer<typeof ImageSceneSchema>;

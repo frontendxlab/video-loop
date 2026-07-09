@@ -6,6 +6,8 @@ export const OutroSceneSchema = z.object({
   title: z.string(),
   cta: z.string().optional(),
   duration: z.number().positive(),
+  wordTimestamps: z.array(z.object({ text: z.string(), startMs: z.number(), endMs: z.number() })).optional(),
+  sceneStartFrame: z.number().optional().default(0),
 });
 
 export type OutroSceneProps = z.infer<typeof OutroSceneSchema>;

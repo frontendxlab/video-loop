@@ -6,3 +6,4 @@ export { ImageScene, ImageSceneSchema } from "./ImageScene";
 export { ComparisonScene, ComparisonSceneSchema } from "./ComparisonScene";
 export { DiagramScene, DiagramSceneSchema } from "./DiagramScene";
 export { OutroScene, OutroSceneSchema } from "./OutroScene";
+export type { WordTiming } from "../captions/wordTiming";

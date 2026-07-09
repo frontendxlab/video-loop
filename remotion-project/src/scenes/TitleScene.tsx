@@ -1,26 +1,48 @@
 import React from "react";
 import { AbsoluteFill, useCurrentFrame, interpolate, spring, useVideoConfig, Easing } from "remotion";
 import { z } from "zod";
+import { WordTiming } from "../captions/wordTiming";
+import { getStepProgress } from "../timing/audio-timing";
 
 export const TitleSceneSchema = z.object({
   title: z.string(),
   subtitle: z.string().optional(),
   duration: z.number().positive(),
   animation: z.enum(["fadeIn", "slideUp", "typewriter"]).optional().default("fadeIn"),
+  wordTimestamps: z.array(z.object({ text: z.string(), startMs: z.number(), endMs: z.number() })).optional(),
+  sceneStartFrame: z.number().optional().default(0),
 });
 
 export type TitleSceneProps = z.infer<typeof TitleSceneSchema>;
 
 export const TitleScene: React.FC<TitleSceneProps> = ({
-  title, subtitle, animation = "fadeIn",
+  title, subtitle, animation = "fadeIn", wordTimestamps, sceneStartFrame = 0,
 }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
+  let titleProgress: number;
+  let subProgress: number;
+
+  if (wordTimestamps && wordTimestamps.length >= 4) {
+    const titleStartMs = wordTimestamps[0].startMs;
+    const titleEndMs = wordTimestamps[1].endMs;
+    const subStartMs = wordTimestamps[2].startMs;
+    const subEndMs = wordTimestamps[3].endMs;
+    titleProgress = getStepProgress(frame, fps, titleStartMs, titleEndMs, sceneStartFrame);
+    subProgress = getStepProgress(frame, fps, subStartMs, subEndMs, sceneStartFrame);
+  } else if (wordTimestamps && wordTimestamps.length >= 2) {
+    const titleStartMs = wordTimestamps[0].startMs;
+    const titleEndMs = wordTimestamps[wordTimestamps.length - 1].endMs;
+    titleProgress = getStepProgress(frame, fps, titleStartMs, titleEndMs, sceneStartFrame);
+    subProgress = getStepProgress(frame, fps, titleStartMs, titleEndMs, sceneStartFrame);
+  } else {
+    titleProgress = interpolate(frame, [0, 40], [0, 1], { extrapolateRight: "clamp", easing: Easing.out(Easing.cubic) });
+    subProgress = interpolate(frame, [20, 50], [0, 1], { extrapolateRight: "clamp", easing: Easing.out(Easing.cubic) });
+  }
+
   const springProgress = spring({ frame, fps, config: { damping: 12, stiffness: 100 } });
-  const fadeOpacity = interpolate(frame, [0, 40], [0, 1], { extrapolateRight: "clamp", easing: Easing.out(Easing.cubic) });
   const slideY = interpolate(springProgress, [0, 1], [60, 0]);
-  const subOpacity = interpolate(frame, [20, 50], [0, 1], { extrapolateRight: "clamp", easing: Easing.out(Easing.cubic) });
   const charsPerFrame = title.length / 30;
   const typewritten = title.slice(0, Math.floor(frame * charsPerFrame));
 
@@ -39,7 +61,7 @@ export const TitleScene: React.FC<TitleSceneProps> = ({
     border: "1px solid rgba(255,255,255,0.08)",
     boxShadow: "none",
     transform: `translateY(${slideY}px)`,
-    opacity: fadeOpacity,
+    opacity: titleProgress,
   };
 
   const titleTextStyle: React.CSSProperties = {
@@ -65,7 +87,7 @@ export const TitleScene: React.FC<TitleSceneProps> = ({
     color: "rgba(255,255,255,0.6)",
     textAlign: "center",
     marginTop: 8,
-    opacity: subOpacity,
+    opacity: subProgress,
     letterSpacing: 1,
   };
 

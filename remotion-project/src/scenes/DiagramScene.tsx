@@ -16,6 +16,8 @@ export const DiagramSceneSchema = z.object({
     nodes: z.array(NodeSchema),
   }),
   duration: z.number().positive(),
+  wordTimestamps: z.array(z.object({ text: z.string(), startMs: z.number(), endMs: z.number() })).optional(),
+  sceneStartFrame: z.number().optional().default(0),
 });
 
 export type DiagramSceneProps = z.infer<typeof DiagramSceneSchema>;
