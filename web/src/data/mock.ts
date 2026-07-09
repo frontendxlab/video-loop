@@ -54,10 +54,10 @@ const JOB_SEED: Job[] = [
       { id: 'sa_7', name: 'Compositor', engine: 'remotion', task: 'Render all scenes', status: 'completed', startedAt: ago(530_000), completedAt: ago(460_000), durationMs: 70000, error: null, tokens: 0 },
     ],
     scenes: [
-      { id: 'scene_5', kind: 'title', engine: 'remotion', status: 'completed', reviewIssues: 0, retryCount: 0 },
-      { id: 'scene_6', kind: 'code', engine: 'remotion', status: 'completed', reviewIssues: 0, retryCount: 0 },
-      { id: 'scene_7', kind: 'diagram', engine: 'manim', status: 'completed', reviewIssues: 0, retryCount: 1 },
-      { id: 'scene_8', kind: 'outro', engine: 'remotion', status: 'completed', reviewIssues: 0, retryCount: 0 },
+      { id: 'scene_5', kind: 'title', engine: 'remotion', status: 'completed', reviewIssues: 0, retryCount: 0, thumbnailUrl: '/api/artifacts/job_003/scenes/scene_5/thumbnail', frameUrl: '/api/artifacts/job_003/scenes/scene_5/frame', reportUrl: '/api/artifacts/job_003/scenes/scene_5/report' },
+      { id: 'scene_6', kind: 'code', engine: 'remotion', status: 'completed', reviewIssues: 0, retryCount: 0, thumbnailUrl: '/api/artifacts/job_003/scenes/scene_6/thumbnail', frameUrl: '/api/artifacts/job_003/scenes/scene_6/frame', reportUrl: '/api/artifacts/job_003/scenes/scene_6/report' },
+      { id: 'scene_7', kind: 'diagram', engine: 'manim', status: 'completed', reviewIssues: 0, retryCount: 1, thumbnailUrl: '/api/artifacts/job_003/scenes/scene_7/thumbnail', frameUrl: '/api/artifacts/job_003/scenes/scene_7/frame', reportUrl: '/api/artifacts/job_003/scenes/scene_7/report' },
+      { id: 'scene_8', kind: 'outro', engine: 'remotion', status: 'completed', reviewIssues: 0, retryCount: 0, thumbnailUrl: '/api/artifacts/job_003/scenes/scene_8/thumbnail', frameUrl: '/api/artifacts/job_003/scenes/scene_8/frame', reportUrl: '/api/artifacts/job_003/scenes/scene_8/report' },
     ],
     events: [
       makeSSEEvent('job_003', 'job.started', { title: 'Release v0.5 — Demo video' }),

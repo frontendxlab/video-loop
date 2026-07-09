@@ -12,6 +12,7 @@ from videoforge.api.adapters import EventFeed, MemoryEventFeed
 from videoforge.api.artifacts import router as artifacts_router
 from videoforge.api.director_preview import router as director_preview_router
 from videoforge.api.jobs import router as jobs_router, seed_jobs
+from videoforge.api.recipes import router as recipes_router
 from videoforge.api.reports import router as reports_router
 from videoforge.api.settings import router as settings_router
 from videoforge.api.sse import router as sse_router, set_feed
@@ -38,6 +39,7 @@ def create_app(feed: EventFeed | None = None) -> FastAPI:
     app.include_router(actions_router)
     app.include_router(artifacts_router)
     app.include_router(director_preview_router)
+    app.include_router(recipes_router)
     app.include_router(sse_router)
     app.include_router(settings_router)
     app.include_router(jobs_router)
