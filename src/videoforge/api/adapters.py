@@ -150,12 +150,12 @@ class PlaceholderEventFeed(EventFeed):
     def _build_placeholder_events(self, job_id: str) -> list[JobEvent]:
         t0 = time.time()
         return [
-            JobStarted(jobId=job_id, payload={"recipeId": "default", "input": "placeholder", "runId": job_id}),
-            JobStage(jobId=job_id, payload={"stage": "grill", "progress": 10, "label": "Grilling prompt"}),
-            JobStage(jobId=job_id, payload={"stage": "direct", "progress": 25, "label": "Planning scenes"}),
-            JobStage(jobId=job_id, payload={"stage": "render", "progress": 50, "label": "Rendering scenes"}),
-            JobStage(jobId=job_id, payload={"stage": "review", "progress": 75, "label": "Reviewing output"}),
-            JobStage(jobId=job_id, payload={"stage": "assemble", "progress": 90, "label": "Assembling final"}),
+            JobStarted(jobId=job_id, payload={"title": f"Job {job_id}", "recipeId": "default", "input": "placeholder", "runId": job_id}),
+            JobStage(jobId=job_id, payload={"stage": "grill", "progressPct": 10, "phase": "grill"}),
+            JobStage(jobId=job_id, payload={"stage": "direct", "progressPct": 25, "phase": "direct"}),
+            JobStage(jobId=job_id, payload={"stage": "render", "progressPct": 50, "phase": "render"}),
+            JobStage(jobId=job_id, payload={"stage": "review", "progressPct": 75, "phase": "review"}),
+            JobStage(jobId=job_id, payload={"stage": "assemble", "progressPct": 90, "phase": "assemble"}),
             JobCompleted(jobId=job_id, payload={"finalVideo": f"/artifacts/{job_id}/final.mp4", "duration": 30, "artifactCount": 5}),
         ]
 
