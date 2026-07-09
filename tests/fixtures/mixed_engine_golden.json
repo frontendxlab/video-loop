@@ -59,5 +59,85 @@
     "pixel_format": "yuv420p",
     "video_codec": "h264",
     "audio_codec": "aac"
+  },
+  "report_artifact_spec": {
+    "version": 1,
+    "description": "Expected key structure for report artifacts generated from this fixture. Update if generate_video_report / generate_scene_report schema changes.",
+    "video_report": {
+      "artifact": "videoforge-video-report",
+      "version": 1,
+      "top_level_keys": [
+        "artifact",
+        "version",
+        "video_path",
+        "report_timestamp",
+        "content_hash",
+        "engine_mix",
+        "render_format",
+        "scenes_summary",
+        "l0_summary",
+        "l1_summary",
+        "l2_layout_overlap_summary"
+      ],
+      "render_format_keys": [
+        "fps",
+        "width",
+        "height",
+        "pixel_format",
+        "video_codec",
+        "audio_codec"
+      ],
+      "scenes_summary_keys": [
+        "count",
+        "engines",
+        "total_duration_frames"
+      ],
+      "l0_summary_keys": [
+        "status",
+        "passed",
+        "total_issues",
+        "severity_counts",
+        "sampled_frames",
+        "total_frames",
+        "duration_seconds",
+        "issues"
+      ],
+      "l1_summary_keys": [
+        "passed",
+        "total_frames",
+        "total_issues",
+        "issues"
+      ],
+      "l2_summary_keys": [
+        "status",
+        "passed",
+        "total_issues",
+        "severity_counts",
+        "issues"
+      ]
+    },
+    "scene_report": {
+      "artifact": "videoforge-scene-report",
+      "version": 1,
+      "top_level_keys": [
+        "artifact",
+        "version",
+        "scene_index",
+        "engine",
+        "duration_frames",
+        "scene_path",
+        "report_timestamp",
+        "content_hash",
+        "render_format"
+      ],
+      "render_format_keys": [
+        "fps",
+        "width",
+        "height",
+        "pixel_format",
+        "video_codec",
+        "audio_codec"
+      ]
+    }
   }
 }

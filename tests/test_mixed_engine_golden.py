@@ -31,6 +31,10 @@ from videoforge.engine.ir import (
     SceneNode,
     VideoProject,
 )
+from videoforge.review.frame_reviewer import (
+    generate_scene_report,
+    generate_video_report,
+)
 
 HERE = Path(__file__).resolve().parent
 GOLDEN_FIXTURE_PATH = HERE / "fixtures" / "mixed_engine_golden.json"
@@ -290,6 +294,95 @@ def test_golden_fixture_render_format():
     assert rf["pixel_format"] == "yuv420p"
     assert rf["video_codec"] == "h264"
     assert rf["audio_codec"] == "aac"
+
+
+# ── Report artifact structure assertions ────────────────────────────────
+
+
+def test_golden_fixture_has_report_artifact_spec():
+    """Golden fixture must contain report_artifact_spec section."""
+    golden = json.loads(GOLDEN_FIXTURE_PATH.read_text())
+    spec = golden.get("report_artifact_spec")
+    assert spec is not None, "Missing report_artifact_spec in golden fixture"
+    assert spec["version"] == 1
+    assert "video_report" in spec
+    assert "scene_report" in spec
+
+
+def test_golden_video_report_keys_match_spec():
+    """generate_video_report output keys must match golden spec."""
+    golden = json.loads(GOLDEN_FIXTURE_PATH.read_text())
+    spec = golden["report_artifact_spec"]["video_report"]
+    report = generate_video_report(
+        video_path="/tmp/_golden_video_report_test.mp4",
+        content_hash=golden["content_hash"],
+        engine_mix=golden["engine_mix"],
+        render_format=golden["render_format"],
+    )
+    assert report["artifact"] == spec["artifact"]
+    assert report["version"] == spec["version"]
+    assert set(report.keys()) == set(spec["top_level_keys"])
+    assert set(report["render_format"].keys()) == set(spec["render_format_keys"])
+    assert set(report["scenes_summary"].keys()) == set(spec["scenes_summary_keys"])
+    assert set(report["l0_summary"].keys()) == set(spec["l0_summary_keys"])
+    assert set(report["l1_summary"].keys()) == set(spec["l1_summary_keys"])
+    assert set(report["l2_layout_overlap_summary"].keys()) == set(
+        spec["l2_summary_keys"]
+    )
+
+
+def test_golden_video_report_propagates_ir_fields():
+    """IR fields (content_hash, engine_mix, render_format) propagate to report."""
+    golden = json.loads(GOLDEN_FIXTURE_PATH.read_text())
+    report = generate_video_report(
+        video_path="/tmp/_golden_video_report_test.mp4",
+        content_hash=golden["content_hash"],
+        engine_mix=golden["engine_mix"],
+        render_format=golden["render_format"],
+    )
+    assert report["content_hash"] == golden["content_hash"]
+    assert report["engine_mix"] == sorted(golden["engine_mix"])
+    assert report["render_format"] == golden["render_format"]
+
+
+def test_golden_scene_report_keys_match_spec():
+    """generate_scene_report for each scene must match golden spec."""
+    golden = json.loads(GOLDEN_FIXTURE_PATH.read_text())
+    spec = golden["report_artifact_spec"]["scene_report"]
+    p = _fixture()
+    for i, (scene, gs) in enumerate(zip(p.scenes, golden["scenes"])):
+        report = generate_scene_report(
+            scene_index=i,
+            engine=gs["engine"],
+            duration_frames=scene.duration_frames,
+            scene_path=f"/tmp/_golden_scene_{i:04d}_test.mp4",
+            render_format=golden["render_format"],
+            content_hash=scene.content_hash(),
+        )
+        assert report["artifact"] == spec["artifact"]
+        assert report["version"] == spec["version"]
+        assert set(report.keys()) == set(spec["top_level_keys"])
+        assert set(report["render_format"].keys()) == set(spec["render_format_keys"])
+
+
+def test_golden_scene_report_propagates_ir_fields():
+    """Scene report contains correct engine, duration, and content_hash per scene."""
+    golden = json.loads(GOLDEN_FIXTURE_PATH.read_text())
+    p = _fixture()
+    for i, (scene, gs) in enumerate(zip(p.scenes, golden["scenes"])):
+        report = generate_scene_report(
+            scene_index=i,
+            engine=gs["engine"],
+            duration_frames=scene.duration_frames,
+            scene_path=f"/tmp/_golden_scene_{i:04d}_test.mp4",
+            render_format=golden["render_format"],
+            content_hash=scene.content_hash(),
+        )
+        assert report["scene_index"] == i
+        assert report["engine"] == gs["engine"]
+        assert report["duration_frames"] == scene.duration_frames
+        assert report["content_hash"] == scene.content_hash()
+        assert report["render_format"] == golden["render_format"]
 
 
 # ── Hash sensitivity (mixed-engine specific) ────────────────────────────
