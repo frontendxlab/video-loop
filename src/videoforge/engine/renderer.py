@@ -75,6 +75,40 @@ def _matches_pinned(fmt: dict[str, Any] | None) -> bool:
     )
 
 
+def _mux_audio_track(
+    track: Any,  # AudioTrack (avoid import cycle)
+    output_path: Path,
+    output_dir: Path,
+    index: int,
+) -> None:
+    """Replace silent audio in scene clip with real narration audio."""
+    audio_src = Path(track.src)
+    if not audio_src.exists():
+        logger.warning("Audio src %s not found for scene %d", audio_src, index)
+        return
+    muxed = output_dir / f"scene_{index:04d}_muxed.mp4"
+    cmd = [
+        "ffmpeg", "-y",
+        "-i", str(output_path),
+        "-i", str(audio_src.resolve()),
+        "-c:v", "copy",
+        "-c:a", "aac",
+        "-ac", "2",
+        "-ar", "48000",
+        "-map", "0:v:0",
+        "-map", "1:a:0",
+        "-shortest",
+        str(muxed),
+    ]
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+    if result.returncode != 0 or not muxed.exists():
+        raise RuntimeError(
+            f"Audio mux failed for scene {index}: {(result.stderr or '')[-300:]}"
+        )
+    import shutil as _sh
+    _sh.move(str(muxed), str(output_path))
+
+
 def render_scenes(
     video: VideoDefinition | VideoProject,
     remotion_dir: str | Path,
@@ -141,6 +175,11 @@ def render_scenes(
                 if src != output_path:
                     import shutil
                     shutil.copy2(str(src), str(output_path))
+
+                # Mux real narration audio over silent track (legacy path only)
+                if not is_ir and i < len(video.audioTracks):
+                    _mux_audio_track(video.audioTracks[i], output_path, output_dir, i)
+
                 rendered.append(str(output_path.resolve()))
             else:
                 raise RuntimeError(f"Scene {i} Animotion render failed: {result.get('log', '')[-300:]}")

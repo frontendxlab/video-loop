@@ -203,6 +203,11 @@ def frames_to_video(
 ) -> str:
     """Assemble frame PNG sequence into MP4 via FFmpeg.
 
+    Always muxes a silent AAC audio track so output has consistent
+    stream layout (1 video + 1 audio) for lossless concat with
+    Remotion/Manim clips. Caller can replace silent track with real
+    narration audio via FFmpeg after render.
+
     Returns output path string.
     """
     frame_dir = Path(frame_dir)
@@ -216,12 +221,17 @@ def frames_to_video(
         "ffmpeg", "-y",
         "-framerate", str(fps),
         "-i", pattern,
+        "-f", "lavfi", "-i", "anullsrc=r=48000:cl=mono",
         "-c:v", "libx264",
         "-pix_fmt", "yuv420p",
         "-preset", "fast",
         "-crf", "18",
         "-vf", f"scale={CLIP_FORMAT['width']}:{CLIP_FORMAT['height']}:force_original_aspect_ratio=disable",
         "-frames:v", str(frame_count) if frame_count else "",
+        "-shortest",
+        "-c:a", "aac",
+        "-ac", "2",
+        "-ar", "48000",
         str(output_path),
     ]
     # Remove empty strings from list

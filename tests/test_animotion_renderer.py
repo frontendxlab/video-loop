@@ -100,7 +100,7 @@ class TestAnimotionAdapter:
 
 class TestAnimotionRenderer:
     def test_frames_to_video(self, tmp_path: Path):
-        """FFmpeg assembly from frame PNGs."""
+        """FFmpeg assembly from frame PNGs — includes silent audio track."""
         frame_dir = tmp_path / "frames"
         frame_dir.mkdir()
         output = tmp_path / "output.mp4"
@@ -122,6 +122,16 @@ class TestAnimotionRenderer:
             )
             assert result.endswith(".mp4")
             assert mock_run.called
+            # Verify silent audio track is muxed
+            args = mock_run.call_args[0][0]
+            args_str = " ".join(args)
+            assert "anullsrc" in args_str, "Missing anullsrc silent audio source"
+            assert "-c:a" in args, "Missing audio codec flag"
+            aac_idx = args.index("-c:a")
+            assert args[aac_idx + 1] == "aac", "Audio codec should be aac"
+            assert "-shortest" in args, "Missing -shortest flag"
+            assert "-ac" in args, "Missing audio channels flag"
+            assert "-ar" in args, "Missing audio sample rate flag"
 
     def test_capture_frames_no_chrome(self):
         """Should raise RuntimeError when Chrome not found."""
