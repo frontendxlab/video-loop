@@ -18,10 +18,14 @@
     "@remotion/media-utils": "^4.0.228",
     "@remotion/renderer": "^4.0.228",
     "@remotion/transitions": "4.0.486",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^1.24.0",
     "react": "^18.3",
     "react-dom": "^18.3",
     "remotion": "^4.0.228",
     "shiki": "^4.3.1",
+    "tailwind-merge": "^3.6.0",
     "zod": "4.3.6"
   },
   "devDependencies": {
