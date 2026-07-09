@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { SettingsPage } from "@/routes/settings/index";
+import { SettingsPage } from "@/lib/contracts/settings-page";
 import {
   DEFAULT_SETTINGS,
   SettingsSchema,
