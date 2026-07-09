@@ -26,11 +26,12 @@ import typer
 from typing_extensions import Annotated
 
 from videoforge.design_tokens import remotion_style_defaults
-from videoforge.validation.coherence_gate import (
-    extract_script_from_scenes,
-    log_coherence_results,
-    run_coherence_gate,
-    write_coherence_report,
+from videoforge.engine.tts import wav_duration
+from videoforge.paths import (
+    ensure_dir,
+    ensure_parent,
+    merge_coherence_to_report,
+    run_coherence_on_scenes,
 )
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
@@ -81,7 +82,7 @@ def grill(
         "scene_types": ["title", "mindmap", "code-walkthrough", "bullet", "outro"],
         "quality_gates": ["audio-timing-sync", "l1-frame-review", "scene-isolation"],
     }
-    Path(output).parent.mkdir(parents=True, exist_ok=True)
+    ensure_parent(output)
     Path(output).write_text(json.dumps(req, indent=2))
     logger.info("\nRequirements written to %s", output)
 
@@ -98,16 +99,12 @@ def plan(
     else:
         # Generate basic scene plan from topic
         scene_data = _generate_scene_plan(topic)
-    Path(output).parent.mkdir(parents=True, exist_ok=True)
+    ensure_parent(output)
     Path(output).write_text(json.dumps(scene_data, indent=2))
     logger.info("Scene plan: %d scenes -> %s", len(scene_data), output)
 
     # Coherence gate
-    plan_dict: dict[str, Any] = {"scenes": scene_data}
-    script = extract_script_from_scenes(scene_data) or topic
-    coherence = run_coherence_gate(script, plan_dict, plan_path=output)
-    log_coherence_results(coherence)
-    write_coherence_report(coherence, output)
+    run_coherence_on_scenes(scene_data, output, fallback_script=topic)
 
 
 @app.command()
@@ -125,17 +122,11 @@ def build(
         raise typer.Exit(1)
 
     scene_data = json.loads(scenes_path.read_text())
-    out_dir = Path(output).parent
-    out_dir.mkdir(parents=True, exist_ok=True)
-    build_dir = Path("/tmp/vfx-build")
-    build_dir.mkdir(parents=True, exist_ok=True)
+    ensure_parent(output)
+    build_dir = ensure_dir("/tmp/vfx-build")
 
     # Step 0: Coherence gate
-    plan_dict: dict[str, Any] = {"scenes": scene_data}
-    script = extract_script_from_scenes(scene_data)
-    coherence = run_coherence_gate(script, plan_dict, plan_path=str(scenes_path))
-    log_coherence_results(coherence)
-    write_coherence_report(coherence, scenes_path)
+    coherence = run_coherence_on_scenes(scene_data, scenes_path)
 
     # Step 1: TTS for each scene
     for i, scene in enumerate(scene_data):
@@ -143,8 +134,7 @@ def build(
         if not text:
             logger.warning("Scene %d has no text, skipping TTS", i)
             continue
-        audio_dir = build_dir / f"audio_{i:04d}"
-        audio_dir.mkdir(parents=True, exist_ok=True)
+        audio_dir = ensure_dir(build_dir / f"audio_{i:04d}")
         wav_path = audio_dir / "audio.wav"
 
         logger.info("[%d/%d] TTS: %s (%d chars)", i + 1, len(scene_data), scene.get("type", "?"), len(text))
@@ -153,7 +143,7 @@ def build(
             resp = requests.post(f"{tts_url}/tts", data={"text": text, "voice": voice}, timeout=120)
             if resp.status_code == 200:
                 wav_path.write_bytes(resp.content)
-                dur = _wav_duration(wav_path)
+                dur = wav_duration(wav_path)
                 scene["duration"] = max(1, int(dur * 30))
                 scene["wordTimestamps"] = _estimate_timestamps(text.split(), dur)
                 logger.info("  -> %.1fs, %d words", dur, len(text.split()))
@@ -259,14 +249,7 @@ def build(
         logger.info("Build report: %s", r["report_path"])
         # Append coherence summary to existing report
         try:
-            report_path = Path(r["report_path"])
-            report_data = json.loads(report_path.read_text())
-            report_data["coherence"] = {
-                "coherent": coherence.get("coherent", False),
-                "total_issues": len(coherence.get("issues", [])),
-                "issues": coherence.get("issues", []),
-            }
-            report_path.write_text(json.dumps(report_data, indent=2, default=str))
+            merge_coherence_to_report(r["report_path"], coherence)
         except Exception:
             pass
     except Exception as e:
@@ -322,16 +305,6 @@ def _generate_scene_plan(topic: str) -> list[dict]:
         {"type": "title", "title": topic, "duration": 180, "text": f"Welcome to {topic}."},
         {"type": "outro", "title": "Summary", "duration": 120, "text": "Thank you for watching."},
     ]
-
-
-def _wav_duration(path: Path) -> float:
-    import wave
-    with wave.open(str(path), "rb") as wf:
-        fr = wf.getframerate()
-        sw = wf.getsampwidth()
-        ch = wf.getnchannels()
-    db = path.stat().st_size - 44
-    return db / (sw * ch) / fr if db > 0 else 0
 
 
 def _compute_video_def_hash(video_def: dict) -> str:

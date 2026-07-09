@@ -6,16 +6,20 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from videoforge.engine.models import VideoDefinition
 from videoforge.review.l0_mixed_engine import L0MixedEngineReview
 from videoforge.review.l3_smoothness import L3Smoothness
 from videoforge.review.l4_transitions import L4Transitions
 from videoforge.review.l5_consistency import L5Consistency
 from videoforge.review.overlap_gate import OverlapGate
+from videoforge.review.repair_actions import RepairAction, RepairHook, build_repair_plan
+from videoforge.review.rerender_orchestrator import run_orchestrated_review
 from videoforge.review.policy import (
     ReviewVerdict,
     aggregate as aggregate_policy,
     evaluate_l0 as _policy_evaluate_l0,
     evaluate_l1 as _policy_evaluate_l1,
+    evaluate_l2 as _policy_evaluate_l2,
 )
 
 
@@ -241,7 +245,7 @@ class FrameReviewer:
         l1_result = self.check_integrity(video_path)
         report["levels"]["l1_integrity"] = l1_result
 
-        if not l1_result.get("passed", False):
+        if _policy_evaluate_l1(l1_result) != ReviewVerdict.PASS:
             report["passed"] = False
             report["gate_blocked"] = "l1_integrity"
             report["levels"]["l2_frames"] = {"issues": [], "passed": False, "skipped": True}
@@ -253,7 +257,7 @@ class FrameReviewer:
         l2_result = self.check_frames(video_path)
         report["levels"]["l2_frames"] = l2_result
 
-        if not l2_result.get("passed", False):
+        if _policy_evaluate_l2(l2_result) != ReviewVerdict.PASS:
             report["passed"] = False
             report["gate_blocked"] = "l2_frames"
             report["levels"]["l3_smoothness"] = {"issues": [], "passed": False, "skipped": True}
@@ -294,11 +298,14 @@ def generate_video_report(
     l0_status: str = "pass",
     l2_result: dict[str, Any] | None = None,
     l2_status: str = "pass",
+    scene_reports: list[dict[str, Any]] | None = None,
+    coherence_result: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Build structured JSON artifact for final assembled video.
 
     Includes content hash, engine mix, render format, L0 summary, L1 summary,
-    and L2b layout-overlap summary.
+    L2b layout-overlap summary, per-scene artifact summary, and optional
+    coherence summary.
 
     Args:
         video_path: Path to final MP4.
@@ -310,6 +317,12 @@ def generate_video_report(
         l0_status: Pre-computed L0 policy status ("pass", "warn", "fail").
         l2_result: Raw L2b layout-overlap result dict (issues, passed).
         l2_status: Pre-computed L2b policy status ("pass", "warn", "fail").
+        scene_reports: Optional list of per-scene report dicts. When provided,
+            ``scenes_summary`` with count, engine breakdown, total duration,
+            and compact scene references is included in report.
+        coherence_result: Optional coherence gate result dict. When provided,
+            ``coherence_summary`` with coherent bool, issues list, and
+            narrative_arc summary is included in report.
 
     Returns:
         Report dict suitable for JSON serialization.
@@ -332,6 +345,28 @@ def generate_video_report(
     for iss in l2_issues:
         sev = iss.get("severity", "low")
         l2_severity_counts[sev] = l2_severity_counts.get(sev, 0) + 1
+
+    # ── Scenes summary ────────────────────────────────────────────────────
+    scene_engines: dict[str, int] = {}
+    scene_duration = 0
+    scene_refs: list[dict[str, Any]] = []
+    for sr in scene_reports or []:
+        eng = sr.get("engine", "?")
+        scene_engines[eng] = scene_engines.get(eng, 0) + 1
+        scene_duration += sr.get("duration_frames", 0)
+        scene_refs.append({
+            "index": sr.get("scene_index", 0),
+            "engine": eng,
+            "duration_frames": sr.get("duration_frames", 0),
+        })
+
+    scenes_summary: dict[str, Any] = {
+        "count": len(scene_reports or []),
+        "engines": scene_engines,
+        "total_duration_frames": scene_duration,
+    }
+    if scene_refs:
+        scenes_summary["scenes"] = scene_refs
 
     # ── Render format fallback ─────────────────────────────────────────────
     fmt = render_format or {
@@ -358,6 +393,7 @@ def generate_video_report(
             "video_codec": fmt.get("video_codec", "h264"),
             "audio_codec": fmt.get("audio_codec", "aac"),
         },
+        "scenes_summary": scenes_summary,
         "l0_summary": {
             "status": l0_status,
             "passed": l0_status == "pass",
@@ -383,6 +419,19 @@ def generate_video_report(
         },
     }
 
+    # ── Coherence summary ───────────────────────────────────────────────────
+    if coherence_result is not None:
+        nar = coherence_result.get("narrative_arc", {})
+        report["coherence_summary"] = {
+            "coherent": coherence_result.get("coherent", False),
+            "total_issues": len(coherence_result.get("issues", [])),
+            "issues": coherence_result.get("issues", []),
+            "has_complete_arc": nar.get("has_complete_arc", False),
+            "missing_phases": nar.get("missing_phases", []),
+            "duplicate_phases": nar.get("duplicate_phases", []),
+            "phase_order_valid": nar.get("phase_order_valid", True),
+        }
+
     return report
 
 
@@ -399,14 +448,45 @@ def write_video_report(
     return str(report_path.resolve())
 
 
+def _discover_scene_reports(video_path: str) -> list[dict[str, Any]]:
+    """Discover per-scene report artifacts on disk next to video file.
+
+    Scans for ``*.mp4.scene.report.json`` files in same directory as
+    ``video_path`` and returns them sorted by ``scene_index``.
+
+    Returns:
+        List of scene report dicts (empty if none found).
+    """
+    video_dir = Path(video_path).parent
+    reports: list[dict[str, Any]] = []
+    for p in sorted(video_dir.glob("*.mp4.scene.report.json")):
+        try:
+            reports.append(json.loads(p.read_text()))
+        except (json.JSONDecodeError, OSError):
+            continue
+    reports.sort(key=lambda r: r.get("scene_index", 0))
+    return reports
+
+
 def run_review(
     video_path: str,
     content_hash: str = "",
     engine_mix: list[str] | None = None,
     reviewer: FrameReviewer | None = None,
     elements: list[dict[str, Any]] | None = None,
+    scene_reports: list[dict[str, Any]] | None = None,
+    rerender: bool = False,
+    rerender_hook: RepairHook | None = None,
+    coherence_result: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Run L0 + L1 + L2b review, generate and write report artifact.
+    """Run L0 + L1 + L2b review + optional coherence, generate report artifact.
+
+    Automatically discovers per-scene report artifacts from disk when
+    ``scene_reports`` is not provided.
+
+    When ``rerender=True``, L0-repairable issues trigger the rerender
+    orchestrator loop (bounded retry via ``run_orchestrated_review``).
+    The orchestrator's final review replaces ``l0_result``.
 
     Args:
         video_path: Path to video file to review.
@@ -414,16 +494,44 @@ def run_review(
         engine_mix: Optional list of render engines used.
         reviewer: Optional FrameReviewer instance (created fresh if omitted).
         elements: Optional element layout metadata for L2b overlap gate.
+        scene_reports: Optional list of per-scene report dicts. Auto-discovered
+            from disk when omitted.
+        rerender: Enable rerender orchestration loop for L0-repairable issues.
+        rerender_hook: Callback invoked per repair action. If omitted and
+            ``rerender=True``, a default no-op hook (always returns True) is used.
+        coherence_result: Optional coherence gate result dict. When provided,
+            coherence is included in the unified policy decision and report.
 
     Returns:
         Dict with keys: l0_result, l0_status, l1_result, l2_result, l2_status,
-                        report, report_path.
+                        report, report_path, decision.
+                        When ``rerender=True``, also includes
+                        ``orchestration_result``.
+                        When ``coherence_result`` is provided, also includes
+                        ``coherence_result``.
     """
     if reviewer is None:
         reviewer = FrameReviewer()
 
     l0_result = reviewer.check_mixed_engine(video_path)
     l0_status = reviewer.evaluate_l0_policy(l0_result)
+
+    # ── Optional rerender orchestration ────────────────────────────────────
+    orchestration_result: dict[str, Any] | None = None
+    if rerender:
+        plan = build_repair_plan(l0_result)
+        if plan:
+            hook = rerender_hook if rerender_hook is not None else _default_rerender_hook
+            orc_result = run_orchestrated_review(
+                video_path=video_path,
+                review_fn=reviewer.check_mixed_engine,
+                render_hook=hook,
+                max_rounds=reviewer.max_retries + 1,
+            )
+            orchestration_result = orc_result
+            l0_result = orc_result["final_review"]
+            l0_status = reviewer.evaluate_l0_policy(l0_result)
+
     l1_result = reviewer.check_integrity(video_path)
 
     # L2b: Layout overlap (passes trivially when no elements provided)
@@ -434,11 +542,16 @@ def run_review(
         l2_result = {"issues": [], "passed": True}
         l2_status = "pass"
 
+    # Auto-discover scene reports from disk if not provided
+    if scene_reports is None:
+        scene_reports = _discover_scene_reports(video_path)
+
     # Unified policy decision across all levels
     decision = reviewer.evaluate(
         l0_result=l0_result,
         l1_result=l1_result,
         l2_result=l2_result,
+        coherence_result=coherence_result,
     )
 
     report = generate_video_report(
@@ -450,10 +563,14 @@ def run_review(
         l0_status=l0_status,
         l2_result=l2_result,
         l2_status=l2_status,
+        scene_reports=scene_reports,
+        coherence_result=coherence_result,
     )
+    # Embed central policy verdict in report artifact
+    report["policy_verdict"] = decision["verdict"]
     report_path = write_video_report(report, video_path)
 
-    return {
+    result: dict[str, Any] = {
         "l0_result": l0_result,
         "l0_status": l0_status,
         "l1_result": l1_result,
@@ -463,6 +580,21 @@ def run_review(
         "report_path": report_path,
         "decision": decision,
     }
+    if orchestration_result is not None:
+        result["orchestration_result"] = orchestration_result
+        result["scene_reports"] = scene_reports
+    if coherence_result is not None:
+        result["coherence_result"] = coherence_result
+    return result
+
+
+def _default_rerender_hook(action: RepairAction) -> bool:
+    """Default no-op rerender hook — always returns True.
+
+    Callers that want actual rerender side effects should pass a custom
+    ``rerender_hook`` to :func:`run_review`.
+    """
+    return True
 
 
 def generate_scene_report(
@@ -529,3 +661,146 @@ def write_scene_report(
     report_path = Path(scene_path).with_suffix(".mp4.scene.report.json")
     report_path.write_text(json.dumps(report, indent=2, default=str))
     return str(report_path.resolve())
+
+
+# ── Provenance Graph ────────────────────────────────────────────────────────
+
+
+def _scene_content_hash(scene: object, index: int) -> str:
+    """Deterministic sha256 for single scene definition (16-char hex).
+
+    Uses dataclass fields, prefixed by index so identical content at
+    different positions yields different hashes.
+    """
+    import hashlib
+    from dataclasses import asdict
+
+    try:
+        data = json.dumps(asdict(scene), sort_keys=True, default=str)
+    except (TypeError, ValueError):
+        data = json.dumps(scene, sort_keys=True, default=str)
+    return hashlib.sha256(f"{index}:{data}".encode()).hexdigest()[:16]
+
+
+def generate_provenance_graph(
+    video_path: str,
+    content_hash: str = "",
+    scenes: list[dict] | None = None,
+    engine_mix: list[str] | None = None,
+) -> dict[str, Any]:
+    """Build deterministic provenance graph artifact.
+
+    Traces render lineage: scene ids → engine choice → asset paths →
+    report artifact paths → content hash references. Links video-level
+    content hash down through per-scene hashes to individual assets.
+
+    Args:
+        video_path: Path to final assembled MP4.
+        content_hash: Video-level content hash (16-char hex).
+        scenes: List of scene provenance entries, each with:
+            - id: Scene identifier.
+            - engine: Engine used (``remotion``, ``manim``, ``animotion``).
+            - kind: Scene type/kind.
+            - content_hash: Per-scene content hash.
+            - scene_path: Path to rendered scene MP4.
+            - scene_report_path: Path to scene report JSON.
+            - duration_frames: Scene duration in frames.
+            - assets: Dict of asset paths (audio_src, props_path, …).
+        engine_mix: List of all engines used.
+
+    Returns:
+        Provenance graph dict suitable for JSON serialization.
+    """
+    scenes = scenes or []
+    video_resolved = str(Path(video_path).resolve())
+
+    graph: dict[str, Any] = {
+        "artifact": "videoforge-provenance-graph",
+        "version": 1,
+        "video_path": video_resolved,
+        "report_timestamp": datetime.now(timezone.utc).isoformat(),
+        "content_hash": content_hash,
+        "engines": sorted(set(engine_mix or [])),
+        "scenes": scenes,
+        "reports": {
+            "video_report": str(
+                Path(video_resolved).with_suffix(".mp4.report.json")
+            ),
+            "provenance_graph": str(
+                Path(video_resolved).with_suffix(".provenance.json")
+            ),
+        },
+    }
+    return graph
+
+
+def write_provenance_graph(
+    graph: dict[str, Any],
+    video_path: str,
+) -> str:
+    """Write provenance graph JSON to ``<video_path>.provenance.json``.
+
+    Returns path to written provenance file.
+    """
+    graph_path = Path(video_path).with_suffix(".provenance.json")
+    graph_path.write_text(json.dumps(graph, indent=2, default=str))
+    return str(graph_path.resolve())
+
+
+def build_provenance_scenes(
+    video_def: object,
+    scene_paths: list[str],
+    build_dir: str | Path = "",
+) -> list[dict[str, Any]]:
+    """Build scenes list for provenance graph from render result.
+
+    Args:
+        video_def: VideoDefinition (or any object with ``.scenes``,
+            ``.audioTracks`` and ``.fps``).
+        scene_paths: List of scene MP4 paths in render order.
+        build_dir: Build directory (locates props JSON artifacts).
+
+    Returns:
+        List of scene provenance entries.
+    """
+    build_dir = Path(build_dir) if build_dir else Path()
+    scenes_data: list[dict[str, Any]] = []
+
+    for i, sp in enumerate(scene_paths):
+        scene = video_def.scenes[i]  # type: ignore[union-attr]
+        sp_path = Path(sp)
+        scene_report_path = sp_path.with_suffix(".mp4.scene.report.json")
+        engine = getattr(scene, "renderer", "remotion")
+
+        assets: dict[str, str] = {}
+        tracks = getattr(video_def, "audioTracks", None) or getattr(
+            video_def, "audio_tracks", ()
+        )
+        if i < len(tracks):
+            src = getattr(tracks[i], "src", "")
+            if src:
+                assets["audio_src"] = src
+
+        props_path = build_dir / f"props_{i:04d}.json"
+        if props_path.exists():
+            assets["props_path"] = str(props_path.resolve())
+
+        scenes_data.append({
+            "id": f"scene_{i:04d}",
+            "engine": engine,
+            "kind": scene.type.value
+            if hasattr(scene, "type")
+            else getattr(scene, "kind", "").value,
+            "content_hash": _scene_content_hash(scene, i),
+            "scene_path": str(sp_path.resolve()),
+            "scene_report_path": (
+                str(scene_report_path.resolve())
+                if scene_report_path.exists()
+                else ""
+            ),
+            "duration_frames": getattr(scene, "duration", 0)
+            or getattr(scene, "duration_frames", 0),
+            "assets": assets,
+        })
+
+    return scenes_data

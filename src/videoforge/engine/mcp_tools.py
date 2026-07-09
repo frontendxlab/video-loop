@@ -41,7 +41,28 @@ def engine_plan_scenes(
     ]
     Path(output_path).parent.mkdir(parents=True, exist_ok=True)
     Path(output_path).write_text(json.dumps(plan, indent=2))
-    return {"scenes": len(plan), "path": output_path}
+
+    # Run coherence gate on generated scene plan
+    from videoforge.validation.coherence_gate import (  # fmt: skip
+        extract_script_from_scenes,
+        run_coherence_gate,
+        write_coherence_report,
+    )
+    plan_dict: dict = {"scenes": plan}
+    script = extract_script_from_scenes(plan) or topic
+    coherence = run_coherence_gate(script, plan_dict, plan_path=output_path)
+    coherence_report_path = write_coherence_report(coherence, output_path)
+
+    return {
+        "scenes": len(plan),
+        "path": output_path,
+        "coherence": {
+            "coherent": coherence["coherent"],
+            "issues": coherence["issues"],
+            "missing_phases": coherence["narrative_arc"]["missing_phases"],
+            "report_path": coherence_report_path,
+        },
+    }
 
 
 @video_mcp.tool()
@@ -132,12 +153,22 @@ def engine_render_video(
         voice=data.get("voice", "alba"),
     )
 
+    # Run coherence gate on parsed scene data
+    from videoforge.validation.coherence_gate import (  # fmt: skip
+        extract_script_from_scenes,
+        run_coherence_gate,
+    )
+    plan_dict: dict = {"scenes": data.get("scenes", [])}
+    script = extract_script_from_scenes(data.get("scenes", [])) or data.get("title", "")
+    coherence_result = run_coherence_gate(script, plan_dict)
+
     out_dir = Path(build_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     scene_paths = render_scenes(video, remotion_dir, out_dir, tmpdir=out_dir / "tmp")
 
     # Emit per-scene report artifacts alongside each scene file
     from videoforge.review.frame_reviewer import generate_scene_report, write_scene_report
+    scene_reports: list[dict] = []
     for i, (scene, sp) in enumerate(zip(video.scenes, scene_paths)):
         engine = getattr(scene, "renderer", "remotion")
         sr = generate_scene_report(
@@ -148,13 +179,14 @@ def engine_render_video(
             content_hash=getattr(video, "content_hash", lambda: "")() if callable(getattr(video, "content_hash", None)) else "",
         )
         write_scene_report(sr, sp)
+        scene_reports.append(sr)
 
     final = concatenate_scenes(scene_paths, output_path)
 
     info = get_media_info(final)
     fmt = info.get("format", {})
 
-    # Generate report artifact
+    # Generate report artifact with scene summary
     engines = list({s.renderer for s in video.scenes if s.renderer})
     from videoforge.review.frame_reviewer import generate_video_report, write_video_report
     report = generate_video_report(
@@ -163,8 +195,25 @@ def engine_render_video(
         engine_mix=engines,
         render_format={"fps": video.fps, "width": video.width, "height": video.height,
                        "pixel_format": "yuv420p", "video_codec": "h264", "audio_codec": "aac"},
+        scene_reports=scene_reports,
+        coherence_result=coherence_result,
     )
     report_path = write_video_report(report, str(final))
+
+    # Emit provenance graph artifact linking scenes → engines → assets → reports
+    from videoforge.review.frame_reviewer import (
+        build_provenance_scenes,
+        generate_provenance_graph,
+        write_provenance_graph,
+    )
+    provenance_scenes = build_provenance_scenes(video, scene_paths, build_dir=out_dir)
+    provenance = generate_provenance_graph(
+        video_path=str(final),
+        content_hash=video.content_hash(),
+        scenes=provenance_scenes,
+        engine_mix=engines,
+    )
+    provenance_path = write_provenance_graph(provenance, str(final))
 
     return {
         "video_path": str(Path(final).resolve()),
@@ -173,6 +222,12 @@ def engine_render_video(
         "scenes": len(scene_paths),
         "frames": video.total_frames(),
         "report_path": report_path,
+        "provenance_path": provenance_path,
+        "coherence": {
+            "coherent": coherence_result["coherent"],
+            "issues": coherence_result["issues"],
+            "missing_phases": coherence_result["narrative_arc"]["missing_phases"],
+        },
     }
 
 
@@ -203,23 +258,28 @@ def engine_generate_manim(
 def engine_review_video(
     video_path: str,
     elements_json: str = "",
+    coherence_result: str = "",
 ) -> dict:
-    """Run full video review (L0 + L1 + L2b layout overlap).
+    """Run full video review (L0 + L1 + L2b layout overlap + coherence).
 
     L0 samples N frames from the video and checks for blank frames,
     resolution mismatches, palette drift, and freeze. L1 runs ffprobe
     black/frozen frame detection. L2b checks element layout overlap
-    and viewport clipping.
+    and viewport clipping. When ``coherence_result`` is provided, the
+    overall verdict also considers narrative coherence.
 
     Args:
         video_path: Path to the video file.
         elements_json: Optional JSON string or file path with element
             layout metadata (list of dicts with x, y, width, height, id).
+        coherence_result: Optional JSON string or file path with
+            pre-computed coherence gate result (from ``engine_plan_scenes``
+            or ``engine_render_video``).
 
     Returns:
         Review results with pass/fail per check level.
     """
-    from videoforge.review.frame_reviewer import FrameReviewer, generate_video_report, write_video_report
+    from videoforge.review.frame_reviewer import FrameReviewer, _discover_scene_reports, generate_video_report, write_video_report
     from videoforge.review.policy import aggregate
 
     fr = FrameReviewer()
@@ -240,8 +300,26 @@ def engine_review_video(
         l2_result = fr.check_layout_overlap(elements)
         l2_status = fr.evaluate_overlap_policy(l2_result)
 
-    # Unified policy decision (includes L2 when provided)
-    decision = aggregate(l0_result=l0_result, l1_result=l1_result, l2_result=l2_result)
+    # Coherence result (optional)
+    parsed_coherence: dict | None = None
+    if coherence_result:
+        import json as _json
+        from pathlib import Path as _Path
+        if _Path(coherence_result).exists():
+            parsed_coherence = _json.loads(_Path(coherence_result).read_text())
+        else:
+            parsed_coherence = _json.loads(coherence_result)
+
+    # Discover per-scene artifacts from disk
+    scene_reports = _discover_scene_reports(video_path)
+
+    # Unified policy decision (includes L2 and coherence when provided)
+    decision = aggregate(
+        l0_result=l0_result,
+        l1_result=l1_result,
+        l2_result=l2_result,
+        coherence_result=parsed_coherence,
+    )
 
     report = generate_video_report(
         video_path=video_path,
@@ -250,8 +328,20 @@ def engine_review_video(
         l0_status=l0_status,
         l2_result=l2_result or {"issues": [], "passed": True},
         l2_status=l2_status,
+        coherence_result=parsed_coherence,
+        scene_reports=scene_reports,
     )
+    report["policy_verdict"] = decision["verdict"]
     report_path = write_video_report(report, video_path)
+
+    # Build coherence section for return
+    coherence_summary: dict | None = None
+    if parsed_coherence:
+        coherence_summary = {
+            "coherent": parsed_coherence.get("coherent", False),
+            "issues": parsed_coherence.get("issues", []),
+            "missing_phases": parsed_coherence.get("narrative_arc", {}).get("missing_phases", []),
+        }
 
     return {
         "l0_mixed_engine": {
@@ -272,11 +362,12 @@ def engine_review_video(
             "issues": len((l2_result or {"issues": []}).get("issues", [])),
             "details": (l2_result or {"issues": []}).get("issues", []),
         },
-        "passed": l0_status == "pass" and l1_result.get("passed", False) and l2_status == "pass",
+        "passed": decision["verdict"] == "pass",
         "verdict": decision["verdict"],
         "retry_suggested": decision["retry_suggested"],
         "repair_suggested": decision["repair_suggested"],
         "report_path": report_path,
+        "coherence": coherence_summary,
     }
 
 

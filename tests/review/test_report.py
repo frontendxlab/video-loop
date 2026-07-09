@@ -305,6 +305,60 @@ class TestRunReview:
         assert result["report"]["l0_summary"]["total_issues"] == 1
 
 
+class TestScenesSummary:
+    """Tests for scenes_summary in video report."""
+
+    def test_default_empty(self) -> None:
+        """No scene_reports produces empty scenes_summary."""
+        report = generate_video_report(video_path="/tmp/v.mp4")
+        ss = report["scenes_summary"]
+        assert ss["count"] == 0
+        assert ss["engines"] == {}
+        assert ss["total_duration_frames"] == 0
+        assert "scenes" not in ss
+
+    def test_with_scene_reports(self) -> None:
+        """Scene reports aggregated into summary."""
+        scene_reports = [
+            {"scene_index": 0, "engine": "remotion", "duration_frames": 180, "scene_path": "/tmp/s0.mp4", "content_hash": ""},
+            {"scene_index": 1, "engine": "manim", "duration_frames": 90, "scene_path": "/tmp/s1.mp4", "content_hash": ""},
+            {"scene_index": 2, "engine": "remotion", "duration_frames": 180, "scene_path": "/tmp/s2.mp4", "content_hash": ""},
+        ]
+        report = generate_video_report(video_path="/tmp/v.mp4", scene_reports=scene_reports)
+        ss = report["scenes_summary"]
+        assert ss["count"] == 3
+        assert ss["engines"] == {"remotion": 2, "manim": 1}
+        assert ss["total_duration_frames"] == 450
+        assert "scenes" in ss
+        assert ss["scenes"] == [
+            {"index": 0, "engine": "remotion", "duration_frames": 180},
+            {"index": 1, "engine": "manim", "duration_frames": 90},
+            {"index": 2, "engine": "remotion", "duration_frames": 180},
+        ]
+
+    def test_scene_refs_compact(self) -> None:
+        """Scene references contain only index, engine, duration_frames."""
+        scene_reports = [
+            {"scene_index": 0, "engine": "remotion", "duration_frames": 120,
+             "scene_path": "/tmp/s.mp4", "content_hash": "abc", "render_format": {"fps": 30}},
+        ]
+        report = generate_video_report(video_path="/tmp/v.mp4", scene_reports=scene_reports)
+        ref = report["scenes_summary"]["scenes"][0]
+        assert set(ref.keys()) == {"index", "engine", "duration_frames"}
+        assert ref["index"] == 0
+        assert ref["engine"] == "remotion"
+        assert ref["duration_frames"] == 120
+
+    def test_empty_scene_reports(self) -> None:
+        """Empty list produces count=0, no scenes key."""
+        report = generate_video_report(video_path="/tmp/v.mp4", scene_reports=[])
+        ss = report["scenes_summary"]
+        assert ss["count"] == 0
+        assert ss["engines"] == {}
+        assert ss["total_duration_frames"] == 0
+        assert "scenes" not in ss
+
+
 class TestReportShapeIntegration:
     """Verify report shape matches expected keys."""
 
@@ -314,6 +368,7 @@ class TestReportShapeIntegration:
         top_keys = {
             "artifact", "version", "video_path", "report_timestamp",
             "content_hash", "engine_mix", "render_format",
+            "scenes_summary",
             "l0_summary", "l1_summary",
             "l2_layout_overlap_summary",
         }
@@ -331,6 +386,19 @@ class TestReportShapeIntegration:
 
         l2_keys = {"status", "passed", "total_issues", "severity_counts", "issues"}
         assert set(report["l2_layout_overlap_summary"].keys()) == l2_keys
+
+        # scenes_summary keys (no scenes refs when empty)
+        ss_keys = {"count", "engines", "total_duration_frames"}
+        assert set(report["scenes_summary"].keys()) == ss_keys
+
+    def test_all_expected_keys_with_scenes(self) -> None:
+        """With scene_reports, scenes key present in scenes_summary."""
+        report = generate_video_report(
+            video_path="/tmp/v.mp4",
+            scene_reports=[{"scene_index": 0, "engine": "remotion", "duration_frames": 180}],
+        )
+        ss_keys = {"count", "engines", "total_duration_frames", "scenes"}
+        assert set(report["scenes_summary"].keys()) == ss_keys
 
 
 class TestGenerateSceneReport:

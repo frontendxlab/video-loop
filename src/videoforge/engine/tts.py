@@ -98,7 +98,7 @@ def generate_audio(
     }
 
 
-def _wav_duration(path: Path) -> float:
+def wav_duration(path: Path) -> float:
     """Get actual WAV duration from file size, not header (which is wrong for streamed WAVs)."""
     with wave.open(str(path), "rb") as wf:
         framerate = wf.getframerate()
@@ -106,6 +106,9 @@ def _wav_duration(path: Path) -> float:
         channels = wf.getnchannels()
     data_bytes = path.stat().st_size - 44
     return data_bytes / (sampwidth * channels) / framerate if data_bytes > 0 else 0.0
+
+
+_wav_duration = wav_duration  # alias for backward compat
 
 
 def _estimate_word_timestamps(words: list[str], total_duration: float) -> list[WordTiming]:

@@ -32,12 +32,7 @@ from videoforge.engine.models import (
 )
 from videoforge.engine.tts import generate_audio, build_scene_timing
 from videoforge.engine.renderer import render_scenes, concatenate_scenes, get_media_info
-from videoforge.validation.coherence_gate import (
-    extract_script_from_scenes,
-    log_coherence_results,
-    run_coherence_gate,
-    write_coherence_report,
-)
+from videoforge.paths import ensure_parent, ensure_dir, run_coherence_on_scenes
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 logger = logging.getLogger("videoforge")
@@ -58,15 +53,12 @@ def plan(
     plan_data: list[dict[str, Any]] = [
         {"type": "title", "title": topic, "duration": 180, "text": f"Welcome to {topic}."},
     ]
+    ensure_parent(output)
     Path(output).write_text(json.dumps(plan_data, indent=2))
     logger.info("Scene plan written to %s", output)
 
     # Coherence gate
-    plan_dict: dict[str, Any] = {"scenes": plan_data}
-    script = extract_script_from_scenes(plan_data) or topic
-    coherence = run_coherence_gate(script, plan_dict, plan_path=output)
-    log_coherence_results(coherence)
-    write_coherence_report(coherence, output)
+    run_coherence_on_scenes(plan_data, output, fallback_script=topic)
 
 
 @app.command()
@@ -106,14 +98,14 @@ def render(
 ):
     """Render a video from definition."""
     video_def = _load_video_def(video)
-    out_dir = Path(build_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
+    out_dir = ensure_dir(build_dir)
 
     logger.info("Rendering %d scenes (%d frames = %.1fs)...", len(video_def.scenes), video_def.total_frames(), video_def.total_seconds())
     scene_paths = render_scenes(video_def, remotion_dir, out_dir, tmpdir=out_dir / "tmp")
 
     # Emit per-scene report artifacts alongside each scene file
-    from videoforge.review.frame_reviewer import generate_scene_report, write_scene_report
+    from videoforge.review.frame_reviewer import generate_scene_report, generate_video_report, write_scene_report, write_video_report
+    scene_reports: list[dict] = []
     for i, (scene, sp) in enumerate(zip(video_def.scenes, scene_paths)):
         engine = getattr(scene, "renderer", "remotion")
         sr = generate_scene_report(
@@ -124,10 +116,37 @@ def render(
             content_hash=video_def.content_hash(),
         )
         write_scene_report(sr, sp)
+        scene_reports.append(sr)
 
     logger.info("Concatenating %d scenes...", len(scene_paths))
     final = concatenate_scenes(scene_paths, output)
     logger.info("Video: %s", final)
+
+    # Generate video-level report with scene summary
+    engines = list({s.renderer for s in video_def.scenes if s.renderer})
+    report = generate_video_report(
+        video_path=str(final),
+        content_hash=video_def.content_hash(),
+        engine_mix=engines,
+        scene_reports=scene_reports,
+    )
+    write_video_report(report, str(final))
+
+    # Emit provenance graph artifact linking scenes → engines → assets → reports
+    from videoforge.review.frame_reviewer import (
+        build_provenance_scenes,
+        generate_provenance_graph,
+        write_provenance_graph,
+    )
+    provenance_scenes = build_provenance_scenes(video_def, scene_paths, build_dir=out_dir)
+    provenance = generate_provenance_graph(
+        video_path=str(final),
+        content_hash=video_def.content_hash(),
+        scenes=provenance_scenes,
+        engine_mix=engines,
+    )
+    p_path = write_provenance_graph(provenance, str(final))
+    logger.info("Provenance graph: %s", p_path)
 
     info = get_media_info(final)
     if "format" in info:
@@ -140,10 +159,12 @@ def report_summary(
     video: Annotated[str, typer.Argument(help="Video file path (reads <video>.mp4.report.json)")],
     json_output: Annotated[bool, typer.Option("--json", help="Output raw JSON instead of key=value pairs")] = False,
     scenes: Annotated[bool, typer.Option("--scenes", help="Also scan for per-scene report artifacts")] = False,
+    verbose: Annotated[bool, typer.Option("--verbose", "-v", help="Show issue details alongside summary")] = False,
 ):
     """Print deterministic summary from <video>.mp4.report.json and scene artifacts.
 
     Output key=value lines (script-friendly) or --json for raw report.
+    Use --verbose/-v for human-readable issue details.
     Exit code 0 = all pass, 1 = any fail.
     """
     report_path = Path(video).with_suffix(".mp4.report.json")
@@ -159,15 +180,24 @@ def report_summary(
     if json_output:
         print(json.dumps(report, indent=2))
     else:
+        # Route through central policy engine
         l0_s = l0.get("status", "?")
         l1_p = l1.get("passed", False)
         l2_s = l2.get("status", "pass")
-        if l0_s == "fail" or not l1_p or l2_s == "fail":
-            overall = "FAIL"
-        elif l0_s == "warn" or l2_s == "warn":
-            overall = "WARN"
+        if l0_s == "?":
+            overall = "?"
         else:
-            overall = "PASS"
+            from videoforge.review.policy import aggregate as aggregate_policy
+            # Build minimal result dicts for policy engine
+            l0_for_policy = _build_status_result(l0_s, "l0")
+            l1_for_policy = _build_l1_result(l1_p)
+            l2_for_policy = _build_status_result(l2_s, "l2")
+            decision = aggregate_policy(
+                l0_result=l0_for_policy,
+                l1_result=l1_for_policy,
+                l2_result=l2_for_policy,
+            )
+            overall = decision["verdict"].upper()
         print(f"REPORT_status={overall}")
         print(f"REPORT_video={report.get('video_path', '')}")
         print(f"REPORT_content_hash={report.get('content_hash', '')}")
@@ -186,19 +216,100 @@ def report_summary(
         print(f"REPORT_l2b_issues={l2.get('total_issues', 0)}")
 
         if scenes:
-            _print_scene_artifacts(report_path.parent)
+            _print_scene_artifacts(report.get("scenes_summary"), report_path.parent)
 
-    all_pass = l0.get("status") != "fail" and l1.get("passed", False) and l2.get("status", "pass") != "fail"
-    if not all_pass:
+        if verbose:
+            _print_verbose_issues(l0, l1, l2)
+
+    from videoforge.review.policy import aggregate as aggregate_policy, ReviewVerdict
+    l0_for_policy = _build_status_result(l0.get("status", "pass"), "l0")
+    l1_for_policy = _build_l1_result(l1.get("passed", True))
+    l2_for_policy = _build_status_result(l2.get("status", "pass"), "l2")
+    decision = aggregate_policy(
+        l0_result=l0_for_policy,
+        l1_result=l1_for_policy,
+        l2_result=l2_for_policy,
+    )
+    if decision["verdict"] == ReviewVerdict.FAIL:
         raise typer.Exit(1)
 
 
-def _print_scene_artifacts(directory: Path) -> None:
-    """Print summary of per-scene report artifacts in directory."""
-    for p in sorted(directory.glob("*.mp4.scene.report.json")):
-        sr = json.loads(p.read_text())
-        print(f"SCENE_{sr.get('scene_index', '?')}_engine={sr.get('engine', '?')}")
-        print(f"SCENE_{sr.get('scene_index', '?')}_duration_frames={sr.get('duration_frames', 0)}")
+def _build_status_result(status: str, level: str) -> dict:
+    """Build minimal result dict for policy engine from a status string."""
+    if status == "fail":
+        return {"issues": [{"severity": "high", "type": "aggregated_failure"}]}
+    if status == "warn":
+        return {"issues": [{"severity": "medium", "type": "aggregated_warning"}]}
+    return {"issues": []}
+
+
+def _build_l1_result(passed: bool) -> dict:
+    """Build minimal L1 result dict for policy engine."""
+    if not passed:
+        return {"issues": [{"type": "black_frame"}]}
+    return {"issues": [], "passed": True}
+
+
+def _print_scene_artifacts(
+    scenes_summary: dict | None = None,
+    directory: Path | None = None,
+) -> None:
+    """Print summary of per-scene report artifacts.
+
+    Uses embedded ``scenes_summary.scenes`` list when available, otherwise
+    falls back to scanning ``directory`` for ``*.mp4.scene.report.json`` files.
+    """
+    scenes_list: list[dict] | None = None
+    if scenes_summary:
+        scenes_list = scenes_summary.get("scenes")  # compact refs or None
+
+    if scenes_list is not None:
+        for s in scenes_list:
+            print(f"SCENE_{s.get('index', '?')}_engine={s.get('engine', '?')}")
+            print(f"SCENE_{s.get('index', '?')}_duration_frames={s.get('duration_frames', 0)}")
+    elif directory is not None:
+        for p in sorted(directory.glob("*.mp4.scene.report.json")):
+            sr = json.loads(p.read_text())
+            print(f"SCENE_{sr.get('scene_index', '?')}_engine={sr.get('engine', '?')}")
+            print(f"SCENE_{sr.get('scene_index', '?')}_duration_frames={sr.get('duration_frames', 0)}")
+
+
+def _print_verbose_issues(
+    l0: dict[str, Any],
+    l1: dict[str, Any],
+    l2: dict[str, Any],
+) -> None:
+    """Print human-readable issue details for --verbose mode."""
+    l0_issues = l0.get("issues", [])
+    l1_issues = l1.get("issues", [])
+    l2_issues = l2.get("issues", [])
+
+    if l0_issues:
+        print(f"--- L0 Issues ({len(l0_issues)}) ---")
+        for iss in l0_issues:
+            sev = iss.get("severity", "?")
+            typ = iss.get("type", "?")
+            detail = iss.get("detail", "")
+            print(f"  [{sev}] {typ}: {detail}" if detail else f"  [{sev}] {typ}")
+
+    if l1_issues:
+        print(f"--- L1 Issues ({len(l1_issues)}) ---")
+        for iss in l1_issues:
+            typ = iss.get("type", "?")
+            start = iss.get("start")
+            end = iss.get("end")
+            if start is not None and end is not None:
+                print(f"  {typ}: frames {start}-{end}")
+            else:
+                print(f"  {typ}")
+
+    if l2_issues:
+        print(f"--- L2b Issues ({len(l2_issues)}) ---")
+        for iss in l2_issues:
+            sev = iss.get("severity", "?")
+            typ = iss.get("type", "?")
+            detail = iss.get("detail", "")
+            print(f"  [{sev}] {typ}: {detail}" if detail else f"  [{sev}] {typ}")
 
 
 @app.command()
@@ -241,16 +352,17 @@ def review(
     else:
         logger.info("L2b Layout Overlap: skipped (no element metadata)")
 
-    # Combine results
-    all_passed = l0_status == "pass" and l1_passed and l2_status == "pass"
+    # Unified policy decision from central engine
+    decision = r["decision"]
+    verdict = decision["verdict"]
+
     all_issues = l0_result.get("issues", []) + l1_result.get("issues", []) + l2_issues
 
-    if all_passed:
+    if verdict == "pass":
         logger.info("Review: PASSED — 0 issues across all gates")
     else:
         logger.warning("Review: %s — %d total issues (L0=%s, L1=%s, L2b=%s)",
-                       "FAIL" if l0_status == "fail" else "WARN",
-                       len(all_issues), l0_status, l1_label, l2_status)
+                       verdict.upper(), len(all_issues), l0_status, l1_label, l2_status)
         for issue in all_issues:
             sev = issue.get("severity", "?")
             typ = issue.get("type", "?")
@@ -258,8 +370,16 @@ def review(
 
     logger.info("Review report: %s", r["report_path"])
 
-    # Fail CLI on L0 or L2b high-severity issues
-    if l0_status == "fail" or l2_status == "fail":
+    # Structured key=value output on stdout for script consumption
+    print(f"REVIEW_status={verdict.upper()}")
+    print(f"REVIEW_l0_status={l0_status}")
+    print(f"REVIEW_l1_passed={str(l1_passed).lower()}")
+    print(f"REVIEW_l2b_status={l2_status}")
+    print(f"REVIEW_total_issues={len(all_issues)}")
+    print(f"REVIEW_report_path={r['report_path']}")
+
+    # Fail CLI on any FAIL verdict from central policy engine
+    if verdict == "fail":
         raise typer.Exit(1)
 
 
@@ -278,10 +398,7 @@ def pipeline(
 
     # Step 1b: Coherence gate on planned scenes
     scenes = json.loads(Path(scenes_json).read_text())
-    plan_dict: dict[str, Any] = {"scenes": scenes}
-    coherence = run_coherence_gate(topic, plan_dict, plan_path=scenes_json)
-    log_coherence_results(coherence)
-    write_coherence_report(coherence, scenes_json)
+    run_coherence_on_scenes(scenes, scenes_json, fallback_script=topic)
 
     # Step 2: TTS for each scene
     for i, scene in enumerate(scenes):
@@ -304,7 +421,7 @@ def pipeline(
     if elements:
         elements_data = json.loads(Path(elements).read_text())
     engines = list({s.renderer for s in video_def.scenes if s.renderer})
-    r = run_review(output, content_hash=video_def.content_hash(), engine_mix=engines, elements=elements_data)
+    r = run_review(output, content_hash=video_def.content_hash(), engine_mix=engines, elements=elements_data, rerender=True)
     l0_result = r["l0_result"]
     l0_status = r["l0_status"]
     l1_result = r["l1_result"]
