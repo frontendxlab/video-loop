@@ -1,0 +1,43 @@
+{
+  "last_sync_commit": "dbf663758fc9d2560efb0baa3cb88876ece7ae4c",
+  "total_pages": 99,
+  "provider": "openrouter",
+  "model": "openai/gpt-oss-120b",
+  "docs_enabled": true,
+  "run_mode": "standard",
+  "git_tier": "full",
+  "include_submodules": false,
+  "total_tokens": 308052,
+  "phase_timings": {
+    "co_change": 0.07,
+    "traverse": 0.84,
+    "git": 4.59,
+    "parse": 4.67,
+    "tsconfig": 0.02,
+    "graph.ts_index": 0.02,
+    "graph.imports": 0.03,
+    "graph.type_refs": 0.01,
+    "graph.heritage": 0.0,
+    "graph.calls": 0.02,
+    "dynamic_hints": 0.16,
+    "graph.metrics": 1.06,
+    "graph.communities": 0.17,
+    "external_systems": 0.07,
+    "dead_code": 0.49,
+    "health": 7.75,
+    "decisions": 155.64,
+    "knowledge_graph.skeleton": 0.03,
+    "graph.flows": 0.01
+  },
+  "knowledge_graph": {
+    "version": "1.0.0",
+    "node_count": 350,
+    "layer_count": 6,
+    "tour_steps": 12,
+    "has_summaries": true,
+    "fingerprint": "a5c799db81fc8072"
+  },
+  "store_format_version": 1,
+  "written_by_version": "0.25.0",
+  "config_fingerprint": "5dcb0a901b52ece7cb0ed6f97363281081da8049b0450f0fe8739c88990f6bd5"
+}

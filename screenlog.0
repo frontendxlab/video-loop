@@ -1,0 +1,28 @@
+Loading model...
+Model loaded. SR=24000
+Loading voices...
+  alba: OK
+  jane: OK
+  varun: OK
+  fireship: OK
+
+=== 01_agentic_architecture.wav (primary: varun) ===
+  32 segments, 3938w, ~21min
+WARNING:pocket_tts.models.tts_model:Chunk has 55 tokens (max 50), generation may skip words: 'A classic example from the exam scenarios involves...'
+WARNING:pocket_tts.models.tts_model:Chunk has 52 tokens (max 50), generation may skip words: 'Decouple the orchestration logic from tool impleme...'
+  [20/32]
+  SAVED: /home/rashid/Music/01_agentic_architecture.wav (1192s/19.9min, 54.6MB)
+
+=== 02_claude_code.wav (primary: fireship) ===
+  35 segments, 3462w, ~19min
+WARNING:pocket_tts.models.tts_model:Chunk has 52 tokens (max 50), generation may skip words: 'MCP servers are configured in a file called . mcp....'
+WARNING:pocket_tts.models.tts_model:Chunk has 51 tokens (max 50), generation may skip words: 'The print flag is the key enabler for non-interact...'
+  [20/35]
+WARNING:pocket_tts.models.tts_model:Chunk has 52 tokens (max 50), generation may skip words: 'mdc extension are treated as configuration files b...'
+WARNING:pocket_tts.models.tts_model:Chunk has 51 tokens (max 50), generation may skip words: 'md loads first and provides base context. Subdirec...'
+  SAVED: /home/rashid/Music/02_claude_code.wav (1039s/17.3min, 47.6MB)
+
+=== 03_prompt_engineering.wav (primary: jane) ===
+  42 segments, 4247w, ~23min
+WARNING:pocket_tts.models.tts_model:Chunk has 55 tokens (max 50), generation may skip words: 'A well-designed system prompt is the single highes...'
+  [20/42]

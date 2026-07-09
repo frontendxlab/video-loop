@@ -18,6 +18,60 @@ from videoforge.engine.models import VideoDefinition
 logger = logging.getLogger("videoforge.engine.render")
 
 
+CLIP_FORMAT: dict[str, Any] = {
+    "fps": 30,
+    "width": 1920,
+    "height": 1080,
+    "pixel_format": "yuv420p",
+    "audio_codec": "aac",
+    "video_codec": "h264",
+}
+
+
+def _probe_clip_format(path: str | Path) -> dict[str, Any] | None:
+    """Return {fps, width, height, pix_fmt, vcodec, acodec} or None on failure."""
+    cmd = [
+        "ffprobe", "-v", "quiet", "-print_format", "json",
+        "-show_streams", str(path),
+    ]
+    res = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+    if res.returncode != 0:
+        return None
+    try:
+        info = json.loads(res.stdout)
+    except json.JSONDecodeError:
+        return None
+    fmt: dict[str, Any] = {}
+    for st in info.get("streams", []):
+        if st.get("codec_type") == "video":
+            fr = st.get("r_frame_rate", "30/1")
+            num, _, den = fr.partition("/")
+            try:
+                fmt["fps"] = round(int(num) / (int(den) or 1))
+            except ValueError:
+                fmt["fps"] = 30
+            fmt["width"] = int(st.get("width", 1920))
+            fmt["height"] = int(st.get("height", 1080))
+            fmt["pix_fmt"] = st.get("pix_fmt", "yuv420p")
+            fmt["vcodec"] = st.get("codec_name", "h264")
+        if st.get("codec_type") == "audio":
+            fmt["acodec"] = st.get("codec_name", "aac")
+    return fmt or None
+
+
+def _matches_pinned(fmt: dict[str, Any] | None) -> bool:
+    if not fmt:
+        return True  # unknown — assume ok, copy
+    return (
+        fmt.get("fps") == CLIP_FORMAT["fps"]
+        and fmt.get("width") == CLIP_FORMAT["width"]
+        and fmt.get("height") == CLIP_FORMAT["height"]
+        and fmt.get("pix_fmt") == CLIP_FORMAT["pixel_format"]
+        and fmt.get("vcodec") == CLIP_FORMAT["video_codec"]
+        and fmt.get("acodec") == CLIP_FORMAT["audio_codec"]
+    )
+
+
 def render_scenes(
     video: VideoDefinition,
     remotion_dir: str | Path,
@@ -84,6 +138,9 @@ def render_scenes(
             "--concurrency", str(concurrency),
             "--log", "error",
             "--enforce-audio-track",
+            "--codec", "h264",
+            "--pixel-format", CLIP_FORMAT["pixel_format"],
+            "--fps", str(CLIP_FORMAT["fps"]),
         ]
 
         logger.info("Rendering scene %d/%d via Remotion (%s, %df)", i + 1, len(video.scenes), scene.type.value, scene.duration)
@@ -102,7 +159,11 @@ def concatenate_scenes(
     scene_paths: list[str],
     output_path: str | Path,
 ) -> str:
-    """Concatenate rendered scenes with FFmpeg — lossless copy."""
+    """Concatenate rendered scenes with FFmpeg.
+
+    Lossless -c copy when all clips match the pinned CLIP_FORMAT; otherwise
+    re-encode to the pinned format (h264/yuv420p/30fps/aac) for safe concat.
+    """
     output_path = Path(output_path)
     list_file = output_path.parent / "concat_list.txt"
 
@@ -110,12 +171,29 @@ def concatenate_scenes(
         for p in scene_paths:
             f.write(f"file '{Path(p).name}'\n")
 
-    cmd = [
-        "ffmpeg", "-y", "-f", "concat", "-safe", "0",
-        "-i", str(list_file),
-        "-c", "copy",
-        str(output_path),
-    ]
+    all_match = True
+    for p in scene_paths:
+        if not _matches_pinned(_probe_clip_format(p)):
+            all_match = False
+            break
+
+    if all_match:
+        cmd = [
+            "ffmpeg", "-y", "-f", "concat", "-safe", "0",
+            "-i", str(list_file),
+            "-c", "copy",
+            str(output_path),
+        ]
+    else:
+        logger.info("concat: format mismatch detected, re-encoding to pinned format")
+        cmd = [
+            "ffmpeg", "-y", "-f", "concat", "-safe", "0",
+            "-i", str(list_file),
+            "-c:v", "libx264", "-pix_fmt", CLIP_FORMAT["pixel_format"],
+            "-r", str(CLIP_FORMAT["fps"]),
+            "-c:a", CLIP_FORMAT["audio_codec"],
+            str(output_path),
+        ]
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
     if result.returncode != 0 or not output_path.exists():
         raise RuntimeError(f"Concatenation failed: {(result.stderr or '')[-500:]}")

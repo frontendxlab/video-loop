@@ -46,6 +46,8 @@ def estimate_timestamps(words, dur):
     pm = (dur * 1000) / len(words)
     return [{"text": w, "startMs": round(i * pm), "endMs": round((i + 1) * pm)} for i, w in enumerate(words)]
 
+from videoforge.audio.forced_align import forced_align
+
 
 USE_MANIM = "--use-manim" in sys.argv or os.environ.get("VFX_USE_MANIM") == "1"
 if USE_MANIM:
@@ -134,7 +136,7 @@ def wizard():
                 shutil.copy2(wav, PUBLIC_AUDIO / f"s{i:03d}.wav".replace("s", "a"))
                 dur = wav_duration(wav)
                 scene["duration"] = max(1, int(dur * 30))
-                scene["wordTimestamps"] = estimate_timestamps(text.split(), dur)
+                scene["wordTimestamps"] = forced_align(text, str(wav))
                 ok(f"{dur:.1f}s, {len(text.split())} words")
             else:
                 warn(f"TTS returned {r.status_code}")

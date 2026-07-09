@@ -1,0 +1,8 @@
+commit_limit: 1000
+provider: openrouter
+model: openai/gpt-oss-120b
+embedder: openrouter
+reasoning: auto
+distill:
+  commands:
+    enabled: true

@@ -63,9 +63,18 @@ def generate_audio(
     # Get actual duration from WAV file size
     duration = _wav_duration(path)
 
-    # Compute word timestamps
+    # Prefer forced alignment (real word boundaries) when module available
     words = text.split()
-    word_timestamps = _estimate_word_timestamps(words, duration)
+    word_timestamps: list[WordTiming]
+    try:
+        from videoforge.audio.forced_align import forced_align
+        aligned = forced_align(text, str(path))
+        word_timestamps = [
+            WordTiming(text=w["text"], startMs=float(w["startMs"]), endMs=float(w["endMs"]))
+            for w in aligned
+        ]
+    except Exception:
+        word_timestamps = _estimate_word_timestamps(words, duration)
 
     return {
         "audio_path": str(path.resolve()),

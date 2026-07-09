@@ -97,6 +97,16 @@ class VideoDefinition:
     def total_seconds(self) -> float:
         return self.total_frames() / self.fps
 
+    def content_hash(self) -> str:
+        import hashlib
+        import json
+        props = self.to_remotion_props()
+        props["fps"] = self.fps
+        props["width"] = self.width
+        props["height"] = self.height
+        data = json.dumps(props, sort_keys=True)
+        return hashlib.sha256(data.encode()).hexdigest()[:16]
+
     def to_remotion_props(self) -> dict[str, Any]:
         """Convert to Remotion inputProps JSON."""
         scenes_json = []
