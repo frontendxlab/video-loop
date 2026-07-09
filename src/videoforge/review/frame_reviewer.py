@@ -4,6 +4,7 @@ import json
 import subprocess
 from typing import Any
 
+from videoforge.review.l0_mixed_engine import L0MixedEngineReview
 from videoforge.review.l3_smoothness import L3Smoothness
 from videoforge.review.l4_transitions import L4Transitions
 from videoforge.review.l5_consistency import L5Consistency
@@ -11,6 +12,7 @@ from videoforge.review.l5_consistency import L5Consistency
 
 class FrameReviewer:
     def __init__(self) -> None:
+        self._l0 = L0MixedEngineReview()
         self._l3 = L3Smoothness()
         self._l4 = L4Transitions()
         self._l5 = L5Consistency()
@@ -89,6 +91,14 @@ class FrameReviewer:
             "passed": len(issues) == 0,
         }
 
+    def check_mixed_engine(self, video_path: str) -> dict[str, Any]:
+        """Run L0 mixed-engine review gate standalone.
+
+        Convenience method for pipeline callers that only need the frame-sampled
+        visual consistency check without running the full L1-L5 gauntlet.
+        """
+        return self._l0.run(video_path)
+
     def aggregate_review(
         self, video_path: str, input_props: dict | None = None
     ) -> dict[str, Any]:
@@ -96,6 +106,9 @@ class FrameReviewer:
             "video_path": video_path,
             "levels": {},
         }
+
+        l0_result = self._l0.run(video_path)
+        report["levels"]["l0_mixed_engine"] = l0_result
 
         l1_result = self.check_integrity(video_path)
         report["levels"]["l1_integrity"] = l1_result
