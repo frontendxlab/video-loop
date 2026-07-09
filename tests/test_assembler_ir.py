@@ -228,3 +228,109 @@ def test_render_scenes_legacy_animotion_no_audio_gives_silent_track(tmp_path: Pa
         if "-map" in c[0][0] and "1:a:0" in c[0][0]
     ]
     assert len(mux_calls) == 0, "No audio mux should happen when no audio tracks exist"
+
+
+# ── Audio mux for Manim scenes ───────────────────────────────────────────────
+
+
+def test_render_scenes_legacy_manim_muxes_audio(tmp_path: Path):
+    """render_scenes muxes narration audio into legacy Manim clips."""
+    scene = SceneDefinition(
+        type=SceneType.TITLE, duration=30, title="Manim Audio",
+        renderer="manim",
+    )
+    audio_file = tmp_path / "manim_audio.wav"
+    audio_file.write_text("fake-audio")
+    audio_track = AudioTrack(src=str(audio_file), startFrame=0, durationFrames=30)
+    video = VideoDefinition(
+        title="Test", scenes=[scene], audioTracks=[audio_track],
+        captions=[], fps=30,
+    )
+
+    with (
+        patch("subprocess.run") as mock_run,
+        patch("videoforge.engine.manim_renderer.render_scene") as mock_manim_render,
+    ):
+        out_video = tmp_path / "out" / "scene_0000.mp4"
+        mock_manim_render.return_value = {
+            "success": True,
+            "video_path": str(out_video),
+            "log": "mocked",
+        }
+
+        def _fake_run(cmd, *a, **kw):
+            r = MagicMock()
+            r.returncode = 0
+            for token in cmd:
+                if isinstance(token, str) and token.endswith(".mp4"):
+                    Path(token).parent.mkdir(parents=True, exist_ok=True)
+                    Path(token).write_text("dummy")
+            return r
+
+        mock_run.side_effect = _fake_run
+
+        rendered = render_scenes(
+            video, remotion_dir=tmp_path / "remotion", output_dir=tmp_path / "out",
+            tmpdir=tmp_path / "tmp",
+        )
+        assert len(rendered) == 1
+
+    # Verify ffmpeg called with audio mux args
+    mux_calls = [
+        c for c in mock_run.call_args_list
+        if "-map" in c[0][0] and "1:a:0" in c[0][0]
+    ]
+    assert len(mux_calls) == 1, "Audio mux FFmpeg should be called exactly once"
+    args = mux_calls[0][0][0]
+    assert "-c:v" in args and "copy" in args
+    assert "-c:a" in args and "aac" in args[args.index("-c:a") + 1]
+
+
+def test_render_scenes_legacy_manim_no_audio(tmp_path: Path):
+    """render_scenes for Manim with no audio tracks — no mux call."""
+    scene = SceneDefinition(
+        type=SceneType.TITLE, duration=30, title="Silent Manim",
+        renderer="manim",
+    )
+    video = VideoDefinition(
+        title="Test", scenes=[scene], audioTracks=[],
+        captions=[], fps=30,
+    )
+
+    with (
+        patch("subprocess.run") as mock_run,
+        patch("videoforge.engine.manim_renderer.render_scene") as mock_manim_render,
+    ):
+        out_video = tmp_path / "out" / "scene_0000.mp4"
+        mock_manim_render.return_value = {
+            "success": True,
+            "video_path": str(out_video),
+            "log": "mocked",
+        }
+
+        def _fake_run(cmd, *a, **kw):
+            r = MagicMock()
+            r.returncode = 0
+            for token in cmd:
+                if isinstance(token, str) and token.endswith(".mp4"):
+                    Path(token).parent.mkdir(parents=True, exist_ok=True)
+                    Path(token).write_text("dummy")
+            return r
+
+        mock_run.side_effect = _fake_run
+
+        rendered = render_scenes(
+            video, remotion_dir=tmp_path / "remotion", output_dir=tmp_path / "out",
+            tmpdir=tmp_path / "tmp",
+        )
+        assert len(rendered) == 1
+
+    # Verify no audio mux call (no audio tracks)
+    mux_calls = [
+        c for c in mock_run.call_args_list
+        if "-map" in c[0][0] and "1:a:0" in c[0][0]
+    ]
+    assert len(mux_calls) == 0, "No audio mux should happen when no audio tracks exist"
+
+
+

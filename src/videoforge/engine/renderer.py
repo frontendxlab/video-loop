@@ -199,6 +199,11 @@ def render_scenes(
                 if src != output_path:
                     import shutil
                     shutil.copy2(str(src), str(output_path))
+
+                # Mux real narration audio over silent track (legacy path only)
+                if not is_ir and i < len(video.audioTracks):
+                    _mux_audio_track(video.audioTracks[i], output_path, output_dir, i)
+
                 rendered.append(str(output_path.resolve()))
             else:
                 raise RuntimeError(f"Scene {i} Manim render failed: {result.get('log', '')[-300:]}")
