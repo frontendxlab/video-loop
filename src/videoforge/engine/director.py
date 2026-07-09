@@ -27,6 +27,8 @@ def pick_engine(node: SceneNode) -> Engine:
         payload = json.loads(node.payload)
         if payload.get("layout") == "math_graph":
             return Engine.MANIM
+        if payload.get("interactive"):
+            return Engine.ANIMOTION
         return Engine.REMOTION
     if k in (SceneKind.CHART, SceneKind.TIMELINE, SceneKind.MAP3D):
         return Engine.MANIM
@@ -51,8 +53,12 @@ def load_routing_table(path: str | Path | None = None) -> dict[str, Engine]:
     table: dict[str, Engine] = {}
     for entry in data.get("routing", []):
         kind = entry.get("kind", "")
-        layout = entry.get("layout")
-        key = f"{kind}:{layout}" if layout else kind
+        qualifiers = []
+        if entry.get("layout"):
+            qualifiers.append(f"layout:{entry['layout']}")
+        if entry.get("interactive"):
+            qualifiers.append("interactive:true")
+        key = f"{kind}:{':'.join(qualifiers)}" if qualifiers else kind
         table[key] = Engine(entry.get("engine", "remotion"))
     if path is None:
         _ROUTING_CACHE = table

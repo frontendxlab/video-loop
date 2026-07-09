@@ -11,6 +11,16 @@ from videoforge.engine.ir import (
 from videoforge.engine.director import pick_engine
 
 
+def _animotion_project() -> VideoProject:
+    n0 = SceneNode(
+        id="s0", kind=SceneKind.DIAGRAM,
+        payload='{"interactive": true, "title":"Interactive"}',
+        engine_hint=Engine.ANIMOTION, duration_frames=90,
+        narration=NarrationSpec("t", (), "estimated"),
+    )
+    return VideoProject("Animotion", (n0,), 30, 1920, 1080)
+
+
 def _project() -> VideoProject:
     n0 = SceneNode(
         id="s0", kind=SceneKind.TITLE,
@@ -60,3 +70,8 @@ def test_ir_scene_props_includes_payload_fields():
     assert sc["code"] == "print(1)"
     assert sc["lang"] == "python"
     assert sc["highlightLines"] == [2]
+
+
+def test_director_routes_interactive_diagram_to_animotion():
+    p = _animotion_project()
+    assert pick_engine(p.scenes[0]) == Engine.ANIMOTION

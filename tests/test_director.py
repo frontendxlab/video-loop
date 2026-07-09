@@ -59,6 +59,14 @@ def test_diagram_math_graph_routes_to_manim():
     assert pick_engine(_node(SceneKind.DIAGRAM, {"layout": "math_graph"})) == Engine.MANIM
 
 
+def test_diagram_interactive_routes_to_animotion():
+    assert pick_engine(_node(SceneKind.DIAGRAM, {"interactive": True, "layout": "default"})) == Engine.ANIMOTION
+
+
+def test_diagram_interactive_false_routes_to_remotion():
+    assert pick_engine(_node(SceneKind.DIAGRAM, {"interactive": False})) == Engine.REMOTION
+
+
 def test_diagram_no_layout_routes_to_remotion():
     assert pick_engine(_node(SceneKind.DIAGRAM, {})) == Engine.REMOTION
 
@@ -79,8 +87,9 @@ def test_routing_table_loads():
     table = load_routing_table()
     assert table.get("code") == Engine.REMOTION
     assert table.get("chart") == Engine.MANIM
-    assert table.get("diagram:math_graph") == Engine.MANIM
-    assert table.get("diagram:default") == Engine.REMOTION
+    assert table.get("diagram:layout:math_graph") == Engine.MANIM
+    assert table.get("diagram:layout:default") == Engine.REMOTION
+    assert table.get("diagram:interactive:true") == Engine.ANIMOTION
 
 
 def test_pick_engine_is_deterministic():

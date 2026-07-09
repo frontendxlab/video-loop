@@ -28,6 +28,10 @@ routing:
     engine: manim
     reason: "Real graph layout with dot/spring algorithm"
   - kind: diagram
+    interactive: true
+    engine: animotion
+    reason: "Web-animated diagrams with CSS/JS transitions"
+  - kind: diagram
     layout: default
     engine: remotion
     reason: "Fallback to React-based diagram"

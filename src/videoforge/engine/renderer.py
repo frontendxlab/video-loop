@@ -127,6 +127,25 @@ def render_scenes(
             kind = scene.type.value
             duration = scene.duration
 
+        if engine == Engine.ANIMOTION:
+            logger.info("Rendering scene %d/%d via Animotion (%s, %df)", i + 1, n_scenes, kind, duration)
+            if is_ir:
+                from videoforge.engine.ir_adapters import node_to_scene_definition
+                sd = node_to_scene_definition(video.scenes[i], video.fps)
+            else:
+                sd = video.scenes[i]
+            from videoforge.engine.animotion_renderer import render_scene as animotion_render_scene
+            result = animotion_render_scene(sd, output_dir, fps=video.fps)
+            if result["success"] and result["video_path"]:
+                src = Path(result["video_path"])
+                if src != output_path:
+                    import shutil
+                    shutil.copy2(str(src), str(output_path))
+                rendered.append(str(output_path.resolve()))
+            else:
+                raise RuntimeError(f"Scene {i} Animotion render failed: {result.get('log', '')[-300:]}")
+            continue
+
         if engine == Engine.MANIM:
             logger.info("Rendering scene %d/%d via Manim (%s, %df)", i + 1, n_scenes, kind, duration)
             if is_ir:
