@@ -243,5 +243,13 @@ def _build_video_def(title: str, scenes_data: list[dict]) -> VideoDefinition:
     )
 
 
-if __name__ == "__main__":
+
+def main():
+    import sys
+    if len(sys.argv) <= 1:
+        sys.argv.append("--help")
     app()
+
+
+if __name__ == "__main__":
+    main()

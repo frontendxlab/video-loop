@@ -2,16 +2,21 @@
 """VideoForge CLI — deterministic video generation commands.
 
 Usage:
-    ./vfx-cli plan --topic "..."           # Plan scenes
+    ./vfx-cli pipeline --topic "..."       # Full build
+    ./vfx-cli plan --topic "..."           # Plan scenes  
     ./vfx-cli tts scene.json               # Generate TTS audio
     ./vfx-cli render --video video.json    # Render video
     ./vfx-cli review video.mp4             # Review quality
-    ./vfx-cli pipeline --topic "..."       # Build full pipeline
+    ./vfx-cli --help                       # All commands
 """
 
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent / "src"))
+
+# Show help by default
+if len(sys.argv) <= 1:
+    sys.argv.append("--help")
 
 from videoforge.app import app
 
