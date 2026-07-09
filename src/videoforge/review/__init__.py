@@ -1,4 +1,5 @@
 from videoforge.review.frame_reviewer import FrameReviewer
+from videoforge.review.overlap_gate import OverlapGate
 from videoforge.review.repair_actions import (
     ACTION_RERENDER,
     ACTION_RERENDER_WITH_TOKEN_RESET,
@@ -11,6 +12,7 @@ from videoforge.review.repair_actions import (
 
 __all__ = [
     "FrameReviewer",
+    "OverlapGate",
     "RepairAction",
     "RepairHook",
     "build_repair_plan",
