@@ -1,0 +1,210 @@
+{
+  "version": 1,
+  "recipes": [
+    {
+      "id": "map3d",
+      "name": "3D Map with Landmarks",
+      "description": "Travel route on 3D map with landmark overlays, camera follows path",
+      "scene_kind": "map3d",
+      "preferred_engine": "manim",
+      "fallback_engines": ["remotion"],
+      "allowed_inputs": [
+        {"key": "route_coords", "type": "array", "required": true, "description": "Array of [lat, lng] waypoints"},
+        {"key": "landmarks", "type": "array", "required": false, "description": "Array of landmark objects with name, position"},
+        {"key": "camera_tilt", "type": "number", "required": false, "description": "Camera elevation angle in degrees"},
+        {"key": "map_style", "type": "string", "required": false, "description": "Map color theme: satellite, street, dark"}
+      ],
+      "entrance": "fade_in",
+      "exit": "fade_out",
+      "tags": ["geospatial", "3d", "travel", "map"],
+      "review_hints": [
+        {"check": "verify route path clips to map bounds", "severity": "error"},
+        {"check": "landmark labels readable at target resolution", "severity": "warn"},
+        {"check": "camera speed smooth along entire route", "severity": "warn"}
+      ]
+    },
+    {
+      "id": "document-highlight",
+      "name": "Document Highlight",
+      "description": "News article or document with animated text focus, blur/unblur, marker overlay",
+      "scene_kind": "title",
+      "preferred_engine": "remotion",
+      "fallback_engines": [],
+      "allowed_inputs": [
+        {"key": "headline", "type": "string", "required": true, "description": "Headline text to feature"},
+        {"key": "body_snippet", "type": "string", "required": false, "description": "Secondary text for context"},
+        {"key": "focus_phrase", "type": "string", "required": false, "description": "Exact phrase to highlight with marker"},
+        {"key": "highlight_color", "type": "string", "required": false, "description": "CSS color for highlight marker"},
+        {"key": "perspective_tilt", "type": "boolean", "required": false, "description": "Apply 3D perspective transform to document"}
+      ],
+      "entrance": "zoom_in",
+      "exit": "blur_out",
+      "tags": ["text", "highlight", "document", "news"],
+      "review_hints": [
+        {"check": "focus phrase exactly matches body_snippet substring", "severity": "error"},
+        {"check": "blur transition does not obscure adjacent text", "severity": "warn"},
+        {"check": "perspective tilt keeps text readable", "severity": "info"}
+      ]
+    },
+    {
+      "id": "screenflow",
+      "name": "Screenflow Product Demo",
+      "description": "Product demo with screen mockups, cursor movements, feature callouts",
+      "scene_kind": "comparison",
+      "preferred_engine": "remotion",
+      "fallback_engines": ["animotion"],
+      "allowed_inputs": [
+        {"key": "screenshots", "type": "array", "required": true, "description": "Array of screenshot URLs or paths"},
+        {"key": "callouts", "type": "array", "required": false, "description": "Array of feature callout objects with text, position"},
+        {"key": "cursor_path", "type": "array", "required": false, "description": "Array of cursor [x,y] positions over time"},
+        {"key": "transition_style", "type": "string", "required": false, "description": "Slide transition: push, fade, wipe"}
+      ],
+      "entrance": "slide_in_right",
+      "exit": "slide_out_left",
+      "tags": ["product", "demo", "screenflow", "ui"],
+      "review_hints": [
+        {"check": "screenshot aspect ratio matches output canvas", "severity": "warn"},
+        {"check": "callout text does not overlap UI elements", "severity": "error"},
+        {"check": "cursor path smooth and natural speed", "severity": "warn"}
+      ]
+    },
+    {
+      "id": "hero-intro",
+      "name": "Cinematic Hero Intro",
+      "description": "Cinematic opener with 3D text, particles, glass HUD, scanner lines",
+      "scene_kind": "title",
+      "preferred_engine": "remotion",
+      "fallback_engines": [],
+      "allowed_inputs": [
+        {"key": "title", "type": "string", "required": true, "description": "Primary title text"},
+        {"key": "subtitle", "type": "string", "required": false, "description": "Secondary subtitle text"},
+        {"key": "particle_count", "type": "number", "required": false, "description": "Number of background particles"},
+        {"key": "hud_style", "type": "string", "required": false, "description": "HUD style: glass, cyber, minimal"},
+        {"key": "accent_color", "type": "string", "required": false, "description": "Primary accent CSS color"},
+        {"key": "include_scanner", "type": "boolean", "required": false, "description": "Add scanning line effect"}
+      ],
+      "entrance": "camera_fly_in",
+      "exit": "dissolve",
+      "tags": ["cinematic", "hero", "intro", "3d-text", "hud"],
+      "review_hints": [
+        {"check": "particles do not overlap title text", "severity": "warn"},
+        {"check": "3D text readable without heavy anti-aliasing artifacts", "severity": "warn"},
+        {"check": "HUD elements visible but not distracting", "severity": "info"},
+        {"check": "duration sufficient for viewer to read title", "severity": "error"}
+      ]
+    },
+    {
+      "id": "overlay-cta",
+      "name": "Transparent CTA Overlay",
+      "description": "Lower-third CTA or overlay with transparent background for compositing",
+      "scene_kind": "outro",
+      "preferred_engine": "remotion",
+      "fallback_engines": ["animotion"],
+      "allowed_inputs": [
+        {"key": "cta_text", "type": "string", "required": true, "description": "Call-to-action text"},
+        {"key": "button_label", "type": "string", "required": false, "description": "Optional button text"},
+        {"key": "position", "type": "string", "required": false, "description": "Overlay position: lower-third, center, top-right"},
+        {"key": "background_opacity", "type": "number", "required": false, "description": "Background opacity 0.0-1.0"},
+        {"key": "include_transparent_bg", "type": "boolean", "required": false, "description": "Render with alpha channel"}
+      ],
+      "entrance": "slide_up",
+      "exit": "fade_out",
+      "tags": ["cta", "overlay", "lower-third", "transparent"],
+      "review_hints": [
+        {"check": "transparent export renders valid alpha channel", "severity": "error"},
+        {"check": "text contrast sufficient against varied backdrops", "severity": "error"},
+        {"check": "position does not clip off-screen", "severity": "warn"}
+      ]
+    },
+    {
+      "id": "trajectory-timeline",
+      "name": "Trajectory Timeline",
+      "description": "Timeline with curved path motion, axis ticks, animated trajectory",
+      "scene_kind": "timeline",
+      "preferred_engine": "manim",
+      "fallback_engines": ["remotion"],
+      "allowed_inputs": [
+        {"key": "events", "type": "array", "required": true, "description": "Array of event objects with date, label, value"},
+        {"key": "trajectory_points", "type": "array", "required": false, "description": "Array of [x,y] points for curved path"},
+        {"key": "show_axis_labels", "type": "boolean", "required": false, "description": "Show axis tick labels"},
+        {"key": "animation_style", "type": "string", "required": false, "description": "Path draw: continuous, stepped, dashed"}
+      ],
+      "entrance": "grow_from_left",
+      "exit": "shrink_to_right",
+      "tags": ["timeline", "trajectory", "path", "motion"],
+      "review_hints": [
+        {"check": "axis tick marks evenly spaced and labeled", "severity": "error"},
+        {"check": "curved path smooth without sharp angles", "severity": "warn"},
+        {"check": "event markers distinguishable from trajectory line", "severity": "warn"}
+      ]
+    },
+    {
+      "id": "3d-ranking",
+      "name": "3D Ranking Bars",
+      "description": "Three-dimensional ranking bars with camera fly-through, animated growth",
+      "scene_kind": "chart",
+      "preferred_engine": "remotion",
+      "fallback_engines": ["manim"],
+      "allowed_inputs": [
+        {"key": "items", "type": "array", "required": true, "description": "Array of ranked items with name, value, rank"},
+        {"key": "bar_color_scale", "type": "string", "required": false, "description": "Color scale: gradient, categorical, single"},
+        {"key": "camera_path", "type": "string", "required": false, "description": "Camera movement: fly-through, orbit, static"},
+        {"key": "show_values", "type": "boolean", "required": false, "description": "Display numeric values on bars"}
+      ],
+      "entrance": "bars_grow_up",
+      "exit": "fade_out",
+      "tags": ["3d", "ranking", "bars", "chart", "data"],
+      "review_hints": [
+        {"check": "bar heights proportional to values, not ranks", "severity": "error"},
+        {"check": "camera fly-through does not clip bars", "severity": "warn"},
+        {"check": "value labels readable at all camera angles", "severity": "warn"}
+      ]
+    },
+    {
+      "id": "audio-reactive",
+      "name": "Audio-Reactive Visuals",
+      "description": "Music-driven visuals: waveform, frequency bars, particle patterns synced to audio",
+      "scene_kind": "title",
+      "preferred_engine": "remotion",
+      "fallback_engines": ["animotion"],
+      "allowed_inputs": [
+        {"key": "audio_source", "type": "string", "required": true, "description": "Path or URL to audio file"},
+        {"key": "visual_style", "type": "string", "required": false, "description": "Visual style: waveform, spectrogram, particles"},
+        {"key": "color_palette", "type": "array", "required": false, "description": "Array of CSS colors for visual layers"},
+        {"key": "smoothing", "type": "number", "required": false, "description": "Frequency smoothing factor 0.0-1.0"},
+        {"key": "overlay_text", "type": "string", "required": false, "description": "Optional text overlay centered"}
+      ],
+      "entrance": "fade_in",
+      "exit": "fade_out",
+      "tags": ["audio", "reactive", "music", "waveform", "visualizer"],
+      "review_hints": [
+        {"check": "visual beats match audio transients within tolerance", "severity": "error"},
+        {"check": "no clipping or distortion at peak amplitude", "severity": "warn"},
+        {"check": "frame rate sufficient for smooth waveform animation", "severity": "warn"}
+      ]
+    },
+    {
+      "id": "dual-chart",
+      "name": "Dual Chart Combo",
+      "description": "Hybrid chart with bar and line series overlaid, animated axes",
+      "scene_kind": "chart",
+      "preferred_engine": "manim",
+      "fallback_engines": ["remotion"],
+      "allowed_inputs": [
+        {"key": "bar_data", "type": "array", "required": true, "description": "Array of bar series data points"},
+        {"key": "line_data", "type": "array", "required": true, "description": "Array of line series data points"},
+        {"key": "x_labels", "type": "array", "required": false, "description": "Category or time labels for x-axis"},
+        {"key": "chart_title", "type": "string", "required": false, "description": "Title displayed above chart"},
+        {"key": "dual_axes", "type": "boolean", "required": false, "description": "Use separate y-axes for bar vs line"}
+      ],
+      "entrance": "axes_draw",
+      "exit": "fade_out",
+      "tags": ["chart", "dual", "bar", "line", "data"],
+      "review_hints": [
+        {"check": "bar and line axes scales match or secondary axis labeled", "severity": "error"},
+        {"check": "bar width does not occlude line markers", "severity": "warn"},
+        {"check": "legend clearly distinguishes bar from line series", "severity": "info"}
+      ]
+    }
+  ]
+}
