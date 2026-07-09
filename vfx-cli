@@ -258,12 +258,15 @@ def wizard():
     print(f"\n  {B}── Step 6: Quality Review ──{N}")
     log("review-agent", "Running L0 Mixed-Engine + L1 Frame Review + L2b Layout Overlap...")
     try:
-        from videoforge.review.frame_reviewer import FrameReviewer
-        fr = FrameReviewer()
+        from videoforge.review.frame_reviewer import run_review
+        r = run_review(str(final))
+        report = json.loads(Path(r["report_path"]).read_text())
+        l0 = report.get("l0_summary", {})
+        l1 = report.get("l1_summary", {})
+        l2 = report.get("l2_layout_overlap_summary", {})
 
-        l0 = fr.check_mixed_engine(str(final))
-        l0_st = fr.evaluate_l0_policy(l0)
         l0_issues = l0.get("issues", [])
+        l0_st = l0.get("status", "pass")
         if l0_st == "pass":
             ok(f"L0 Mixed-Engine: {l0.get('sampled_frames', 0)} frames sampled — clean")
         else:
@@ -274,14 +277,22 @@ def wizard():
             if l0_st == "fail":
                 warn("L0 gate FAILED — video may have visual defects")
 
-        l1 = fr.check_integrity(str(final))
-        if l1.get("passed"):
+        l1_passed = l1.get("passed", True)
+        if l1_passed:
             ok(f"L1 Frame Review: {l1.get('total_frames', 0)} frames — passed")
         else:
             warn(f"L1 Frame Review: FAILED — {len(l1.get('issues', []))} issues")
 
-        # L2b: Layout overlap (no element metadata in wizard flow — passes trivially)
-        info("L2b Layout Overlap: available with element metadata (x, y, width, height)")
+        l2_issues = l2.get("issues", [])
+        l2_st = l2.get("status", "pass")
+        if l2_st == "pass":
+            info("L2b Layout Overlap: available with element metadata (x, y, width, height)")
+        elif l2_st == "warn":
+            warn(f"L2b Layout Overlap: WARN — {len(l2_issues)} issues")
+        else:
+            warn(f"L2b Layout Overlap: FAIL — {len(l2_issues)} issues")
+
+        log("report-agent", f"Report artifact: {r['report_path']}")
     except Exception as e:
         warn(f"Review error: {e}")
 
