@@ -109,6 +109,12 @@ def _build_scene_html(
         return _html_bullets(t, title, payload, dur, fps)
     elif kind in ("code", "diff"):
         return _html_code(t, title, payload, dur, fps)
+    elif kind in ("chart", "bar-chart"):
+        return _html_chart(t, title, payload, dur, fps)
+    elif kind == "comparison":
+        return _html_comparison(t, title, payload, dur, fps)
+    elif kind == "timeline":
+        return _html_timeline(t, title, payload, dur, fps)
     else:
         return _html_generic(t, title, payload, dur, fps)
 
@@ -227,6 +233,299 @@ def _html_code(
     return "\n".join(lines), css
 
 
+def _html_chart(
+    t: _Theme, title: str, payload: dict[str, Any],
+    duration_frames: int, fps: int,
+) -> tuple[str, str]:
+    """Render bar chart with sequential bar animation.
+
+    Payload keys:
+        labels (list[str]): Bar labels (bottom axis).
+        values (list[float]): Bar heights (positive numbers).
+        max_value (float, optional): Override chart max for consistent scale.
+
+    Each bar animates in left-to-right via grow-up (scaleY) animation.
+    """
+    labels: list[str] = list(payload.get("labels", []) or [])
+    values: list[float] = [float(v) for v in (payload.get("values", []) or [])]
+
+    count = min(len(labels), len(values))
+    labels = labels[:count]
+    values = values[:count]
+
+    if count == 0:
+        return _html_generic(t, title, payload, duration_frames, fps)
+
+    max_val = float(payload.get("max_value", 0)) or max(values) or 1
+
+    # Layout constants
+    chart_area_h = int(t.height * 0.68)
+    bar_bottom = int(t.height * 0.10)
+
+    bar_gap_pct = 0.15
+    total_gap = bar_gap_pct * count
+    bar_area_w = int(t.width * 0.76)
+    bar_w = int(bar_area_w / (count + total_gap)) if count else 0
+    gap_w = int(bar_w * bar_gap_pct) if count else 0
+    start_x = int((t.width - count * bar_w - (count - 1) * gap_w) / 2)
+
+    per_bar_frames = int(duration_frames * 0.65 / max(count, 1))
+    start_offset = int(duration_frames * 0.18)
+
+    colors = [
+        t.accent, "#F59E0B", "#38BDF8", "#22C55E",
+        "#F87171", "#A78BFA", "#F472B6", "#34D399",
+    ]
+
+    lines = [
+        f'<div {_anim_attrs(0, int(duration_frames*0.1), "fade-up")} '
+        f'style="position:absolute;top:{int(t.height*0.04)}px;left:0;width:100%;text-align:center;">'
+        f'<h2 style="font-family:{t.heading_font};font-size:32px;font-weight:600;'
+        f'color:{t.text_color};">{_esc(title)}</h2></div>'
+    ]
+
+    for i in range(count):
+        s = start_offset + i * per_bar_frames
+        e = s + per_bar_frames
+        bar_h = int((values[i] / max_val) * chart_area_h) if max_val > 0 else 0
+        bar_h = max(bar_h, 4)
+        bar_color = colors[i % len(colors)]
+        x = start_x + i * (bar_w + gap_w)
+
+        lines.append(
+            f'<div {_anim_attrs(s, e, "grow-up")} '
+            f'style="position:absolute;left:{x}px;bottom:{bar_bottom}px;'
+            f'width:{bar_w}px;height:{bar_h}px;'
+            f'background:linear-gradient(180deg, {bar_color} 0%, {bar_color}cc 100%);'
+            f'border-radius:4px 4px 0 0;'
+            f'transform-origin:bottom center;">'
+            f'<span style="position:absolute;top:-24px;left:0;width:100%;'
+            f'text-align:center;font-family:{t.body_font};font-size:16px;'
+            f'font-weight:600;color:{t.text_color};">'
+            f'{_esc(str(int(values[i])))}</span></div>'
+        )
+        lines.append(
+            f'<div style="position:absolute;left:{x}px;'
+            f'top:{int(t.height*0.04) + 56 + chart_area_h + 8}px;'
+            f'width:{bar_w}px;text-align:center;'
+            f'font-family:{t.body_font};font-size:14px;'
+            f'color:rgba(229,238,248,0.6);overflow:hidden;'
+            f'text-overflow:ellipsis;white-space:nowrap;">'
+            f'{_esc(labels[i])}</div>'
+        )
+
+    css = (
+        '.anim-element[data-anim="grow-up"] {\n'
+        '  transition: none;\n'
+        '  transform: scaleY(0);\n'
+        '}\n'
+    )
+    return "\n".join(lines), css
+
+
+def _html_comparison(
+    t: _Theme, title: str, payload: dict[str, Any],
+    duration_frames: int, fps: int,
+) -> tuple[str, str]:
+    """Split-pane comparison — left/right headings + body text.
+
+    Payload keys:
+        left_heading (str): Heading for left pane.
+        right_heading (str): Heading for right pane.
+        left_body (str): Body content for left pane.
+        right_body (str): Body content for right pane.
+
+    Each pane animates in sequentially: title 0-20%, left 10-55%, right 40-85%.
+    """
+    left_heading = payload.get("left_heading", "")
+    right_heading = payload.get("right_heading", "")
+    left_body = payload.get("left_body", "")
+    right_body = payload.get("right_body", "")
+
+    dur = max(duration_frames, 1)
+    title_end = int(dur * 0.2)
+    left_start, left_end = int(dur * 0.1), int(dur * 0.55)
+    right_start, right_end = int(dur * 0.4), int(dur * 0.85)
+
+    def _panel(side: str, heading: str, body: str, s: int, e: int) -> str:
+        margin = (
+            f"margin-right:{t.width*0.02}px"
+            if side == "left" else
+            f"margin-left:{t.width*0.02}px"
+        )
+        parts: list[str] = []
+        if heading:
+            parts.append(
+                f'<h3 style="font-family:{t.heading_font};font-size:24px;font-weight:600;'
+                f'color:{t.text_color};margin-bottom:{t.height*0.02}px;">{_esc(heading)}</h3>'
+            )
+        if body:
+            parts.append(
+                f'<p style="font-family:{t.body_font};font-size:18px;line-height:1.6;'
+                f'color:rgba(229,238,248,0.7);">{_esc(body)}</p>'
+            )
+        inner = "\n".join(parts)
+        return (
+            f'<div {_anim_attrs(s, e, "fade-up")} '
+            f'style="width:44%;display:inline-block;vertical-align:top;text-align:left;{margin};">'
+            f'<div style="background:{t.panel_bg};border-radius:8px;'
+            f'padding:{t.height*0.025}px {t.width*0.025}px;'
+            f'border:1px solid rgba(148,163,184,0.18);min-height:{t.height*0.35}px;">'
+            f'{inner}</div></div>'
+        )
+
+    left_html = _panel("left", left_heading, left_body, left_start, left_end)
+    right_html = _panel("right", right_heading, right_body, right_start, right_end)
+    divider = (
+        f'<div style="display:inline-block;width:1px;height:{t.height*0.4}px;'
+        f'background:rgba(148,163,184,0.2);vertical-align:middle;"></div>'
+    )
+
+    lines = [
+        f'<div {_anim_attrs(0, title_end, "fade-up")} style="text-align:center;'
+        f'padding:{t.height*0.06}px {t.width*0.04}px {t.height*0.03}px;">'
+        f'<h2 style="font-family:{t.heading_font};font-size:32px;font-weight:600;'
+        f'color:{t.text_color};">{_esc(title)}</h2></div>',
+        f'<div style="text-align:center;padding:0 {t.width*0.04}px;">'
+        f'{left_html}{divider}{right_html}</div>',
+    ]
+
+    css = ".anim-element { transition: none; }"
+    return "\n".join(lines), css
+
+
+def _html_timeline(
+    t: _Theme, title: str, payload: dict[str, Any],
+    duration_frames: int, fps: int,
+) -> tuple[str, str]:
+    """Horizontal timeline with milestone nodes revealing by frame progress.
+
+    Payload keys:
+        milestones (list[dict]): Each with ``date``, ``title``, ``description``.
+
+    Layout: title, horizontal track line with fill + cursor + milestone
+    dots, then milestone labels (date/title) staggered beneath.
+    """
+    milestones = payload.get("milestones", [])
+    milestones = list(milestones)[:10]
+    n = len(milestones)
+
+    title_end = int(duration_frames * 0.15)
+    line_start = int(duration_frames * 0.10)
+    line_end = int(duration_frames * 0.85)
+    line_span = line_end - line_start
+    hm = int(t.width * 0.06)
+
+    parts = [
+        f'<div {_anim_attrs(0, title_end, "fade-up")} '
+        f'style="text-align:center;padding-top:{t.height*0.1}px;'
+        f'margin-bottom:{int(t.height*0.03)}px;">'
+        f'<h2 style="font-family:{t.heading_font};font-size:36px;font-weight:600;'
+        f'color:{t.text_color};">{_esc(title)}</h2></div>',
+    ]
+
+    if n:
+        line_y = int(t.height * 0.40)
+
+        parts.append(
+            f'<div style="position:relative;height:{int(t.height*0.68)}px;'
+            f'margin:0 {hm}px;">'
+        )
+
+        # Background track line (static)
+        parts.append(
+            f'<div style="position:absolute;top:{line_y}px;left:0;right:0;'
+            f'height:4px;background:rgba(148,163,184,0.12);'
+            f'border-radius:2px;"></div>'
+        )
+
+        # Fill line — grows left-to-right via expand animation
+        parts.append(
+            f'<div {_anim_attrs(line_start, line_end, "expand")} '
+            f'style="position:absolute;top:{line_y}px;left:0;'
+            f'height:4px;background:{t.accent};'
+            f'border-radius:2px;width:0%;"></div>'
+        )
+
+        # Progress cursor — slides along line via progress animation
+        parts.append(
+            f'<div {_anim_attrs(0, duration_frames, "progress")} '
+            f'style="position:absolute;top:{line_y - 10}px;left:0%;'
+            f'width:24px;height:24px;border-radius:50%;'
+            f'background:{t.accent};border:3px solid {t.text_color};'
+            f'box-shadow:0 0 16px rgba(74,144,217,0.5);'
+            f'transform:translateX(-50%);z-index:3;"></div>'
+        )
+
+        # Milestone dots — one per milestone, positioned along line
+        for i in range(n):
+            left_pct = (i / (n - 1)) * 100 if n > 1 else 50
+            parts.append(
+                f'<div style="position:absolute;top:{line_y - 7}px;'
+                f'left:{left_pct}%;transform:translateX(-50%);'
+                f'width:14px;height:14px;border-radius:50%;'
+                f'background:{t.text_color};'
+                f'border:3px solid {t.accent};z-index:2;"></div>'
+            )
+
+        # Milestone labels — flex row with staggered fade-up
+        parts.append(
+            f'<div style="display:flex;justify-content:space-between;'
+            f'position:absolute;top:{line_y + 20}px;left:0;right:0;">'
+        )
+
+        per_ms = int(line_span / max(n, 1))
+        for i, ms in enumerate(milestones):
+            s = line_start + i * per_ms
+            e = min(s + per_ms, duration_frames)
+            date = ms.get("date", "")
+            title_ms = ms.get("title", "")
+            desc = ms.get("description", "")
+
+            parts.append(
+                f'<div {_anim_attrs(s, e, "fade-up")} '
+                f'style="display:flex;flex-direction:column;align-items:center;'
+                f'flex:0 1 auto;max-width:{int(t.width*0.75/n)}px;'
+                f'overflow:hidden;text-align:center;">'
+            )
+
+            if date:
+                parts.append(
+                    f'<span style="font-family:{t.mono_font};font-size:12px;'
+                    f'font-weight:600;color:{t.accent};margin-bottom:2px;'
+                    f'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'
+                    f'max-width:100%;">{_esc(date)}</span>'
+                )
+            if title_ms:
+                parts.append(
+                    f'<span style="font-family:{t.body_font};font-size:14px;'
+                    f'font-weight:500;color:{t.text_color};'
+                    f'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'
+                    f'max-width:100%;">{_esc(title_ms)}</span>'
+                )
+            if desc:
+                parts.append(
+                    f'<span style="font-family:{t.body_font};font-size:12px;'
+                    f'color:rgba(229,238,248,0.55);margin-top:1px;'
+                    f'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'
+                    f'max-width:100%;">{_esc(desc[:60])}</span>'
+                )
+
+            parts.append("</div>")
+
+        parts.append("</div>")  # end labels row
+        parts.append("</div>")  # end track container
+    else:
+        parts.append(
+            f'<div style="text-align:center;padding-top:{t.height*0.2}px;'
+            f'font-family:{t.body_font};font-size:22px;'
+            f'color:rgba(229,238,248,0.4);">No timeline data</div>'
+        )
+
+    css = ".anim-element { transition: none; }"
+    return "\n".join(parts), css
+
+
 def _html_generic(
     t: _Theme, title: str, payload: dict[str, Any],
     duration_frames: int, fps: int,
@@ -280,6 +579,9 @@ def _build_animation_js(duration_frames: int) -> str:
       }} else if (anim === 'fade-left') {{
         el.style.opacity = t;
         el.style.transform = 'translateX(' + ((1 - t) * 40) + 'px)';
+      }} else if (anim === 'grow-up') {{
+        el.style.opacity = 1;
+        el.style.transform = 'scaleY(' + t + ')';
       }} else {{
         el.style.opacity = t;
         el.style.transform = '';

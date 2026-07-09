@@ -52,6 +52,99 @@ class TestAnimotionAdapter:
         assert "data-start" in html
         assert "data-anim" in html
 
+    def test_scene_to_html_comparison_basic(self):
+        """Comparison scene produces split-pane layout with headings + body."""
+        html = scene_to_html(
+            title="VS Code vs Neovim",
+            kind="comparison",
+            payload={
+                "left_heading": "VS Code",
+                "right_heading": "Neovim",
+                "left_body": "Full IDE with GUI and extensions.",
+                "right_body": "Terminal editor with fast startup.",
+            },
+            duration_frames=120,
+        )
+        assert "VS Code vs Neovim" in html
+        assert "VS Code" in html
+        assert "Neovim" in html
+        assert "Full IDE with GUI and extensions." in html
+        assert "Terminal editor with fast startup." in html
+        assert "display:inline-block" in html
+        assert "44%" in html  # each pane width
+        assert "window.setFrame" in html
+
+    def test_scene_to_html_comparison_empty_fields(self):
+        """Comparison with empty left heading/body handles gracefully."""
+        html = scene_to_html(
+            title="Comparison",
+            kind="comparison",
+            payload={
+                "left_heading": "",
+                "right_heading": "Right Only",
+                "left_body": "",
+                "right_body": "Some content here.",
+            },
+            duration_frames=60,
+        )
+        assert "Comparison" in html
+        assert "Right Only" in html
+        assert "Some content here." in html
+
+    def test_scene_to_html_comparison_uses_shared_tokens(self):
+        """Comparison scene references theme tokens (fonts, colors)."""
+        tokens = animotion_theme_stub()
+        html = scene_to_html(
+            title="Token Test",
+            kind="comparison",
+            payload={
+                "left_heading": "Left",
+                "right_heading": "Right",
+                "left_body": "Body A",
+                "right_body": "Body B",
+            },
+            duration_frames=90,
+        )
+        assert tokens.get("headingFont", "Inter") in html
+        assert tokens.get("panelBackground", "#1E293B") in html
+
+    def test_scene_to_html_comparison_frame_visibility(self):
+        """Comparison elements have data-start/data-end for frame-driven visibility."""
+        html = scene_to_html(
+            title="Frame Test",
+            kind="comparison",
+            payload={
+                "left_heading": "L",
+                "right_heading": "R",
+                "left_body": "LB",
+                "right_body": "RB",
+            },
+            duration_frames=100,
+        )
+        count_start = html.count("data-start")
+        assert count_start >= 3, f"Expected >=3 anim elements, got {count_start}"
+        assert html.count("data-anim") == count_start
+
+    def test_scene_to_html_comparison_kind_routes_correctly(self):
+        """'comparison' kind routes to split-pane layout, not generic fallback."""
+        generic = scene_to_html(
+            title="Same", kind="generic",
+            payload={"text": "plain"},
+            duration_frames=60,
+        )
+        comp = scene_to_html(
+            title="Same", kind="comparison",
+            payload={
+                "left_heading": "A",
+                "right_heading": "B",
+                "left_body": "X",
+                "right_body": "Y",
+            },
+            duration_frames=60,
+        )
+        assert "44%" in comp
+        assert "44%" not in generic
+
     def test_scene_to_html_code_scene(self):
         html = scene_to_html(
             title="Code",
@@ -75,7 +168,7 @@ class TestAnimotionAdapter:
         assert tokens.get("deckBackground", "") in html
 
     def test_scene_to_html_different_kinds(self):
-        kinds = ["title", "outro", "bullets", "code", "diff", "diagram"]
+        kinds = ["title", "outro", "bullets", "code", "diff", "diagram", "chart", "bar-chart", "comparison"]
         for kind in kinds:
             html = scene_to_html(
                 title=f"Test {kind}",
@@ -96,6 +189,85 @@ class TestAnimotionAdapter:
         # Animation logic for element visibility
         assert "data-start" in html
         assert "el.style.display" in html
+
+    # --- Chart / bar-chart scene tests ---
+
+    def test_bar_chart_html_structure(self):
+        html = scene_to_html(
+            title="Sales",
+            kind="bar-chart",
+            payload={"labels": ["Q1", "Q2", "Q3"], "values": [100, 200, 150]},
+            duration_frames=90,
+        )
+        assert "Sales" in html
+        assert "Q1" in html
+        assert "Q2" in html
+        assert "Q3" in html
+        assert "100" in html
+        assert "200" in html
+        assert "150" in html
+        assert "scaleY" in html
+        assert "data-anim=\"grow-up\"" in html
+
+    def test_bar_chart_uses_shared_tokens(self):
+        tokens = animotion_theme_stub()
+        html = scene_to_html(
+            title="Chart",
+            kind="chart",
+            payload={"labels": ["A", "B"], "values": [10, 20]},
+            duration_frames=60,
+        )
+        assert tokens.get("accentColor", "") in html
+        assert tokens.get("bodyFont", "Inter") in html
+
+    def test_bar_chart_anim_element_count(self):
+        html = scene_to_html(
+            title="Bars",
+            kind="bar-chart",
+            payload={"labels": ["X", "Y", "Z"], "values": [5, 15, 10]},
+            duration_frames=120,
+        )
+        # Each bar + title = 4 anim-elements
+        assert html.count("anim-element") >= 3
+        assert "grow-up" in html
+        assert "transform-origin:bottom center" in html
+
+    def test_bar_chart_empty_payload_falls_back(self):
+        html = scene_to_html(
+            title="Empty Chart",
+            kind="chart",
+            payload={},
+            duration_frames=60,
+        )
+        assert "Empty Chart" in html
+        # No element with data-anim="grow-up" (only in shared JS)
+        assert 'data-anim="grow-up"' not in html
+
+    def test_bar_chart_uneven_zipped(self):
+        html = scene_to_html(
+            title="Uneven",
+            kind="chart",
+            payload={"labels": ["A", "B", "C", "D"], "values": [10, 20]},
+            duration_frames=60,
+        )
+        assert "A" in html
+        assert "B" in html
+        # Only 2 bars rendered (values zipped to shortest).
+        # Count grow-up in element attrs only (CSS selector also matches).
+        body = html.split("<body")[1].split("</body")[0]
+        assert body.count("data-anim=\"grow-up\"") == 2
+
+    def test_bar_chart_window_set_frame_compatible(self):
+        html = scene_to_html(
+            title="Chart Frame",
+            kind="chart",
+            payload={"labels": ["Apples", "Oranges"], "values": [30, 50]},
+            duration_frames=90,
+        )
+        assert "window.setFrame" in html
+        assert "data-anim=\"grow-up\"" in html
+        # JS must handle grow-up animation
+        assert "grow-up" in html
 
 
 class TestAnimotionRenderer:
