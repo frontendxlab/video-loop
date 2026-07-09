@@ -24,3 +24,8 @@ target-version = "py310"
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 filterwarnings = ["ignore::DeprecationWarning"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]

@@ -383,6 +383,195 @@ class TestTimelineScene:
         assert "T1" in html
 
 
+class TestDiagramScene:
+    """Interactive diagram scene — positioned nodes + SVG edges."""
+
+    def test_diagram_html_structure(self):
+        """Diagram with basic nodes/edges produces correct HTML skeleton."""
+        html = scene_to_html(
+            title="Flow",
+            kind="diagram",
+            payload={
+                "nodes": [
+                    {"id": "n1", "label": "Start", "x": 200, "y": 400},
+                    {"id": "n2", "label": "End", "x": 600, "y": 400},
+                ],
+                "edges": [
+                    {"source": "n1", "target": "n2"},
+                ],
+            },
+            duration_frames=90,
+        )
+        assert "Flow" in html
+        assert "Start" in html
+        assert "End" in html
+        assert "<line " in html  # SVG edge line
+        assert '<svg ' in html
+        assert "window.setFrame" in html
+        assert 'data-anim="fade-up"' in html
+
+    def test_diagram_auto_layout(self):
+        """Diagram auto-places nodes when x/y omitted — horizontal row."""
+        html = scene_to_html(
+            title="Auto",
+            kind="diagram",
+            payload={
+                "nodes": [
+                    {"id": "a", "label": "A"},
+                    {"id": "b", "label": "B"},
+                    {"id": "c", "label": "C"},
+                ],
+            },
+            duration_frames=60,
+        )
+        assert "Auto" in html
+        assert "A" in html
+        assert "B" in html
+        assert "C" in html
+        assert "window.setFrame" in html
+
+    def test_diagram_edges_rendered(self):
+        """Edges rendered as SVG line elements with arrow marker."""
+        html = scene_to_html(
+            title="Edges",
+            kind="diagram",
+            payload={
+                "nodes": [
+                    {"id": "a", "label": "Src", "x": 100, "y": 300},
+                    {"id": "b", "label": "Dst", "x": 500, "y": 300},
+                ],
+                "edges": [
+                    {"source": "a", "target": "b", "label": "connects"},
+                ],
+            },
+            duration_frames=60,
+        )
+        assert "<line " in html
+        assert "marker-end" in html
+        assert 'class="diagram-edge"' in html
+        assert 'x1="' in html
+        assert 'x2="' in html
+
+    def test_diagram_shared_tokens(self):
+        """Diagram uses shared theme tokens (fonts, colors)."""
+        tokens = animotion_theme_stub()
+        html = scene_to_html(
+            title="Token Test",
+            kind="diagram",
+            payload={
+                "nodes": [
+                    {"id": "n", "label": "Node", "x": 300, "y": 300},
+                ],
+            },
+            duration_frames=60,
+        )
+        assert tokens.get("bodyFont", "Inter") in html
+        assert tokens.get("accentColor", "#4A90D9") in html
+
+    def test_diagram_frame_attributes(self):
+        """Diagram elements have data-start/data-end for frame-driven visibility."""
+        html = scene_to_html(
+            title="Frame Test",
+            kind="diagram",
+            payload={
+                "nodes": [
+                    {"id": "a", "label": "A", "x": 100, "y": 300},
+                    {"id": "b", "label": "B", "x": 500, "y": 300},
+                ],
+                "edges": [
+                    {"source": "a", "target": "b"},
+                ],
+            },
+            duration_frames=100,
+        )
+        count_start = html.count("data-start")
+        assert count_start >= 3, f"Expected >=3 anim-elements, got {count_start}"
+        assert html.count("data-anim") == count_start
+
+    def test_diagram_empty_nodes_falls_back(self):
+        """Diagram with no nodes falls back to generic output."""
+        html = scene_to_html(
+            title="Empty Diagram",
+            kind="diagram",
+            payload={},
+            duration_frames=60,
+        )
+        assert "Empty Diagram" in html
+        assert "window.setFrame" in html
+        # No SVG line elements
+        assert "<line " not in html
+
+    def test_diagram_interactive_hover(self):
+        """Diagram nodes include hover interaction attributes."""
+        html = scene_to_html(
+            title="Hover Test",
+            kind="diagram",
+            payload={
+                "nodes": [
+                    {"id": "n1", "label": "Hover", "x": 400, "y": 300},
+                ],
+            },
+            duration_frames=60,
+        )
+        assert "onmouseenter" in html
+        assert "onmouseleave" in html
+        assert "scale(1.08)" in html
+        assert "cursor:pointer" in html
+
+    def test_diagram_set_frame_compatible(self):
+        """Diagram scene works with window.setFrame frame-by-frame capture."""
+        html = scene_to_html(
+            title="Diagram Frame",
+            kind="diagram",
+            payload={
+                "nodes": [
+                    {"id": "n1", "label": "X", "x": 200, "y": 300},
+                    {"id": "n2", "label": "Y", "x": 600, "y": 300},
+                ],
+                "edges": [
+                    {"source": "n1", "target": "n2"},
+                ],
+            },
+            duration_frames=90,
+        )
+        assert "window.setFrame" in html
+        assert "data-start" in html
+        assert "data-anim" in html
+
+    def test_diagram_color_per_node(self):
+        """Each node can have its own color, falls back to palette."""
+        html = scene_to_html(
+            title="Colors",
+            kind="diagram",
+            payload={
+                "nodes": [
+                    {"id": "a", "label": "Red", "x": 100, "y": 300, "color": "#FF0000"},
+                    {"id": "b", "label": "Blue", "x": 400, "y": 300, "color": "#0000FF"},
+                    {"id": "c", "label": "Default", "x": 700, "y": 300},
+                ],
+            },
+            duration_frames=60,
+        )
+        assert "#FF0000" in html
+        assert "#0000FF" in html
+
+    def test_diagram_recognized_kind(self):
+        """Diagram is a recognized kind routed to specific handler."""
+        generic = scene_to_html(
+            title="Same", kind="generic",
+            payload={"text": "plain"},
+            duration_frames=60,
+        )
+        diag = scene_to_html(
+            title="Same", kind="diagram",
+            payload={"nodes": [{"id": "n", "label": "N", "x": 300, "y": 300}]},
+            duration_frames=60,
+        )
+        # Diagram has positioned nodes, generic does not
+        assert "position:absolute" in diag
+        assert "position:absolute" not in generic
+
+
 class TestAnimotionRenderer:
     def test_frames_to_video(self, tmp_path: Path):
         """FFmpeg assembly from frame PNGs — includes silent audio track."""

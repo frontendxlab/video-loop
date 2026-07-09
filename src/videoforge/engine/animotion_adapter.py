@@ -92,6 +92,42 @@ class _Theme:
         self.height = height
 
 
+# Diagram layout constants
+_NODE_W = 160
+_NODE_H = 56
+
+
+def _layout_nodes(
+    nodes: list[dict[str, Any]],
+    canvas_w: int, canvas_h: int,
+) -> list[dict[str, Any]]:
+    """Auto-assign node positions if x/y missing — horizontal row layout."""
+    if not nodes:
+        return []
+    has_all = all("x" in n and "y" in n for n in nodes)
+    if has_all:
+        return [dict(n) for n in nodes]
+    count = len(nodes)
+    gap = 80
+    total_w = count * _NODE_W + (count - 1) * gap
+    start_x = max(40, (canvas_w - total_w) // 2)
+    center_y = canvas_h // 2 - _NODE_H // 2
+    result = []
+    for i, n in enumerate(nodes):
+        node = dict(n)
+        node.setdefault("x", start_x + i * (_NODE_W + gap))
+        node.setdefault("y", center_y)
+        result.append(node)
+    return result
+
+
+def _find_node(nodes: list[dict[str, Any]], node_id: str) -> dict[str, Any] | None:
+    for n in nodes:
+        if n.get("id") == node_id:
+            return n
+    return None
+
+
 def _esc(s: str) -> str:
     return html_mod.escape(str(s), quote=True)
 
@@ -115,6 +151,8 @@ def _build_scene_html(
         return _html_comparison(t, title, payload, dur, fps)
     elif kind == "timeline":
         return _html_timeline(t, title, payload, dur, fps)
+    elif kind == "diagram":
+        return _html_diagram(t, title, payload, dur, fps)
     else:
         return _html_generic(t, title, payload, dur, fps)
 
@@ -520,6 +558,123 @@ def _html_timeline(
             f'<div style="text-align:center;padding-top:{t.height*0.2}px;'
             f'font-family:{t.body_font};font-size:22px;'
             f'color:rgba(229,238,248,0.4);">No timeline data</div>'
+        )
+
+    css = ".anim-element { transition: none; }"
+    return "\n".join(parts), css
+
+
+def _html_diagram(
+    t: _Theme, title: str, payload: dict[str, Any],
+    duration_frames: int, fps: int,
+) -> tuple[str, str]:
+    """Render interactive node-link diagram with nodes/edges.
+
+    Payload keys:
+        nodes (list[dict]): Each with id, label, x/y (optional), color (optional).
+        edges (list[dict]): Each with source, target, label (optional).
+
+    Nodes animate in staggered (fade-up). Edges fade in after connected nodes.
+    Hover highlights nodes. Auto-layout when x/y omitted.
+    Falls back to generic when nodes list empty.
+    """
+    raw_nodes = list(payload.get("nodes", []) or [])
+    raw_edges = list(payload.get("edges", []) or [])
+    dur = max(duration_frames, 1)
+
+    if not raw_nodes:
+        return _html_generic(t, title, payload, dur, fps)
+
+    nodes = _layout_nodes(raw_nodes, t.width, t.height)
+    node_ids = {n["id"] for n in nodes if "id" in n}
+    valid_edges = [
+        e for e in raw_edges
+        if e.get("source") in node_ids and e.get("target") in node_ids
+    ]
+
+    title_end = int(dur * 0.15)
+    node_start = int(dur * 0.15)
+    node_span = int(dur * 0.55)
+    edge_start = int(dur * 0.35)
+    edge_span = int(dur * 0.50)
+    per_node = max(1, node_span // max(len(nodes), 1))
+    per_edge = max(1, edge_span // max(len(valid_edges), 1))
+
+    colors = [
+        t.accent, "#F59E0B", "#38BDF8", "#22C55E",
+        "#F87171", "#A78BFA", "#F472B6", "#34D399",
+    ]
+
+    parts = [
+        f'<div {_anim_attrs(0, title_end, "fade-up")} '
+        f'style="text-align:center;padding-top:{int(t.height*0.04)}px;'
+        f'position:relative;z-index:5;">'
+        f'<h2 style="font-family:{t.heading_font};font-size:32px;font-weight:600;'
+        f'color:{t.text_color};">{_esc(title)}</h2></div>',
+    ]
+
+    # SVG edge layer
+    edge_lines = []
+    for i, e in enumerate(valid_edges):
+        sn = _find_node(nodes, e["source"])
+        tn = _find_node(nodes, e["target"])
+        if not sn or not tn:
+            continue
+        sx = sn["x"] + _NODE_W // 2
+        sy = sn["y"] + _NODE_H // 2
+        tx = tn["x"] + _NODE_W // 2
+        ty = tn["y"] + _NODE_H // 2
+        s_frame = edge_start + i * per_edge
+        e_frame = min(s_frame + per_edge, dur)
+        edge_lines.append(
+            f'<line {_anim_attrs(s_frame, e_frame, "fade")} '
+            f'x1="{sx}" y1="{sy}" x2="{tx}" y2="{ty}" '
+            f'stroke="{t.accent}" stroke-width="2.5" '
+            f'stroke-opacity="0.6" marker-end="url(#arrow)" '
+            f'class="diagram-edge"/>',
+        )
+
+    arrow_marker = (
+        f'<marker id="arrow" viewBox="0 0 10 10" refX="10" refY="5" '
+        f'markerWidth="8" markerHeight="8" orient="auto-start-reverse">'
+        f'<path d="M 0 0 L 10 5 L 0 10 z" fill="{t.accent}" fill-opacity="0.6"/>'
+        f'</marker>'
+    )
+    parts.append(
+        f'<svg style="position:absolute;top:0;left:0;width:{t.width}px;'
+        f'height:{t.height}px;pointer-events:none;z-index:1;" '
+        f'xmlns="http://www.w3.org/2000/svg">'
+        f'<defs>{arrow_marker}</defs>'
+        + "\n".join(edge_lines)
+        + "</svg>",
+    )
+
+    # Node elements
+    for i, n in enumerate(nodes):
+        s_frame = node_start + i * per_node
+        e_frame = min(s_frame + per_node, dur)
+        color = n.get("color", colors[i % len(colors)])
+        nx = n["x"]
+        ny = n["y"]
+        label = n.get("label", n.get("id", ""))
+        parts.append(
+            f'<div {_anim_attrs(s_frame, e_frame, "fade-up")} '
+            f'style="position:absolute;left:{nx}px;top:{ny}px;'
+            f'width:{_NODE_W}px;height:{_NODE_H}px;'
+            f'background:linear-gradient(135deg, {color} 0%, {color}cc 100%);'
+            f'border-radius:8px;'
+            f'box-shadow:0 4px 12px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.15);'
+            f'display:flex;align-items:center;justify-content:center;'
+            f'cursor:pointer;z-index:2;'
+            f'transition:transform 0.2s, box-shadow 0.2s;" '
+            f'class="diagram-node" '
+            f'onmouseenter="this.style.transform=\'scale(1.08)\';'
+            f'this.style.boxShadow=\'0 0 20px {color}66\'" '
+            f'onmouseleave="this.style.transform=\'\';this.style.boxShadow=\'\'">'
+            f'<span style="font-family:{t.body_font};font-size:14px;font-weight:600;'
+            f'color:#fff;text-align:center;padding:0 8px;overflow:hidden;'
+            f'text-overflow:ellipsis;white-space:nowrap;max-width:100%;">'
+            f'{_esc(label)}</span></div>',
         )
 
     css = ".anim-element { transition: none; }"
