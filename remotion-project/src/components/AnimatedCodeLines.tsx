@@ -6,7 +6,7 @@ import {
   interpolate,
 } from "remotion";
 import { WordTiming, getStepProgress } from "../timing/audio-timing";
-import { codeTheme } from "../design-tokens";
+import { codeTheme, colors, fonts } from "../design-tokens";
 
 interface AnimatedCodeLinesProps {
   code: string;
@@ -146,7 +146,7 @@ export const AnimatedCodeLines: React.FC<AnimatedCodeLinesProps> = ({
         flex: 1,
         display: "flex",
         flexDirection: "column",
-        background: "linear-gradient(135deg, #0f0f23 0%, #1a1a3e 100%)",
+        background: colors.backgroundGradient,
         width: "100%",
         height: "100%",
         overflow: "hidden",
@@ -156,9 +156,10 @@ export const AnimatedCodeLines: React.FC<AnimatedCodeLinesProps> = ({
         <div
           style={{
             padding: "16px 24px 0",
+            fontFamily: fonts.sans,
             fontSize: 22,
             fontWeight: "600",
-            color: "rgba(255,255,255,0.9)",
+            color: colors.text,
           }}
         >
           {title}
@@ -172,7 +173,7 @@ export const AnimatedCodeLines: React.FC<AnimatedCodeLinesProps> = ({
           borderRadius: 16,
           overflow: "hidden",
           background: codeTheme.background,
-          border: "1px solid rgba(255,255,255,0.06)",
+          border: `1px solid ${colors.chromeBorder}`,
           display: "flex",
           flexDirection: "column",
         }}
@@ -180,27 +181,28 @@ export const AnimatedCodeLines: React.FC<AnimatedCodeLinesProps> = ({
         <div
           style={{
             padding: "12px 16px",
-            background: "rgba(255,255,255,0.03)",
-            borderBottom: "1px solid rgba(255,255,255,0.06)",
+            background: colors.chromePanel,
+            borderBottom: `1px solid ${colors.chromeBorder}`,
             display: "flex",
             alignItems: "center",
             gap: 8,
           }}
         >
           <div
-            style={{ width: 12, height: 12, borderRadius: "50%", background: "#ff5f57" }}
+            style={{ width: 12, height: 12, borderRadius: "50%", background: colors.chromeDotRed }}
           />
           <div
-            style={{ width: 12, height: 12, borderRadius: "50%", background: "#ffbd2e" }}
+            style={{ width: 12, height: 12, borderRadius: "50%", background: colors.chromeDotYellow }}
           />
           <div
-            style={{ width: 12, height: 12, borderRadius: "50%", background: "#28c840" }}
+            style={{ width: 12, height: 12, borderRadius: "50%", background: colors.chromeDotGreen }}
           />
           <span
             style={{
               marginLeft: 12,
               fontSize: 13,
-              color: "rgba(255,255,255,0.4)",
+              color: colors.textMuted,
+              fontFamily: fonts.sans,
             }}
           >
             {lang}
@@ -213,7 +215,7 @@ export const AnimatedCodeLines: React.FC<AnimatedCodeLinesProps> = ({
             flex: 1,
             overflow: "auto",
             padding: "16px 0",
-            fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+            fontFamily: fonts.mono,
             fontSize: 15,
             lineHeight: "1.7",
           }}
@@ -240,10 +242,10 @@ export const AnimatedCodeLines: React.FC<AnimatedCodeLinesProps> = ({
                   display: "flex",
                   opacity: isPast ? 0.5 : opacity,
                   background: isActive
-                    ? "rgba(255, 235, 59, 0.08)"
+                    ? codeTheme.highlightBg
                     : "transparent",
                   borderLeft: isActive
-                    ? "3px solid #ffeb3b"
+                    ? `3px solid ${codeTheme.activeBorder}`
                     : "3px solid transparent",
                   transform: `translateX(${(1 - s) * 12}px)`,
                   padding: "1px 0",
@@ -257,7 +259,7 @@ export const AnimatedCodeLines: React.FC<AnimatedCodeLinesProps> = ({
                     marginRight: 16,
                     fontSize: 13,
                     color: isActive
-                      ? "rgba(255,255,255,0.6)"
+                      ? colors.textSubtle
                       : codeTheme.lineNumber,
                     userSelect: "none",
                   }}
@@ -270,7 +272,7 @@ export const AnimatedCodeLines: React.FC<AnimatedCodeLinesProps> = ({
                       key={ti}
                       style={{
                         color: isPast
-                          ? "rgba(255,255,255,0.4)"
+                          ? colors.textMuted
                           : t.color,
                       }}
                     >

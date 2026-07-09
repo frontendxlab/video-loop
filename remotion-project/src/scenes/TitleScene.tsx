@@ -3,6 +3,7 @@ import { AbsoluteFill, useCurrentFrame, interpolate, spring, useVideoConfig, Eas
 import { z } from "zod";
 import { WordTiming } from "../captions/wordTiming";
 import { getStepProgress } from "../timing/audio-timing";
+import { colors, fonts } from "../design-tokens";
 
 export const TitleSceneSchema = z.object({
   title: z.string(),
@@ -50,24 +51,25 @@ export const TitleScene: React.FC<TitleSceneProps> = ({
     position: "absolute", inset: 0,
     display: "flex", flexDirection: "column",
     alignItems: "center", justifyContent: "center",
-    background: "linear-gradient(135deg, #0f0f23 0%, #1a1a3e 50%, #16213e 100%)",
+    background: colors.backgroundGradient,
   };
 
   const titleCardStyle: React.CSSProperties = {
-    background: "rgba(255,255,255,0.06)",
+    background: colors.chromePanel,
     backdropFilter: "blur(2px)",
     borderRadius: 24,
     padding: "48px 64px",
-    border: "1px solid rgba(255,255,255,0.08)",
+    border: `1px solid ${colors.chromeBorder}`,
     boxShadow: "none",
     transform: `translateY(${slideY}px)`,
     opacity: titleProgress,
   };
 
   const titleTextStyle: React.CSSProperties = {
+    fontFamily: fonts.heading,
     fontSize: 52,
     fontWeight: "700",
-    color: "#fff",
+    color: colors.text,
     textAlign: "center",
     letterSpacing: "-0.5px",
     lineHeight: 1.2,
@@ -77,14 +79,15 @@ export const TitleScene: React.FC<TitleSceneProps> = ({
     width: 60,
     height: 4,
     borderRadius: 2,
-    background: "linear-gradient(90deg, #4a90d9, #7c5cbf)",
+    background: `linear-gradient(90deg, ${colors.primary}, ${colors.secondary})`,
     margin: "16px auto",
     transform: `scaleX(${springProgress})`,
   };
 
   const subtitleStyle: React.CSSProperties = {
+    fontFamily: fonts.sans,
     fontSize: 20,
-    color: "rgba(255,255,255,0.6)",
+    color: colors.textSubtle,
     textAlign: "center",
     marginTop: 8,
     opacity: subProgress,

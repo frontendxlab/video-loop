@@ -18,9 +18,11 @@ import textwrap
 from pathlib import Path
 from typing import Any
 
+from videoforge.design_tokens import manim_theme
 from videoforge.engine.models import SceneDefinition, SceneType
 
 logger = logging.getLogger("videoforge.engine.manim")
+MANIM_THEME = manim_theme()
 
 MANIM_MCP_SCRIPT = None
 try:
@@ -35,6 +37,30 @@ MANIM_OUTPUT_PATTERNS = [
     re.compile(r"File\s+(/.*?\.mp4)\s+has"),
     re.compile(r"Successfully rendered at\s+(/.*?\.mp4)"),
 ]
+
+
+def _manim_prelude(fps: int) -> list[str]:
+    return [
+        "from manim import *",
+        "import numpy as np",
+        f"config.frame_rate = {fps}",
+        "config.pixel_width = 1920",
+        "config.pixel_height = 1080",
+        'config.quality = "high_quality"',
+        f'config.background_color = "{MANIM_THEME["backgroundColor"]}"',
+        f'THEME_TEXT = "{MANIM_THEME["textColor"]}"',
+        f'THEME_MUTED = "{MANIM_THEME["mutedTextColor"]}"',
+        f'THEME_PRIMARY = "{MANIM_THEME["primaryColor"]}"',
+        f'THEME_SECONDARY = "{MANIM_THEME["secondaryColor"]}"',
+        f'THEME_SUCCESS = "{MANIM_THEME["successColor"]}"',
+        f'THEME_ERROR = "{MANIM_THEME["errorColor"]}"',
+        f'THEME_CODE_BG = "{MANIM_THEME["codeBackground"]}"',
+        f'THEME_CODE_TEXT = "{MANIM_THEME["codeTextColor"]}"',
+        f'THEME_HEADING_FONT = "{MANIM_THEME["headingFont"]}"',
+        f'THEME_BODY_FONT = "{MANIM_THEME["bodyFont"]}"',
+        f'THEME_MONO_FONT = "{MANIM_THEME["monoFont"]}"',
+        "",
+    ]
 
 
 def find_manim_output(log: str, workdir: str) -> str | None:
@@ -66,15 +92,7 @@ def scene_to_manim_code(scene: SceneDefinition, fps: int = 30) -> str:
 
     duration_sec = scene.duration / fps if scene.duration > 0 else 5
 
-    lines = []
-    lines.append("from manim import *")
-    lines.append("import numpy as np")
-    lines.append(f"config.frame_rate = {fps}")
-    lines.append("config.pixel_width = 1920")
-    lines.append("config.pixel_height = 1080")
-    lines.append('config.quality = "high_quality"')
-    lines.append('config.background_color = "#1a1a2e"')
-    lines.append("")
+    lines = _manim_prelude(fps)
 
     scene_class_name = re.sub(r"[^a-zA-Z0-9]", "", scene.title.replace(" ", "_")) or "ManimScene"
     lines.append(f"class {scene_class_name}(Scene):")
@@ -93,15 +111,15 @@ def scene_to_manim_code(scene: SceneDefinition, fps: int = 30) -> str:
         subtitle_esc = scene.subtitle.replace("'", "\\'")
         text_esc = scene.text[:150].replace("'", "\\'") if scene.text else ""
 
-        lines.append(f"        title = Text('{title_esc}', color=WHITE, font_size=60)")
-        lines.append(f"        subtitle = Text('{subtitle_esc}', color=GRAY, font_size=36)")
+        lines.append(f"        title = Text('{title_esc}', color=THEME_TEXT, font=THEME_HEADING_FONT, font_size=60)")
+        lines.append(f"        subtitle = Text('{subtitle_esc}', color=THEME_MUTED, font=THEME_BODY_FONT, font_size=36)")
         lines.append("        subtitle.next_to(title, DOWN, buff=0.3)")
         lines.append("        self.play(Write(title), run_time=1.5)")
         lines.append("        self.wait(0.5)")
         if subtitle_esc and subtitle_esc != title_esc:
             lines.append("        self.play(Write(subtitle), run_time=1.0)")
         if text_esc:
-            lines.append(f"        extra = Text('{text_esc}', color=BLUE, font_size=24)")
+            lines.append(f"        extra = Text('{text_esc}', color=THEME_PRIMARY, font=THEME_BODY_FONT, font_size=24)")
             lines.append("        extra.next_to(subtitle, DOWN, buff=0.3)")
             lines.append("        self.play(Write(extra), run_time=0.5)")
         lines.append(f"        self.wait({max(duration_sec - 3, 1):.1f})")
@@ -110,10 +128,10 @@ def scene_to_manim_code(scene: SceneDefinition, fps: int = 30) -> str:
         title_esc = scene.title.replace("'", "\\'")
         points_str = "\\n".join("• " + p[:80] for p in scene.points[:6])
         points_esc = points_str.replace("'", "\\'")
-        lines.append(f"        title = Text('{title_esc}', color=WHITE, font_size=48)")
+        lines.append(f"        title = Text('{title_esc}', color=THEME_TEXT, font=THEME_HEADING_FONT, font_size=48)")
         lines.append("        title.to_edge(UP)")
         lines.append("        self.play(Write(title), run_time=0.8)")
-        lines.append(f"        body = Text('{points_esc}', color=WHITE, font_size=28, line_spacing=0.5)")
+        lines.append(f"        body = Text('{points_esc}', color=THEME_TEXT, font=THEME_BODY_FONT, font_size=28, line_spacing=0.5)")
         lines.append("        body.next_to(title, DOWN, buff=0.3, aligned_edge=LEFT)")
         lines.append("        self.play(Write(body), run_time=1.5)")
         lines.append(f"        self.wait({max(duration_sec - 2.5, 1):.1f})")
@@ -125,12 +143,12 @@ def scene_to_manim_code(scene: SceneDefinition, fps: int = 30) -> str:
         code_display = "\\n".join(code_lines)[:1500]
         code_esc = code_display.replace("'", "\\'")
 
-        lines.append(f"        title = Text('{title_esc}', color=WHITE, font_size=36)")
+        lines.append(f"        title = Text('{title_esc}', color=THEME_TEXT, font=THEME_HEADING_FONT, font_size=36)")
         lines.append("        title.to_edge(UP)")
         lines.append("        self.play(Write(title), run_time=0.5)")
-        lines.append(f"        code_text = Text('{code_esc}', color=GREEN, font_size=14, font='Courier', line_spacing=0.5)")
+        lines.append(f"        code_text = Text('{code_esc}', color=THEME_CODE_TEXT, font_size=14, font=THEME_MONO_FONT, line_spacing=0.5)")
         lines.append("        code_text.next_to(title, DOWN, buff=0.3, aligned_edge=LEFT)")
-        lines.append("        bg = Rectangle(width=code_text.width + 1, height=code_text.height + 0.5, fill_opacity=0.3, color=DARK_GRAY)")
+        lines.append("        bg = Rectangle(width=code_text.width + 1, height=code_text.height + 0.5, fill_opacity=0.3, color=THEME_CODE_BG)")
         lines.append("        bg.move_to(code_text)")
         lines.append("        self.add(bg)")
         lines.append("        self.play(Write(code_text), run_time=1.5)")
@@ -140,10 +158,10 @@ def scene_to_manim_code(scene: SceneDefinition, fps: int = 30) -> str:
         title_esc = scene.title.replace("'", "\\'")
         text_esc = scene.text[:300].replace("'", "\\'")
 
-        lines.append(f"        title = Text('{title_esc}', color=WHITE, font_size=42)")
+        lines.append(f"        title = Text('{title_esc}', color=THEME_TEXT, font=THEME_HEADING_FONT, font_size=42)")
         lines.append("        title.to_edge(UP)")
         lines.append("        self.play(Write(title), run_time=0.5)")
-        lines.append(f"        body = Text('{text_esc}', font_size=22, color=LIGHT_GRAY, line_spacing=0.5)")
+        lines.append(f"        body = Text('{text_esc}', font=THEME_BODY_FONT, font_size=22, color=THEME_MUTED, line_spacing=0.5)")
         lines.append("        body.next_to(title, DOWN, buff=0.3)")
         lines.append("        self.play(Write(body), run_time=1.5)")
         lines.append(f"        self.wait({max(duration_sec - 2.5, 1):.1f})")
@@ -152,10 +170,10 @@ def scene_to_manim_code(scene: SceneDefinition, fps: int = 30) -> str:
         title_esc = scene.title.replace("'", "\\'")
         text_esc = scene.text[:200].replace("'", "\\'")
 
-        lines.append(f"        text = Text('{title_esc or 'Manim Scene'}', color=WHITE, font_size=48)")
+        lines.append(f"        text = Text('{title_esc or 'Manim Scene'}', color=THEME_TEXT, font=THEME_HEADING_FONT, font_size=48)")
         lines.append("        self.play(Write(text), run_time=1.0)")
         if text_esc:
-            lines.append(f"        body = Text('{text_esc}', color=GRAY, font_size=28)")
+            lines.append(f"        body = Text('{text_esc}', color=THEME_MUTED, font=THEME_BODY_FONT, font_size=28)")
             lines.append("        body.next_to(text, DOWN)")
             lines.append("        self.play(Write(body), run_time=0.5)")
         lines.append(f"        self.wait({max(duration_sec - 2, 1):.1f})")
@@ -273,15 +291,7 @@ def generate_graph_scene(
     labels = {str(n["id"]): _escape(str(n.get("label", n["id"]))) for n in nodes}
     edge_pairs = [(str(a), str(b)) for a, b in edges]
 
-    lines = [
-        "from manim import *",
-        "import numpy as np",
-        f"config.frame_rate = {fps}",
-        "config.pixel_width = 1920",
-        "config.pixel_height = 1080",
-        'config.quality = "high_quality"',
-        'config.background_color = "#1a1a2e"',
-        "",
+    lines = _manim_prelude(fps) + [
         "class GraphScene(Scene):",
         "    def construct(self):",
         "        bg = Rectangle(width=config.frame_width, height=config.frame_height,",
@@ -290,12 +300,12 @@ def generate_graph_scene(
         f"        vertices = {node_ids!r}",
         f"        edges = {edge_pairs!r}",
         '        g = Graph(vertices, edges, layout="' + layout + '", labels=False,',
-        "                  vertex_config={'radius': 0.35, 'color': '#4a90d9', 'fill_opacity': 0.9},",
-        "                  edge_config={'color': '#7c5cbf', 'stroke_width': 3})",
+        "                  vertex_config={'radius': 0.35, 'color': THEME_PRIMARY, 'fill_opacity': 0.9},",
+        "                  edge_config={'color': THEME_SECONDARY, 'stroke_width': 3})",
         "        self.play(Create(g), run_time=2.0)",
     ]
     for vid in node_ids:
-        lines.append(f"        g.add_labels({{{vid!r}: Text({labels[vid]!r}, font_size=24)}})")
+        lines.append(f"        g.add_labels({{{vid!r}: Text({labels[vid]!r}, font=THEME_BODY_FONT, color=THEME_TEXT, font_size=24)}})")
     lines.append("        self.play(g.animate.scale(0.9).move_to(ORIGIN), run_time=0.5)")
     lines.append(f"        self.wait({max(duration_sec - 3.0, 1.0):.1f})")
     return "\n".join(lines) + "\n"
@@ -322,65 +332,49 @@ def generate_chart_scene(
     title_esc = _escape(title)
 
     if chart_type == "line":
-        return textwrap.dedent(f"""\
-            from manim import *
-            import numpy as np
-            config.frame_rate = {fps}
-            config.pixel_width = 1920
-            config.pixel_height = 1080
-            config.quality = "high_quality"
-            config.background_color = "#1a1a2e"
-
-            class LineChartScene(Scene):
-                def construct(self):
-                    bg = Rectangle(width=config.frame_width, height=config.frame_height,
-                                   fill_opacity=1, color=config.background_color)
-                    self.add(bg)
-                    values = {values!r}
-                    max_val = max(values) if values else 1
-                    axis = NumberLine(x_range=[0, len(values) + 1, 1], length=10,
-                                      color=WHITE, include_numbers=True).shift(DOWN * 0.5)
-                    y_axis = NumberLine(x_range=[0, max_val * 1.1, max_val / 5], length=5,
-                                        rotation=PI / 2, color=WHITE).shift(LEFT * 5)
-                    self.play(Create(axis), Create(y_axis), run_time=1.0)
-                    dots = VGroup()
-                    for i, v in enumerate(values):
-                        p = Dot().move_to(axis.n2p(i + 1) + UP * (v / max_val) * 4)
-                        dots.add(p)
-                    self.play(Create(dots), run_time=1.5)
-                    if len(dots) > 1:
-                        lines = VGroup(*[
-                            Line(dots[i].get_center(), dots[i + 1].get_center(), color='#4a90d9')
-                            for i in range(len(dots) - 1)
-                        ])
-                        self.play(Create(lines), run_time=1.0)
-                    self.wait({max(duration_sec - 3.5, 1.0):.1f})
-        """)
-
-    return textwrap.dedent(f"""\
-        from manim import *
-        import numpy as np
-        config.frame_rate = {fps}
-        config.pixel_width = 1920
-        config.pixel_height = 1080
-        config.quality = "high_quality"
-        config.background_color = "#1a1a2e"
-
-        class BarChartScene(Scene):
+        return "\n".join(_manim_prelude(fps)) + textwrap.dedent(f"""\
+        class LineChartScene(Scene):
             def construct(self):
                 bg = Rectangle(width=config.frame_width, height=config.frame_height,
                                fill_opacity=1, color=config.background_color)
                 self.add(bg)
                 values = {values!r}
-                labels = {labels!r}
                 max_val = max(values) if values else 1
-                chart = BarChart(values=values, y_range=[0, max_val * 1.1, max_val / 5],
-                                 bar_colors=['#4a90d9', '#7c5cbf', '#3ec6a0', '#e0a860', '#d96a6a'],
-                                 x_labels=[Text(l, font_size=24) for l in labels],
-                                 bar_width=0.6).scale(0.8)
-                self.play(Create(chart), run_time=2.0)
-                {f"title = Text('{title_esc}', font_size=36).to_edge(UP); self.play(Write(title), run_time=0.5)" if title_esc else "pass"}
-                self.wait({max(duration_sec - 3.0, 1.0):.1f})
+                axis = NumberLine(x_range=[0, len(values) + 1, 1], length=10,
+                                  color=THEME_TEXT, include_numbers=True).shift(DOWN * 0.5)
+                y_axis = NumberLine(x_range=[0, max_val * 1.1, max_val / 5], length=5,
+                                    rotation=PI / 2, color=THEME_TEXT).shift(LEFT * 5)
+                self.play(Create(axis), Create(y_axis), run_time=1.0)
+                dots = VGroup()
+                for i, v in enumerate(values):
+                    p = Dot(color=THEME_SECONDARY).move_to(axis.n2p(i + 1) + UP * (v / max_val) * 4)
+                    dots.add(p)
+                self.play(Create(dots), run_time=1.5)
+                if len(dots) > 1:
+                    lines = VGroup(*[
+                        Line(dots[i].get_center(), dots[i + 1].get_center(), color=THEME_PRIMARY)
+                        for i in range(len(dots) - 1)
+                    ])
+                    self.play(Create(lines), run_time=1.0)
+                self.wait({max(duration_sec - 3.5, 1.0):.1f})
+        """)
+
+    return "\n".join(_manim_prelude(fps)) + textwrap.dedent(f"""\
+    class BarChartScene(Scene):
+        def construct(self):
+            bg = Rectangle(width=config.frame_width, height=config.frame_height,
+                           fill_opacity=1, color=config.background_color)
+            self.add(bg)
+            values = {values!r}
+            labels = {labels!r}
+            max_val = max(values) if values else 1
+            chart = BarChart(values=values, y_range=[0, max_val * 1.1, max_val / 5],
+                             bar_colors=[THEME_PRIMARY, THEME_SECONDARY, THEME_SUCCESS, '#EAB308', THEME_ERROR],
+                             x_labels=[Text(l, font=THEME_BODY_FONT, color=THEME_TEXT, font_size=24) for l in labels],
+                             bar_width=0.6).scale(0.8)
+            self.play(Create(chart), run_time=2.0)
+            {f"title = Text('{title_esc}', color=THEME_TEXT, font=THEME_HEADING_FONT, font_size=36).to_edge(UP); self.play(Write(title), run_time=0.5)" if title_esc else "pass"}
+            self.wait({max(duration_sec - 3.0, 1.0):.1f})
     """)
 
 
@@ -403,37 +397,29 @@ def generate_timeline_scene(
     title_esc = _escape(title)
     n = len(events)
 
-    return textwrap.dedent(f"""\
-        from manim import *
-        import numpy as np
-        config.frame_rate = {fps}
-        config.pixel_width = 1920
-        config.pixel_height = 1080
-        config.quality = "high_quality"
-        config.background_color = "#1a1a2e"
-
-        class TimelineScene(Scene):
-            def construct(self):
-                bg = Rectangle(width=config.frame_width, height=config.frame_height,
-                               fill_opacity=1, color=config.background_color)
-                self.add(bg)
-                labels = {labels!r}
-                dates = {dates!r}
-                n = {n}
-                axis = NumberLine(x_range=[0, max(n, 1), 1], length=12, color=WHITE,
-                                  include_numbers=False).shift(DOWN * 0.3)
-                self.play(Create(axis), run_time=1.0)
-                {f"title_t = Text('{title_esc}', font_size=36).to_edge(UP); self.play(Write(title_t), run_time=0.5)" if title_esc else "pass"}
-                for i in range(n):
-                    pos = axis.n2p(i + 1)
-                    dot = Dot(point=pos, radius=0.12, color='#7c5cbf')
-                    lbl = Text(labels[i], font_size=24).next_to(dot, UP if i % 2 == 0 else DOWN, buff=0.4)
-                    self.play(FadeIn(dot), Write(lbl), run_time=0.6)
-                    if dates[i]:
-                        d = Text(dates[i], font_size=18, color=GREY).next_to(lbl, UP if i % 2 == 0 else DOWN, buff=0.2)
-                        self.play(Write(d), run_time=0.3)
-                marker = Dot(radius=0.18, color='#4a90d9')
-                marker.move_to(axis.n2p(0))
-                self.add(marker)
-                self.play(MoveAlongPath(marker, axis), run_time={max(duration_sec - 2.0, 1.0):.1f})
+    return "\n".join(_manim_prelude(fps)) + textwrap.dedent(f"""\
+    class TimelineScene(Scene):
+        def construct(self):
+            bg = Rectangle(width=config.frame_width, height=config.frame_height,
+                           fill_opacity=1, color=config.background_color)
+            self.add(bg)
+            labels = {labels!r}
+            dates = {dates!r}
+            n = {n}
+            axis = NumberLine(x_range=[0, max(n, 1), 1], length=12, color=THEME_TEXT,
+                              include_numbers=False).shift(DOWN * 0.3)
+            self.play(Create(axis), run_time=1.0)
+            {f"title_t = Text('{title_esc}', color=THEME_TEXT, font=THEME_HEADING_FONT, font_size=36).to_edge(UP); self.play(Write(title_t), run_time=0.5)" if title_esc else "pass"}
+            for i in range(n):
+                pos = axis.n2p(i + 1)
+                dot = Dot(point=pos, radius=0.12, color=THEME_SECONDARY)
+                lbl = Text(labels[i], color=THEME_TEXT, font=THEME_BODY_FONT, font_size=24).next_to(dot, UP if i % 2 == 0 else DOWN, buff=0.4)
+                self.play(FadeIn(dot), Write(lbl), run_time=0.6)
+                if dates[i]:
+                    d = Text(dates[i], font=THEME_BODY_FONT, font_size=18, color=THEME_MUTED).next_to(lbl, UP if i % 2 == 0 else DOWN, buff=0.2)
+                    self.play(Write(d), run_time=0.3)
+            marker = Dot(radius=0.18, color=THEME_PRIMARY)
+            marker.move_to(axis.n2p(0))
+            self.add(marker)
+            self.play(MoveAlongPath(marker, axis), run_time={max(duration_sec - 2.0, 1.0):.1f})
     """)

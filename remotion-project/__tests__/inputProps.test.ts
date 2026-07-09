@@ -1,6 +1,7 @@
 /** inputProps schema validation tests. */
 
 import { describe, it, expect } from "vitest";
+import { remotionStyleDefaults } from "../src/design-tokens";
 
 describe("inputProps schema", () => {
   it("validates title scene props", () => {
@@ -54,7 +55,7 @@ describe("inputProps schema", () => {
       audioTracks: [{ src: "audio.wav", startFrame: 0, duration: 60 }],
       captions: [{ text: "Hello", startMs: 0, endMs: 500 }],
       voice: "alba",
-      style: { primaryColor: "#000", font: "Inter", codeTheme: "poimandres" },
+      style: remotionStyleDefaults,
     };
     expect(props.scenes.length).toBe(1);
     expect(props.audioTracks.length).toBe(1);

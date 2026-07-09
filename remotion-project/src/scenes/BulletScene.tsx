@@ -3,6 +3,7 @@ import { AbsoluteFill, useCurrentFrame, spring, useVideoConfig, interpolate, Eas
 import { z } from "zod";
 import { WordTiming } from "../captions/wordTiming";
 import { buildTimelineFromWords, getActiveStepIndex, getStepProgress } from "../timing/audio-timing";
+import { colors, fonts } from "../design-tokens";
 
 export const BulletSceneSchema = z.object({
   points: z.array(z.string()).min(1).max(8),
@@ -48,12 +49,12 @@ export const BulletScene: React.FC<BulletSceneProps> = ({ points, title, entry =
   return (
     <AbsoluteFill style={{
       padding: 60, display: "flex", flexDirection: "column", justifyContent: "center",
-      background: "linear-gradient(135deg, #0f0f23 0%, #1a1a3e 100%)",
+      background: colors.backgroundGradient,
     }}>
       {title && (
         <div style={{
-          opacity: titleOpacity, marginBottom: 40,
-          fontSize: 28, fontWeight: "700", color: "rgba(255,255,255,0.9)",
+          opacity: titleOpacity, marginBottom: 40, fontFamily: fonts.heading,
+          fontSize: 28, fontWeight: "700", color: colors.text,
           letterSpacing: "-0.3px",
         }}>
           {title}
@@ -72,8 +73,8 @@ export const BulletScene: React.FC<BulletSceneProps> = ({ points, title, entry =
           padding: "18px 24px",
           marginBottom: 12,
           borderRadius: 16,
-          background: isActive ? "rgba(74, 144, 217, 0.12)" : "rgba(255,255,255,0.04)",
-          border: `1px solid ${isActive ? "rgba(74,144,217,0.3)" : "rgba(255,255,255,0.06)"}`,
+          background: isActive ? colors.diffAdded : colors.chromePanel,
+          border: `1px solid ${isActive ? colors.diffAddedBorder : colors.chromeBorder}`,
           backdropFilter: "blur(2px)",
           transform: `translateX(${(1 - s) * 30}px) scale(${0.95 + 0.05 * s})`,
           opacity: isDimmed ? 0.4 : op,
@@ -82,17 +83,18 @@ export const BulletScene: React.FC<BulletSceneProps> = ({ points, title, entry =
         const bulletDot: React.CSSProperties = {
           width: 10, height: 10,
           borderRadius: "50%",
-          background: isActive ? "#4a90d9" : isDimmed ? "#555" : "rgba(74,144,217,0.5)",
+          background: isActive ? colors.primary : isDimmed ? colors.textMuted : colors.accent,
           marginRight: 16,
           flexShrink: 0,
-          boxShadow: isActive ? "0 0 12px rgba(74,144,217,0.5)" : "none",
+          boxShadow: isActive ? `0 0 12px ${colors.diffAddedBorder}` : "none",
         };
 
         return (
           <div key={i} style={cardStyle}>
             <div style={bulletDot} />
             <span style={{
-              fontSize: 20, color: isActive ? "#fff" : isDimmed ? "#666" : "rgba(255,255,255,0.8)",
+              fontFamily: fonts.sans,
+              fontSize: 20, color: isActive ? colors.text : isDimmed ? colors.textMuted : colors.textSubtle,
               fontWeight: isActive ? "600" : "400",
             }}>
               {point}

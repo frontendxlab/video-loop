@@ -35,7 +35,10 @@ from typing import Any
 
 import requests
 
+from videoforge.design_tokens import remotion_style_defaults
+
 TTS_URL = os.environ.get("POCKET_TTS_URL", "http://localhost:8000")
+STYLE_DEFAULTS = remotion_style_defaults()
 
 
 def wav_actual_duration(path: str | Path) -> float:
@@ -133,11 +136,7 @@ def build_video(
         "audioTracks": audio_tracks,
         "captions": all_captions,
         "voice": voice,
-        "style": {
-            "primaryColor": "#4a90d9",
-            "font": "Inter",
-            "codeTheme": "poimandres",
-        },
+        "style": STYLE_DEFAULTS,
     }
 
     props_path = out_dir / "input_props.json"

@@ -4,6 +4,7 @@ import { z } from "zod";
 import { WordTiming } from "../captions/wordTiming";
 import { getStepProgress } from "../timing/audio-timing";
 import { ShikiCode } from "../components/ShikiCode";
+import { codeTheme, colors, fonts } from "../design-tokens";
 
 export const CodeSceneSchema = z.object({
   code: z.string(),
@@ -43,37 +44,37 @@ export const CodeScene: React.FC<CodeSceneProps> = ({ code, lang, highlightLines
   return (
     <AbsoluteFill style={{
       padding: 40, display: "flex", flexDirection: "column",
-      background: "linear-gradient(135deg, #0d1117 0%, #161b22 100%)",
+      background: colors.panelGradient,
       opacity, transform: `translateY(${(1 - slideUp) * 20}px)`,
     }}>
       {title && (
         <div style={{
-          opacity: titleOpacity, marginBottom: 16,
-          fontSize: 22, fontWeight: "600", color: "rgba(255,255,255,0.9)",
+          opacity: titleOpacity, marginBottom: 16, fontFamily: fonts.sans,
+          fontSize: 22, fontWeight: "600", color: colors.text,
         }}>
           {title}
         </div>
       )}
       <div style={{
         flex: 1, borderRadius: 16, overflow: "hidden",
-        background: "#161b22",
-        border: "1px solid rgba(255,255,255,0.06)",
+         background: colors.surface,
+         border: `1px solid ${colors.chromeBorder}`,
       }}>
         <div style={{
-          padding: "12px 16px", background: "rgba(255,255,255,0.03)",
-          borderBottom: "1px solid rgba(255,255,255,0.06)",
+           padding: "12px 16px", background: colors.chromePanel,
+           borderBottom: `1px solid ${colors.chromeBorder}`,
           display: "flex", alignItems: "center", gap: 8,
         }}>
-          <div style={{ width: 12, height: 12, borderRadius: "50%", background: "#ff5f57" }} />
-          <div style={{ width: 12, height: 12, borderRadius: "50%", background: "#ffbd2e" }} />
-          <div style={{ width: 12, height: 12, borderRadius: "50%", background: "#28c840" }} />
-          <span style={{ marginLeft: 12, fontSize: 13, color: "rgba(255,255,255,0.4)" }}>{lang}</span>
+           <div style={{ width: 12, height: 12, borderRadius: "50%", background: colors.chromeDotRed }} />
+           <div style={{ width: 12, height: 12, borderRadius: "50%", background: colors.chromeDotYellow }} />
+           <div style={{ width: 12, height: 12, borderRadius: "50%", background: colors.chromeDotGreen }} />
+           <span style={{ marginLeft: 12, fontSize: 13, color: colors.textMuted, fontFamily: fonts.sans }}>{lang}</span>
         </div>
         <div style={{ padding: 16, overflow: "auto" }}>
           <ShikiCode
             code={code}
             lang={lang || "text"}
-            theme="poimandres"
+            theme={codeTheme.shikiTheme}
             highlightLines={highlightLines}
             visibleLines={visibleLines}
           />
@@ -81,8 +82,8 @@ export const CodeScene: React.FC<CodeSceneProps> = ({ code, lang, highlightLines
       </div>
       {caption && (
         <div style={{
-          opacity: captionOpacity, marginTop: 12,
-          fontSize: 16, color: "rgba(255,255,255,0.5)", textAlign: "center",
+          opacity: captionOpacity, marginTop: 12, fontFamily: fonts.sans,
+          fontSize: 16, color: colors.textMuted, textAlign: "center",
         }}>
           {caption}
         </div>

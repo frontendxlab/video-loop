@@ -13,10 +13,12 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
+from videoforge.design_tokens import remotion_style_defaults
 from videoforge.engine.models import VideoDefinition
 from videoforge.engine.ir import Engine, VideoProject
 
 logger = logging.getLogger("videoforge.engine.render")
+STYLE_DEFAULTS = remotion_style_defaults()
 
 
 CLIP_FORMAT: dict[str, Any] = {
@@ -204,7 +206,7 @@ def _ir_scene_props(project: VideoProject, index: int) -> dict[str, Any]:
         "audioTracks": [],
         "captions": [],
         "voice": "alba",
-        "style": {"primaryColor": "#4a90d9", "font": "Inter", "codeTheme": "poimandres"},
+        "style": STYLE_DEFAULTS,
     }
 
 

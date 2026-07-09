@@ -1,6 +1,7 @@
 import { Composition } from "remotion";
 import { z } from "zod";
 import { VideoComposition } from "./compositions/VideoComposition";
+import { remotionStyleDefaults } from "./design-tokens";
 
 const WordTimingSchema = z.object({
   text: z.string(),
@@ -56,7 +57,7 @@ const DEFAULT_PROPS = {
   audioTracks: [],
   captions: [],
   voice: "alba",
-  style: { primaryColor: "#4a90d9", font: "Inter", codeTheme: "poimandres" },
+  style: remotionStyleDefaults,
 };
 
 export const RemotionRoot: React.FC = () => {
@@ -100,7 +101,7 @@ export const RemotionRoot: React.FC = () => {
           audioTracks: [],
           captions: [],
           voice: "alba",
-          style: { primaryColor: "#4a90d9", font: "Inter", codeTheme: "poimandres" },
+          style: remotionStyleDefaults,
         }}
       />
       <Composition
@@ -117,7 +118,7 @@ export const RemotionRoot: React.FC = () => {
           audioTracks: [],
           captions: [],
           voice: "alba",
-          style: { primaryColor: "#4a90d9", font: "Inter", codeTheme: "poimandres" },
+          style: remotionStyleDefaults,
         }}
       />
     </>

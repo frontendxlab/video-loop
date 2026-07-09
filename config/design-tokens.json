@@ -1,0 +1,112 @@
+{
+  "theme": {
+    "name": "videoforge-default",
+    "primaryColor": "#4A90D9",
+    "background": {
+      "base": "#0F172A",
+      "elevated": "#162033",
+      "surface": "#1E293B",
+      "gradient": "linear-gradient(135deg, #0F172A 0%, #162033 55%, #1E293B 100%)",
+      "panelGradient": "linear-gradient(135deg, #0F172A 0%, #162033 100%)"
+    },
+    "text": {
+      "primary": "#E5EEF8",
+      "muted": "#94A3B8",
+      "subtle": "rgba(229, 238, 248, 0.65)"
+    },
+    "accent": {
+      "secondary": "#F59E0B",
+      "info": "#38BDF8",
+      "success": "#22C55E",
+      "warning": "#F59E0B",
+      "error": "#F87171",
+      "highlight": "#FACC15"
+    },
+    "diff": {
+      "added": "rgba(34, 197, 94, 0.16)",
+      "addedBorder": "rgba(34, 197, 94, 0.42)",
+      "removed": "rgba(248, 113, 113, 0.16)",
+      "removedBorder": "rgba(248, 113, 113, 0.42)"
+    },
+    "chrome": {
+      "border": "rgba(148, 163, 184, 0.18)",
+      "panel": "rgba(255, 255, 255, 0.04)",
+      "dotRed": "#FF5F57",
+      "dotYellow": "#FEBC2E",
+      "dotGreen": "#28C840"
+    }
+  },
+  "fonts": {
+    "heading": {
+      "family": "Inter",
+      "stack": "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+    },
+    "body": {
+      "family": "Inter",
+      "stack": "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+    },
+    "mono": {
+      "family": "JetBrains Mono",
+      "stack": "'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace"
+    }
+  },
+  "spacing": {
+    "xs": 4,
+    "sm": 8,
+    "md": 16,
+    "lg": 24,
+    "xl": 32,
+    "xxl": 48,
+    "section": 64
+  },
+  "motion": {
+    "entrance": {
+      "damping": 14,
+      "stiffness": 90
+    }
+  },
+  "code": {
+    "theme": {
+      "name": "poimandres",
+      "background": "#111827",
+      "text": "#E5EEF8",
+      "keyword": "#7DD3FC",
+      "string": "#F9A8D4",
+      "number": "#86EFAC",
+      "comment": "#94A3B8",
+      "function": "#FCD34D",
+      "variable": "#C4B5FD",
+      "type": "#5EEAD4",
+      "operator": "#E5EEF8",
+      "lineNumber": "#64748B",
+      "highlightBg": "rgba(250, 204, 21, 0.12)",
+      "activeBorder": "#FACC15"
+    }
+  },
+  "animotion": {
+    "theme": {
+      "deckBackground": "#0F172A",
+      "panelBackground": "#1E293B",
+      "textColor": "#E5EEF8",
+      "accentColor": "#4A90D9",
+      "codeTheme": "poimandres",
+      "headingFont": "Inter",
+      "bodyFont": "Inter",
+      "monoFont": "JetBrains Mono"
+    }
+  },
+  "manim": {
+    "backgroundColor": "#0F172A",
+    "textColor": "#E5EEF8",
+    "mutedTextColor": "#94A3B8",
+    "primaryColor": "#4A90D9",
+    "secondaryColor": "#F59E0B",
+    "successColor": "#22C55E",
+    "errorColor": "#F87171",
+    "codeBackground": "#111827",
+    "codeTextColor": "#E5EEF8",
+    "headingFont": "Inter",
+    "bodyFont": "Inter",
+    "monoFont": "JetBrains Mono"
+  }
+}

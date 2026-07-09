@@ -25,8 +25,11 @@ from pathlib import Path
 import typer
 from typing_extensions import Annotated
 
+from videoforge.design_tokens import remotion_style_defaults
+
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 logger = logging.getLogger("orchestrator")
+STYLE_DEFAULTS = remotion_style_defaults()
 
 app = typer.Typer(help="VideoForge Orchestrator")
 
@@ -166,7 +169,7 @@ def build(
         "audioTracks": tracks,
         "captions": all_captions,
         "voice": voice,
-        "style": {"primaryColor": "#4a90d9", "font": "Inter", "codeTheme": "poimandres"},
+        "style": STYLE_DEFAULTS,
     }
 
     video_json = build_dir / "video_def.json"
@@ -240,7 +243,7 @@ def render_scenes_from_def(video_def: dict, remotion_dir: str, build_dir: str, t
             "audioTracks": [tracks[i]] if i < len(tracks) else [],
             "captions": [],
             "voice": video_def.get("voice", "alba"),
-            "style": video_def.get("style", {"primaryColor": "#4a90d9", "font": "Inter", "codeTheme": "poimandres"}),
+            "style": video_def.get("style", STYLE_DEFAULTS),
         }
         props_path = Path(build_dir) / f"props_{i:04d}.json"
         props_path.write_text(json.dumps(single))

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { continueRender, delayRender } from "remotion";
+import { codeTheme, colors, fonts } from "../design-tokens";
 
 export interface ShikiToken {
   content: string;
@@ -88,7 +89,7 @@ export const ShikiCode: React.FC<ShikiCodeProps> = ({
 
   if (!lines) {
     return (
-      <div style={{ fontFamily: "monospace", fontSize, color: "rgba(255,255,255,0.5)" }}>
+        <div style={{ fontFamily: fonts.mono, fontSize, color: colors.textMuted }}>
         Loading…
       </div>
     );
@@ -97,7 +98,7 @@ export const ShikiCode: React.FC<ShikiCodeProps> = ({
   const shown = visibleLines != null ? lines.slice(0, visibleLines) : lines;
 
   return (
-    <div style={{ fontFamily: "monospace", fontSize, lineHeight }}>
+    <div style={{ fontFamily: fonts.mono, fontSize, lineHeight }}>
       {shown.map((line, i) => {
         const isHighlighted = highlightLines.includes(i + 1);
         return (
@@ -105,14 +106,14 @@ export const ShikiCode: React.FC<ShikiCodeProps> = ({
             key={i}
             style={{
               display: "flex",
-              background: isHighlighted ? "rgba(74,144,217,0.12)" : "transparent",
-              borderLeft: isHighlighted ? "3px solid #4a90d9" : "3px solid transparent",
+               background: isHighlighted ? codeTheme.highlightBg : "transparent",
+               borderLeft: isHighlighted ? `3px solid ${colors.primary}` : "3px solid transparent",
             }}
           >
             <span
               style={{
                 width: 36,
-                color: "rgba(255,255,255,0.3)",
+                 color: codeTheme.lineNumber,
                 textAlign: "right",
                 marginRight: 16,
                 flexShrink: 0,

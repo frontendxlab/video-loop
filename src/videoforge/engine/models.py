@@ -6,6 +6,11 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
+from videoforge.design_tokens import remotion_style_defaults
+
+
+_STYLE_DEFAULTS = remotion_style_defaults()
+
 
 class SceneType(str, Enum):
     TITLE = "title"
@@ -87,9 +92,9 @@ class VideoDefinition:
     fps: int = 30
     width: int = 1920
     height: int = 1080
-    primary_color: str = "#4a90d9"
-    font: str = "Inter"
-    code_theme: str = "poimandres"
+    primary_color: str = _STYLE_DEFAULTS["primaryColor"]
+    font: str = _STYLE_DEFAULTS["font"]
+    code_theme: str = _STYLE_DEFAULTS["codeTheme"]
 
     def total_frames(self) -> int:
         return sum(s.duration for s in self.scenes)

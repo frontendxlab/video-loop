@@ -1,6 +1,7 @@
 import React from "react";
 import { useCurrentFrame } from "remotion";
 import { z } from "zod";
+import { colors, fonts } from "../design-tokens";
 
 export const DiffSceneSchema = z.object({
   oldCode: z.string(),
@@ -62,7 +63,7 @@ export const DiffScene: React.FC<DiffSceneProps> = ({
       style={{
         flex: 1,
         overflow: "hidden",
-        borderRight: side === "left" ? "1px solid #30363d" : "none",
+        borderRight: side === "left" ? `1px solid ${colors.chromeBorder}` : "none",
         paddingRight: side === "left" ? 8 : 0,
         paddingLeft: side === "right" ? 8 : 0,
       }}
@@ -70,9 +71,10 @@ export const DiffScene: React.FC<DiffSceneProps> = ({
       <div
         style={{
           padding: "8px 12px",
-          borderBottom: "1px solid #30363d",
-          color: "#8b949e",
+          borderBottom: `1px solid ${colors.chromeBorder}`,
+          color: colors.textMuted,
           fontSize: 12,
+          fontFamily: fonts.sans,
           textTransform: "uppercase",
           letterSpacing: 1,
         }}
@@ -83,9 +85,9 @@ export const DiffScene: React.FC<DiffSceneProps> = ({
         {lines.map((entry, i) => {
           const bgColor =
             entry.type === "added"
-              ? "rgba(0, 255, 0, 0.1)"
+              ? colors.diffAdded
               : entry.type === "removed"
-                ? "rgba(255, 0, 0, 0.1)"
+                ? colors.diffRemoved
                 : "transparent";
 
           return (
@@ -105,7 +107,7 @@ export const DiffScene: React.FC<DiffSceneProps> = ({
                   width: 32,
                   textAlign: "right",
                   paddingRight: 12,
-                  color: "#484f58",
+                  color: colors.textMuted,
                   fontSize: 12,
                   userSelect: "none",
                 }}
@@ -114,9 +116,9 @@ export const DiffScene: React.FC<DiffSceneProps> = ({
               </span>
               <span
                 style={{
-                  color: "#c9d1d9",
+                  color: colors.text,
                   fontSize: 14,
-                  fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+                  fontFamily: fonts.mono,
                   whiteSpace: "pre",
                 }}
               >
@@ -134,10 +136,10 @@ export const DiffScene: React.FC<DiffSceneProps> = ({
       style={{
         flex: 1,
         display: "flex",
-        backgroundColor: "#0d1117",
+        backgroundColor: colors.background,
         width: "100%",
         height: "100%",
-        fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+        fontFamily: fonts.mono,
       }}
     >
       {renderColumn(diffOld, "left")}

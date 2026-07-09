@@ -10,6 +10,7 @@ import { AnimatedMindMap, MindMapNode } from "../components/AnimatedMindMap";
 import { AnimatedCodeLines } from "../components/AnimatedCodeLines";
 import { ChartScene } from "../components/scenes/ChartScene";
 import { TimelineScene } from "../components/scenes/TimelineScene";
+import { colors, fonts } from "../design-tokens";
 
 interface WordTimingData {
   text: string;
@@ -85,7 +86,7 @@ const SceneRenderer: React.FC<{ scene: SceneData; frameOffset: number }> = ({ sc
       return <TimelineScene title={scene.title} events={scene.events || []} duration={dur} wordTimestamps={ts} sceneStartFrame={sf} />;
     default:
       return (
-        <AbsoluteFill style={{ background: "linear-gradient(135deg, #0f0f23, #1a1a3e)", justifyContent: "center", alignItems: "center", color: "white", fontSize: 32 }}>
+        <AbsoluteFill style={{ background: colors.backgroundGradient, justifyContent: "center", alignItems: "center", color: colors.text, fontFamily: fonts.heading, fontSize: 32 }}>
           {scene.title || scene.caption || ""}
         </AbsoluteFill>
       );
@@ -105,7 +106,7 @@ const ScopedCaption: React.FC<{ words: CaptionWord[]; sceneStartFrame: number; s
 
 export const VideoComposition: React.FC<VideoCompositionProps> = ({ scenes, audioTracks, captions }) => {
   if (!scenes || scenes.length === 0) {
-    return <AbsoluteFill style={{ background: "#000" }} />;
+    return <AbsoluteFill style={{ background: colors.background }} />;
   }
 
   let frameOffset = 0;
@@ -145,7 +146,7 @@ export const VideoComposition: React.FC<VideoCompositionProps> = ({ scenes, audi
   }
 
   return (
-    <AbsoluteFill style={{ background: "#0f0f23" }}>
+    <AbsoluteFill style={{ background: colors.background }}>
       {sceneElements}
       {audioElements}
       {captionElements}
