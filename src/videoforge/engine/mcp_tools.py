@@ -135,6 +135,20 @@ def engine_render_video(
     out_dir = Path(build_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     scene_paths = render_scenes(video, remotion_dir, out_dir, tmpdir=out_dir / "tmp")
+
+    # Emit per-scene report artifacts alongside each scene file
+    from videoforge.review.frame_reviewer import generate_scene_report, write_scene_report
+    for i, (scene, sp) in enumerate(zip(video.scenes, scene_paths)):
+        engine = getattr(scene, "renderer", "remotion")
+        sr = generate_scene_report(
+            scene_index=i,
+            engine=engine,
+            duration_frames=scene.duration,
+            scene_path=sp,
+            content_hash=getattr(video, "content_hash", lambda: "")() if callable(getattr(video, "content_hash", None)) else "",
+        )
+        write_scene_report(sr, sp)
+
     final = concatenate_scenes(scene_paths, output_path)
 
     info = get_media_info(final)

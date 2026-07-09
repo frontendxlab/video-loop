@@ -5,7 +5,12 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from videoforge.review.frame_reviewer import generate_video_report, write_video_report
+from videoforge.review.frame_reviewer import (
+    generate_scene_report,
+    generate_video_report,
+    write_scene_report,
+    write_video_report,
+)
 
 
 class TestGenerateVideoReport:
@@ -198,6 +203,69 @@ class TestWriteVideoReport:
         assert loaded["content_hash"] == "deadbeef"
 
 
+class TestRunReview:
+    """Tests for run_review convenience helper."""
+
+    @pytest.fixture
+    def mock_reviewer(self) -> MagicMock:
+        from videoforge.review.frame_reviewer import FrameReviewer
+        reviewer = MagicMock(spec=FrameReviewer)
+        reviewer.check_mixed_engine.return_value = {
+            "issues": [], "passed": True, "sampled_frames": 6, "total_frames": 300, "duration_seconds": 10.0,
+        }
+        reviewer.evaluate_l0_policy.return_value = "pass"
+        reviewer.check_integrity.return_value = {
+            "issues": [], "passed": True, "total_frames": 300,
+        }
+        return reviewer
+
+    def test_returns_expected_structure(self, mock_reviewer: MagicMock) -> None:
+        """Result dict contains all expected keys."""
+        from videoforge.review.frame_reviewer import run_review
+        result = run_review("test.mp4", reviewer=mock_reviewer)
+        assert set(result.keys()) == {"l0_result", "l0_status", "l1_result", "report", "report_path"}
+
+    def test_runs_l0_and_l1(self, mock_reviewer: MagicMock) -> None:
+        """Both L0 and L1 checks called."""
+        from videoforge.review.frame_reviewer import run_review
+        result = run_review("test.mp4", reviewer=mock_reviewer)
+        mock_reviewer.check_mixed_engine.assert_called_once_with("test.mp4")
+        mock_reviewer.evaluate_l0_policy.assert_called_once()
+        mock_reviewer.check_integrity.assert_called_once_with("test.mp4")
+
+    def test_writes_report_file(self, mock_reviewer: MagicMock, temp_dir: Path) -> None:
+        """Report file created alongside video path."""
+        from videoforge.review.frame_reviewer import run_review
+        video = temp_dir / "videos" / "out.mp4"
+        video.parent.mkdir(parents=True)
+        video.write_text("dummy")
+        result = run_review(str(video), reviewer=mock_reviewer)
+        expected = video.parent / "out.mp4.report.json"
+        assert Path(result["report_path"]) == expected
+        assert expected.exists()
+
+    def test_passes_content_hash_and_engine_mix(self, mock_reviewer: MagicMock) -> None:
+        """Content hash and engine mix forwarded to report."""
+        from videoforge.review.frame_reviewer import run_review
+        result = run_review("test.mp4", content_hash="abc123", engine_mix=["remotion", "manim"],
+                            reviewer=mock_reviewer)
+        assert result["report"]["content_hash"] == "abc123"
+        assert result["report"]["engine_mix"] == ["manim", "remotion"]
+
+    def test_l0_fail_reflected_in_report(self, mock_reviewer: MagicMock) -> None:
+        """L0 fail status propagates to report."""
+        mock_reviewer.check_mixed_engine.return_value = {
+            "issues": [{"severity": "high", "type": "blank_frame", "detail": "blank"}],
+            "passed": False, "sampled_frames": 6, "total_frames": 300,
+        }
+        mock_reviewer.evaluate_l0_policy.return_value = "fail"
+        from videoforge.review.frame_reviewer import run_review
+        result = run_review("test.mp4", reviewer=mock_reviewer)
+        assert result["l0_status"] == "fail"
+        assert result["report"]["l0_summary"]["status"] == "fail"
+        assert result["report"]["l0_summary"]["total_issues"] == 1
+
+
 class TestReportShapeIntegration:
     """Verify report shape matches expected keys."""
 
@@ -218,3 +286,103 @@ class TestReportShapeIntegration:
 
         l1_keys = {"passed", "total_frames", "total_issues", "issues"}
         assert set(report["l1_summary"].keys()) == l1_keys
+
+
+class TestGenerateSceneReport:
+    def test_minimal_args_defaults(self) -> None:
+        """Scene report with only required fields uses sensible defaults."""
+        report = generate_scene_report(
+            scene_index=0,
+            engine="remotion",
+            duration_frames=180,
+            scene_path="/tmp/build/scene_0000.mp4",
+        )
+
+        assert report["artifact"] == "videoforge-scene-report"
+        assert report["version"] == 1
+        assert report["scene_index"] == 0
+        assert report["engine"] == "remotion"
+        assert report["duration_frames"] == 180
+        assert report["scene_path"].endswith("/tmp/build/scene_0000.mp4")
+        assert "report_timestamp" in report
+
+        # Content hash empty when not provided
+        assert report["content_hash"] == ""
+
+        # Render format has pinned defaults
+        rf = report["render_format"]
+        assert rf["fps"] == 30
+        assert rf["width"] == 1920
+        assert rf["height"] == 1080
+        assert rf["pixel_format"] == "yuv420p"
+        assert rf["video_codec"] == "h264"
+        assert rf["audio_codec"] == "aac"
+
+    def test_full_args_shape(self) -> None:
+        """All fields populated correctly."""
+        report = generate_scene_report(
+            scene_index=2,
+            engine="manim",
+            duration_frames=90,
+            scene_path="/tmp/v/scene_0002.mp4",
+            render_format={"fps": 60, "width": 3840, "height": 2160, "pixel_format": "yuv444p",
+                           "video_codec": "prores", "audio_codec": "pcm_s16le"},
+            content_hash="deadbeefcafebabe",
+        )
+
+        assert report["scene_index"] == 2
+        assert report["engine"] == "manim"
+        assert report["duration_frames"] == 90
+        assert report["content_hash"] == "deadbeefcafebabe"
+
+        rf = report["render_format"]
+        assert rf["fps"] == 60
+        assert rf["width"] == 3840
+        assert rf["height"] == 2160
+        assert rf["pixel_format"] == "yuv444p"
+        assert rf["video_codec"] == "prores"
+        assert rf["audio_codec"] == "pcm_s16le"
+
+    def test_all_expected_keys_present(self) -> None:
+        """Top-level keys match spec."""
+        report = generate_scene_report(
+            scene_index=0, engine="animotion", duration_frames=120,
+            scene_path="/tmp/s.mp4",
+        )
+        expected = {"artifact", "version", "scene_index", "engine",
+                     "duration_frames", "scene_path", "report_timestamp",
+                     "content_hash", "render_format"}
+        assert set(report.keys()) == expected
+
+
+class TestWriteSceneReport:
+    def test_writes_to_dot_scene_report_json(self, temp_dir: Path) -> None:
+        """Scene report file written as <scene>.mp4.scene.report.json."""
+        scene_path = temp_dir / "scenes" / "scene_0000.mp4"
+        scene_path.parent.mkdir(parents=True)
+        scene_path.write_text("dummy")
+
+        report_data = {"artifact": "videoforge-scene-report", "version": 1, "scene_index": 0}
+        result = write_scene_report(report_data, str(scene_path))
+
+        expected = scene_path.parent / "scene_0000.mp4.scene.report.json"
+        assert Path(result) == expected
+        assert expected.exists()
+        data = json.loads(expected.read_text())
+        assert data["artifact"] == "videoforge-scene-report"
+
+    def test_content_is_serializable(self, temp_dir: Path) -> None:
+        """Full scene report dict serializes to JSON without error."""
+        report = generate_scene_report(
+            scene_index=0,
+            engine="remotion",
+            duration_frames=180,
+            scene_path=str(temp_dir / "scene_0000.mp4"),
+            content_hash="deadbeef",
+        )
+        dumped = json.dumps(report, indent=2, default=str)
+        loaded = json.loads(dumped)
+        assert loaded["artifact"] == "videoforge-scene-report"
+        assert loaded["scene_index"] == 0
+        assert loaded["engine"] == "remotion"
+        assert loaded["content_hash"] == "deadbeef"

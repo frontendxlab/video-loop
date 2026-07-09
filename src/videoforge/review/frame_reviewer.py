@@ -11,6 +11,12 @@ from videoforge.review.l3_smoothness import L3Smoothness
 from videoforge.review.l4_transitions import L4Transitions
 from videoforge.review.l5_consistency import L5Consistency
 from videoforge.review.overlap_gate import OverlapGate
+from videoforge.review.policy import (
+    ReviewVerdict,
+    aggregate as aggregate_policy,
+    evaluate_l0 as _policy_evaluate_l0,
+    evaluate_l1 as _policy_evaluate_l1,
+)
 
 
 class FrameReviewer:
@@ -160,6 +166,28 @@ class FrameReviewer:
         Returns:
             One of "pass", "warn", "fail".
         """
+        return FrameReviewer._evaluate_by_severity(result)
+
+    @staticmethod
+    def evaluate_overlap_policy(result: dict[str, Any]) -> str:
+        """Evaluate L2b overlap gate issues against severity-based policy.
+
+        Same pass/warn/fail policy as L0.
+
+        Returns:
+            One of "pass", "warn", "fail".
+        """
+        return FrameReviewer._evaluate_by_severity(result)
+
+    @staticmethod
+    def _evaluate_by_severity(result: dict[str, Any]) -> str:
+        """Shared severity-based gate policy.
+
+        - 0 issues → pass
+        - only low → warn
+        - any medium → warn
+        - any high → fail
+        """
         issues = result.get("issues", [])
         if not issues:
             return "pass"
@@ -235,11 +263,13 @@ def generate_video_report(
     l0_result: dict[str, Any] | None = None,
     l1_result: dict[str, Any] | None = None,
     l0_status: str = "pass",
+    l2_result: dict[str, Any] | None = None,
+    l2_status: str = "pass",
 ) -> dict[str, Any]:
     """Build structured JSON artifact for final assembled video.
 
-    Includes content hash, engine mix, render format, L0 summary, L1 summary.
-    Deterministic output path derived from video_path (<video>.report.json).
+    Includes content hash, engine mix, render format, L0 summary, L1 summary,
+    and L2b layout-overlap summary.
 
     Args:
         video_path: Path to final MP4.
@@ -249,6 +279,8 @@ def generate_video_report(
         l0_result: Raw L0 review result dict (issues, sampled_frames, ...).
         l1_result: Raw L1 integrity result dict (issues, total_frames, ...).
         l0_status: Pre-computed L0 policy status ("pass", "warn", "fail").
+        l2_result: Raw L2b layout-overlap result dict (issues, passed).
+        l2_status: Pre-computed L2b policy status ("pass", "warn", "fail").
 
     Returns:
         Report dict suitable for JSON serialization.
@@ -263,6 +295,14 @@ def generate_video_report(
     # ── L1 summary ────────────────────────────────────────────────────────
     l1_data = l1_result or {}
     l1_issues = l1_data.get("issues", [])
+
+    # ── L2b layout-overlap summary ────────────────────────────────────────
+    l2_data = l2_result or {"issues": [], "passed": True}
+    l2_issues = l2_data.get("issues", [])
+    l2_severity_counts: dict[str, int] = {"high": 0, "medium": 0, "low": 0}
+    for iss in l2_issues:
+        sev = iss.get("severity", "low")
+        l2_severity_counts[sev] = l2_severity_counts.get(sev, 0) + 1
 
     # ── Render format fallback ─────────────────────────────────────────────
     fmt = render_format or {
@@ -305,6 +345,13 @@ def generate_video_report(
             "total_issues": len(l1_issues),
             "issues": l1_issues,
         },
+        "l2_layout_overlap_summary": {
+            "status": l2_status,
+            "passed": l2_status == "pass",
+            "total_issues": len(l2_issues),
+            "severity_counts": l2_severity_counts,
+            "issues": l2_issues,
+        },
     }
 
     return report
@@ -319,5 +366,114 @@ def write_video_report(
     Returns path to written report file.
     """
     report_path = Path(video_path).with_suffix(".mp4.report.json")
+    report_path.write_text(json.dumps(report, indent=2, default=str))
+    return str(report_path.resolve())
+
+
+def run_review(
+    video_path: str,
+    content_hash: str = "",
+    engine_mix: list[str] | None = None,
+    reviewer: FrameReviewer | None = None,
+) -> dict[str, Any]:
+    """Run L0 + L1 review, generate and write report artifact.
+
+    Args:
+        video_path: Path to video file to review.
+        content_hash: Optional content hash for report.
+        engine_mix: Optional list of render engines used.
+        reviewer: Optional FrameReviewer instance (created fresh if omitted).
+
+    Returns:
+        Dict with keys: l0_result, l0_status, l1_result, report, report_path.
+    """
+    if reviewer is None:
+        reviewer = FrameReviewer()
+
+    l0_result = reviewer.check_mixed_engine(video_path)
+    l0_status = reviewer.evaluate_l0_policy(l0_result)
+    l1_result = reviewer.check_integrity(video_path)
+
+    report = generate_video_report(
+        video_path=video_path,
+        content_hash=content_hash,
+        engine_mix=engine_mix,
+        l0_result=l0_result,
+        l1_result=l1_result,
+        l0_status=l0_status,
+    )
+    report_path = write_video_report(report, video_path)
+
+    return {
+        "l0_result": l0_result,
+        "l0_status": l0_status,
+        "l1_result": l1_result,
+        "report": report,
+        "report_path": report_path,
+    }
+
+
+def generate_scene_report(
+    scene_index: int,
+    engine: str,
+    duration_frames: int,
+    scene_path: str,
+    render_format: dict[str, Any] | None = None,
+    content_hash: str = "",
+) -> dict[str, Any]:
+    """Build per-scene JSON artifact next to rendered scene file.
+
+    Includes engine, duration, render format, and content hash for
+    traceability back to the parent video definition.
+
+    Args:
+        scene_index: 0-based scene index.
+        engine: Rendering engine (``remotion``, ``manim``, ``animotion``).
+        duration_frames: Scene duration in frames.
+        scene_path: Path to rendered scene MP4.
+        render_format: Dict with fps, width, height, pixel_format, etc.
+        content_hash: Video-level content hash (16-char hex).
+
+    Returns:
+        Scene report dict suitable for JSON serialization.
+    """
+    fmt = render_format or {
+        "fps": 30,
+        "width": 1920,
+        "height": 1080,
+        "pixel_format": "yuv420p",
+        "video_codec": "h264",
+        "audio_codec": "aac",
+    }
+
+    return {
+        "artifact": "videoforge-scene-report",
+        "version": 1,
+        "scene_index": scene_index,
+        "engine": engine,
+        "duration_frames": duration_frames,
+        "scene_path": str(Path(scene_path).resolve()),
+        "report_timestamp": datetime.now(timezone.utc).isoformat(),
+        "content_hash": content_hash,
+        "render_format": {
+            "fps": fmt.get("fps", 30),
+            "width": fmt.get("width", 1920),
+            "height": fmt.get("height", 1080),
+            "pixel_format": fmt.get("pixel_format", "yuv420p"),
+            "video_codec": fmt.get("video_codec", "h264"),
+            "audio_codec": fmt.get("audio_codec", "aac"),
+        },
+    }
+
+
+def write_scene_report(
+    report: dict[str, Any],
+    scene_path: str,
+) -> str:
+    """Write scene report JSON to ``<scene_path>.scene.report.json``.
+
+    Returns path to written report file.
+    """
+    report_path = Path(scene_path).with_suffix(".mp4.scene.report.json")
     report_path.write_text(json.dumps(report, indent=2, default=str))
     return str(report_path.resolve())

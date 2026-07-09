@@ -7,6 +7,7 @@ Usage:
     videoforge time --scene scene.json     # Compute frame timing
     videoforge render --video video.json   # Render video
     videoforge review --video video.mp4    # Review quality
+    videoforge report video.mp4            # Print report summary
     videoforge pipeline --topic "..."      # Full pipeline
 """
 
@@ -31,6 +32,12 @@ from videoforge.engine.models import (
 )
 from videoforge.engine.tts import generate_audio, build_scene_timing
 from videoforge.engine.renderer import render_scenes, concatenate_scenes, get_media_info
+from videoforge.validation.coherence_gate import (
+    extract_script_from_scenes,
+    log_coherence_results,
+    run_coherence_gate,
+    write_coherence_report,
+)
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 logger = logging.getLogger("videoforge")
@@ -53,6 +60,13 @@ def plan(
     ]
     Path(output).write_text(json.dumps(plan_data, indent=2))
     logger.info("Scene plan written to %s", output)
+
+    # Coherence gate
+    plan_dict: dict[str, Any] = {"scenes": plan_data}
+    script = extract_script_from_scenes(plan_data) or topic
+    coherence = run_coherence_gate(script, plan_dict, plan_path=output)
+    log_coherence_results(coherence)
+    write_coherence_report(coherence, output)
 
 
 @app.command()
@@ -98,6 +112,19 @@ def render(
     logger.info("Rendering %d scenes (%d frames = %.1fs)...", len(video_def.scenes), video_def.total_frames(), video_def.total_seconds())
     scene_paths = render_scenes(video_def, remotion_dir, out_dir, tmpdir=out_dir / "tmp")
 
+    # Emit per-scene report artifacts alongside each scene file
+    from videoforge.review.frame_reviewer import generate_scene_report, write_scene_report
+    for i, (scene, sp) in enumerate(zip(video_def.scenes, scene_paths)):
+        engine = getattr(scene, "renderer", "remotion")
+        sr = generate_scene_report(
+            scene_index=i,
+            engine=engine,
+            duration_frames=scene.duration,
+            scene_path=sp,
+            content_hash=video_def.content_hash(),
+        )
+        write_scene_report(sr, sp)
+
     logger.info("Concatenating %d scenes...", len(scene_paths))
     final = concatenate_scenes(scene_paths, output)
     logger.info("Video: %s", final)
@@ -109,22 +136,74 @@ def render(
 
 
 @app.command()
+def report_summary(
+    video: Annotated[str, typer.Argument(help="Video file path (reads <video>.mp4.report.json)")],
+    json_output: Annotated[bool, typer.Option("--json", help="Output raw JSON instead of key=value pairs")] = False,
+    scenes: Annotated[bool, typer.Option("--scenes", help="Also scan for per-scene report artifacts")] = False,
+):
+    """Print deterministic summary from <video>.mp4.report.json and scene artifacts.
+
+    Output key=value lines (script-friendly) or --json for raw report.
+    Exit code 0 = all pass, 1 = any fail.
+    """
+    report_path = Path(video).with_suffix(".mp4.report.json")
+    if not report_path.exists():
+        logger.error("Report not found: %s", report_path)
+        raise typer.Exit(1)
+
+    report = json.loads(report_path.read_text())
+    l0 = report.get("l0_summary", {})
+    l1 = report.get("l1_summary", {})
+
+    if json_output:
+        print(json.dumps(report, indent=2))
+    else:
+        overall = "FAIL" if l0.get("status") == "fail" or not l1.get("passed", True) else "PASS"
+        print(f"REPORT_status={overall}")
+        print(f"REPORT_video={report.get('video_path', '')}")
+        print(f"REPORT_content_hash={report.get('content_hash', '')}")
+        print(f"REPORT_engines={\",\".join(report.get('engine_mix', []))}")
+        print(f"REPORT_l0_status={l0.get('status', '?')}")
+        print(f"REPORT_l0_issues={l0.get('total_issues', 0)}")
+        for sev in ("high", "medium", "low"):
+            print(f"REPORT_l0_{sev}={l0.get('severity_counts', {}).get(sev, 0)}")
+        print(f"REPORT_l0_sampled={l0.get('sampled_frames', 0)}")
+        print(f"REPORT_l0_total_frames={l0.get('total_frames', 0)}")
+        print(f"REPORT_l1_passed={str(l1.get('passed', False)).lower()}")
+        print(f"REPORT_l1_issues={l1.get('total_issues', 0)}")
+        print(f"REPORT_l1_total_frames={l1.get('total_frames', 0)}")
+
+        if scenes:
+            _print_scene_artifacts(report_path.parent)
+
+    all_pass = l0.get("status") != "fail" and l1.get("passed", False)
+    if not all_pass:
+        raise typer.Exit(1)
+
+
+def _print_scene_artifacts(directory: Path) -> None:
+    """Print summary of per-scene report artifacts in directory."""
+    for p in sorted(directory.glob("*.mp4.scene.report.json")):
+        sr = json.loads(p.read_text())
+        print(f"SCENE_{sr.get('scene_index', '?')}_engine={sr.get('engine', '?')}")
+        print(f"SCENE_{sr.get('scene_index', '?')}_duration_frames={sr.get('duration_frames', 0)}")
+
+
+@app.command()
 def review(
     video: Annotated[str, typer.Argument(help="Video file path")],
 ):
     """Review video quality (L0 mixed-engine + L1 frame check)."""
-    from videoforge.review.frame_reviewer import FrameReviewer
-    fr = FrameReviewer()
+    from videoforge.review.frame_reviewer import run_review
+    r = run_review(video)
+    l0_result = r["l0_result"]
+    l0_status = r["l0_status"]
+    l1_result = r["l1_result"]
 
-    # L0: Mixed-engine review
-    l0_result = fr.check_mixed_engine(video)
-    l0_status = fr.evaluate_l0_policy(l0_result)
     logger.info("L0 Mixed-Engine: status=%s issues=%d sampled=%d total=%d",
                 l0_status, len(l0_result.get("issues", [])),
                 l0_result.get("sampled_frames", 0), l0_result.get("total_frames", 0))
 
-    # L1: Frame integrity
-    l1_result = fr.check_integrity(video)
     l1_passed = l1_result.get("passed", False)
     l1_label = "PASSED" if l1_passed else "FAILED"
     logger.info("L1 Frame Integrity: %s — %d frames, %d issues",
@@ -145,16 +224,7 @@ def review(
             typ = issue.get("type", "?")
             logger.warning("  [%s] %s: %s", sev, typ, issue.get("detail", ""))
 
-    # Generate and write report artifact
-    from videoforge.review.frame_reviewer import generate_video_report, write_video_report
-    report = generate_video_report(
-        video_path=video,
-        l0_result=l0_result,
-        l1_result=l1_result,
-        l0_status=l0_status,
-    )
-    report_path = write_video_report(report, video)
-    logger.info("Review report: %s", report_path)
+    logger.info("Review report: %s", r["report_path"])
 
     # Fail CLI on L0 high-severity issues
     if l0_status == "fail":
@@ -173,8 +243,14 @@ def pipeline(
     # Step 1: Plan
     plan.callback(topic=topic, output=scenes_json, voice=voice)
 
-    # Step 2: TTS for each scene
+    # Step 1b: Coherence gate on planned scenes
     scenes = json.loads(Path(scenes_json).read_text())
+    plan_dict: dict[str, Any] = {"scenes": scenes}
+    coherence = run_coherence_gate(topic, plan_dict, plan_path=scenes_json)
+    log_coherence_results(coherence)
+    write_coherence_report(coherence, scenes_json)
+
+    # Step 2: TTS for each scene
     for i, scene in enumerate(scenes):
         scene_file = Path(f"/tmp/scene_{i:04d}.json")
         scene_file.write_text(json.dumps(scene, indent=2))
@@ -190,28 +266,17 @@ def pipeline(
     render.callback(video=video_json, output=output)
 
     # Step 5: Review (L0 mixed-engine + L1 frame integrity)
-    from videoforge.review.frame_reviewer import FrameReviewer, generate_video_report, write_video_report
-    fr = FrameReviewer()
-    l0_result = fr.check_mixed_engine(output)
-    l0_status = fr.evaluate_l0_policy(l0_result)
-    l1_result = fr.check_integrity(output)
+    from videoforge.review.frame_reviewer import run_review
+    engines = list({s.renderer for s in video_def.scenes if s.renderer})
+    r = run_review(output, content_hash=video_def.content_hash(), engine_mix=engines)
+    l0_result = r["l0_result"]
+    l0_status = r["l0_status"]
+    l1_result = r["l1_result"]
     l1_passed = l1_result.get("passed", False)
     logger.info("Pipeline Review — L0=%s (%d issues), L1=%s (%d issues)",
                 l0_status, len(l0_result.get("issues", [])),
                 "PASSED" if l1_passed else "FAILED", len(l1_result.get("issues", [])))
-
-    # Step 6: Generate report artifact
-    engines = list({s.renderer for s in video_def.scenes if s.renderer})
-    report = generate_video_report(
-        video_path=output,
-        content_hash=video_def.content_hash(),
-        engine_mix=engines,
-        l0_result=l0_result,
-        l1_result=l1_result,
-        l0_status=l0_status,
-    )
-    report_path = write_video_report(report, output)
-    logger.info("Pipeline report: %s", report_path)
+    logger.info("Pipeline report: %s", r["report_path"])
 
 
 def _load_video_def(path: str | Path) -> VideoDefinition:
