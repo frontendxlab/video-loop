@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from videoforge.engine.ir import (
+    AudioTrackIR,
     Engine,
     NarrationSpec,
     SceneKind,
@@ -133,3 +134,27 @@ def test_from_legacy_preserves_fps_dims():
     assert vp.fps == 30
     assert vp.width == 1920
     assert vp.height == 1080
+
+
+def test_from_legacy_preserves_audio_tracks():
+    vp = VideoProject.from_legacy(_legacy_video())
+    assert len(vp.audio_tracks) == 1
+    assert vp.audio_tracks[0].src == "a.wav"
+    assert vp.audio_tracks[0].startFrame == 0
+    assert vp.audio_tracks[0].durationFrames == 90
+
+
+def test_video_project_hash_sensitive_to_audio():
+    a = VideoProject("T", (_node(),), 30, 1920, 1080)
+    b = VideoProject("T", (_node(),), 30, 1920, 1080,
+                     audio_tracks=(AudioTrackIR("bgm.mp3", 0, 90),))
+    assert a.content_hash() != b.content_hash()
+
+
+def test_audio_track_frozen():
+    t = AudioTrackIR("a.wav", 0, 90)
+    try:
+        t.src = "b.wav"  # type: ignore[misc]
+    except Exception:
+        return
+    raise AssertionError("AudioTrackIR should be frozen")

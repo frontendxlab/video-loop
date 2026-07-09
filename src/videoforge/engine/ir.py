@@ -52,6 +52,13 @@ class NarrationSpec:
 
 
 @dataclass(frozen=True)
+class AudioTrackIR:
+    src: str
+    startFrame: int
+    durationFrames: int
+
+
+@dataclass(frozen=True)
 class SceneNode:
     id: str
     kind: SceneKind
@@ -76,10 +83,15 @@ class VideoProject:
     fps: int
     width: int
     height: int
+    audio_tracks: tuple[AudioTrackIR, ...] = ()
 
     def content_hash(self) -> str:
+        audio = "".join(
+            f"{a.src}:{a.startFrame}:{a.durationFrames}"
+            for a in self.audio_tracks
+        )
         return hashlib.sha256(
-            (self.title + "".join(s.content_hash() for s in self.scenes)).encode()
+            (self.title + "".join(s.content_hash() for s in self.scenes) + audio).encode()
         ).hexdigest()[:16]
 
     @classmethod
@@ -125,7 +137,12 @@ class VideoProject:
                     engine_hint=engine, duration_frames=s.duration, narration=narration,
                 )
             )
+        audio_tracks = tuple(
+            AudioTrackIR(src=a.src, startFrame=a.startFrame, durationFrames=a.durationFrames)
+            for a in video_def.audioTracks
+        )
         return cls(
             title=video_def.title, scenes=tuple(scenes),
+            audio_tracks=audio_tracks,
             fps=video_def.fps, width=video_def.width, height=video_def.height,
         )

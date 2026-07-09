@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import json
 import subprocess
+from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 from videoforge.review.l0_mixed_engine import L0MixedEngineReview
 from videoforge.review.l3_smoothness import L3Smoothness
 from videoforge.review.l4_transitions import L4Transitions
 from videoforge.review.l5_consistency import L5Consistency
+from videoforge.review.overlap_gate import OverlapGate
 
 
 class FrameReviewer:
@@ -16,6 +19,7 @@ class FrameReviewer:
         self._l3 = L3Smoothness()
         self._l4 = L4Transitions()
         self._l5 = L5Consistency()
+        self._overlap_gate = OverlapGate()
 
     def check_integrity(self, video_path: str) -> dict[str, Any]:
         issues: list[dict[str, Any]] = []
@@ -99,6 +103,22 @@ class FrameReviewer:
         """
         return self._l0.run(video_path)
 
+    def check_layout_overlap(
+        self,
+        elements: list[dict[str, Any]],
+        viewport: tuple[int, int] = (1920, 1080),
+    ) -> dict[str, Any]:
+        """Run L2 layout-overlap gate standalone.
+
+        Args:
+            elements: List of element dicts with ``x``, ``y``, ``width``, ``height``.
+            viewport: ``(width, height)`` of canvas.
+
+        Returns:
+            Dict with ``issues`` and ``passed`` keys.
+        """
+        return self._overlap_gate.run(elements, viewport)
+
     @staticmethod
     def evaluate_l0_policy(result: dict[str, Any]) -> str:
         """Evaluate L0 issues against severity-based gate policy.
@@ -156,6 +176,11 @@ class FrameReviewer:
             report["levels"]["l5_consistency"] = {"issues": [], "passed": False, "skipped": True}
             return report
 
+        # L2b: layout overlap gate (no-video-path gate; passes if no element metadata)
+        elements = (input_props or {}).get("elements", [])
+        layout_result = self._overlap_gate.run(elements)
+        report["levels"]["l2_layout_overlap"] = layout_result
+
         l3_result = self._l3.run(video_path, input_props)
         report["levels"]["l3_smoothness"] = l3_result
 
@@ -172,3 +197,99 @@ class FrameReviewer:
         report["passed"] = all_passed
 
         return report
+
+
+def generate_video_report(
+    video_path: str,
+    content_hash: str = "",
+    engine_mix: list[str] | None = None,
+    render_format: dict[str, Any] | None = None,
+    l0_result: dict[str, Any] | None = None,
+    l1_result: dict[str, Any] | None = None,
+    l0_status: str = "pass",
+) -> dict[str, Any]:
+    """Build structured JSON artifact for final assembled video.
+
+    Includes content hash, engine mix, render format, L0 summary, L1 summary.
+    Deterministic output path derived from video_path (<video>.report.json).
+
+    Args:
+        video_path: Path to final MP4.
+        content_hash: sha256 hash of video definition (16-char hex).
+        engine_mix: List of engines used (remotion, manim, animotion).
+        render_format: Dict with fps, width, height, pixel_format, etc.
+        l0_result: Raw L0 review result dict (issues, sampled_frames, ...).
+        l1_result: Raw L1 integrity result dict (issues, total_frames, ...).
+        l0_status: Pre-computed L0 policy status ("pass", "warn", "fail").
+
+    Returns:
+        Report dict suitable for JSON serialization.
+    """
+    # ── Severity counts for L0 ────────────────────────────────────────────
+    l0_issues = (l0_result or {}).get("issues", [])
+    l0_severity_counts: dict[str, int] = {"high": 0, "medium": 0, "low": 0}
+    for iss in l0_issues:
+        sev = iss.get("severity", "low")
+        l0_severity_counts[sev] = l0_severity_counts.get(sev, 0) + 1
+
+    # ── L1 summary ────────────────────────────────────────────────────────
+    l1_data = l1_result or {}
+    l1_issues = l1_data.get("issues", [])
+
+    # ── Render format fallback ─────────────────────────────────────────────
+    fmt = render_format or {
+        "fps": 30,
+        "width": 1920,
+        "height": 1080,
+        "pixel_format": "yuv420p",
+        "video_codec": "h264",
+        "audio_codec": "aac",
+    }
+
+    report: dict[str, Any] = {
+        "artifact": "videoforge-video-report",
+        "version": 1,
+        "video_path": str(Path(video_path).resolve()),
+        "report_timestamp": datetime.now(timezone.utc).isoformat(),
+        "content_hash": content_hash,
+        "engine_mix": sorted(set(engine_mix or ["remotion"])),
+        "render_format": {
+            "fps": fmt.get("fps", 30),
+            "width": fmt.get("width", 1920),
+            "height": fmt.get("height", 1080),
+            "pixel_format": fmt.get("pixel_format", "yuv420p"),
+            "video_codec": fmt.get("video_codec", "h264"),
+            "audio_codec": fmt.get("audio_codec", "aac"),
+        },
+        "l0_summary": {
+            "status": l0_status,
+            "passed": l0_status == "pass",
+            "total_issues": len(l0_issues),
+            "severity_counts": l0_severity_counts,
+            "sampled_frames": (l0_result or {}).get("sampled_frames", 0),
+            "total_frames": (l0_result or {}).get("total_frames", 0),
+            "duration_seconds": (l0_result or {}).get("duration_seconds", 0.0),
+            "issues": l0_issues,
+        },
+        "l1_summary": {
+            "passed": l1_data.get("passed", False),
+            "total_frames": l1_data.get("total_frames", 0),
+            "total_issues": len(l1_issues),
+            "issues": l1_issues,
+        },
+    }
+
+    return report
+
+
+def write_video_report(
+    report: dict[str, Any],
+    video_path: str,
+) -> str:
+    """Write report JSON to <video_path>.report.json.
+
+    Returns path to written report file.
+    """
+    report_path = Path(video_path).with_suffix(".mp4.report.json")
+    report_path.write_text(json.dumps(report, indent=2, default=str))
+    return str(report_path.resolve())
