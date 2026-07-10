@@ -514,3 +514,74 @@ It should absorb the methodology behind those scenes:
 3. Remotion engine expansion for showcase patterns
 4. review gates specialized to those patterns
 5. golden demo fixtures for top showcase outputs
+
+---
+
+## 13. New hard requirements for next implementation waves
+
+These are mandatory and should be included in all next subagent waves where relevant.
+
+### 13.1 AI provider requirement
+
+- VideoForge app should use **9router** as AI provider.
+- It should use our **locally available model from 9router** where possible.
+- Provider/model selection must be visible in UI and configurable in settings + per-run overrides.
+- Backend contracts should expose provider/model status clearly.
+
+### 13.2 Frame preview requirement
+
+- User must be able to preview frames in **any flow**.
+- This includes:
+  - successful runs
+  - in-progress runs
+  - failed runs
+  - failed scenes / failed subagent-related outputs where visual artifacts exist
+- Scene detail, reports, and job flows should expose thumbnails / sampled frames / best-effort previews.
+- Failure state should never hide available visual evidence.
+
+### 13.3 Single-command dev experience
+
+- Need one command that starts both:
+  - Python backend (FastAPI on port 8000)
+  - Web frontend (Vite on port 5173, proxies `/api` → `localhost:8000`)
+- Prefer deterministic local dev entrypoint, documented and easy to use.
+- Should be suitable for operators and contributors.
+- Implementation: `Makefile` at repo root with `dev` target.
+
+  Usage:
+  ```bash
+  make dev              # Start both backend + frontend
+  make dev-backend      # Start backend only
+  make dev-frontend     # Start frontend only
+  ```
+
+  Prerequisites:
+  - Python >= 3.10 with `uv` installed (see `pyproject.toml` for dependencies)
+  - Node.js with `pnpm` available
+  - Dependencies installed: `uv sync` + `cd web && pnpm install`
+
+  Behavior:
+  - Backend starts with `--reload` for hot-reload on Python changes
+  - Frontend starts with Vite dev server, HMR active
+  - Ctrl-C terminates both processes cleanly via shell `trap`
+
+### 13.4 Infinite canvas flow UI requirement
+
+- Need dotted infinite-canvas style UI with nodes and connectors.
+- It should show:
+  - jobs
+  - stages
+  - scene graph / routing
+  - subagents
+  - status
+  - progress
+- Think mind-map / node-editor style, but task- and status-aware.
+- This should complement normal list/detail views, not replace them.
+
+### 13.5 Requirement propagation rule
+
+All future subagent prompts should include, when relevant:
+- 9router provider integration
+- frame preview coverage for failed/in-progress flows
+- single-command local dev UX
+- infinite-canvas flow visualization support
