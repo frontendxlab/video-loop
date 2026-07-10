@@ -133,6 +133,103 @@ class TestJobDetail:
         assert len(data["scenes"]) == 1
         assert data["scenes"][0]["id"] == "sc1"
 
+    def test_detail_enriches_scene_artifacts_from_disk(self, tmp_path, monkeypatch):
+        """Scene detail includes artifact flags+URLs when files exist on disk."""
+        from videoforge.api.artifacts import ARTIFACTS_DIR
+        monkeypatch.setattr("videoforge.api.artifacts.ARTIFACTS_DIR", tmp_path)
+        # Create artifact files for sc1
+        (tmp_path / "detail-3" / "thumbnails").mkdir(parents=True)
+        (tmp_path / "detail-3" / "thumbnails" / "sc1.jpg").write_bytes(b"thumb")
+        (tmp_path / "detail-3" / "frames").mkdir()
+        (tmp_path / "detail-3" / "frames" / "sc1.png").write_bytes(b"frame")
+        (tmp_path / "detail-3" / "reports").mkdir()
+        (tmp_path / "detail-3" / "reports" / "sc1.json").write_text('{"ok":true}')
+
+        _clear_store()
+        store_job("detail-3", {
+            "id": "detail-3",
+            "title": "Artifact rich",
+            "status": "running",
+            "stage": "render",
+            "progressPct": 50,
+            "createdAt": "2025-01-01T00:00:00",
+            "startedAt": "2025-01-01T00:01:00",
+            "completedAt": None,
+            "error": None,
+            "subagents": [],
+            "scenes": [
+                {"id": "sc1", "kind": "code", "engine": "remotion", "status": "completed", "reviewIssues": 0, "retryCount": 0},
+            ],
+            "artifacts": [],
+            "events": [],
+        })
+        client = TestClient(create_app())
+        resp = client.get("/api/jobs/detail-3")
+        assert resp.status_code == 200
+        scene = resp.json()["scenes"][0]
+        assert scene["hasThumbnail"] is True
+        assert scene["hasFrame"] is True
+        assert scene["hasReport"] is True
+        assert scene["thumbnailUrl"] == "/api/artifacts/detail-3/scenes/sc1/thumbnail"
+        assert scene["frameUrl"] == "/api/artifacts/detail-3/scenes/sc1/frame"
+        assert scene["reportUrl"] == "/api/artifacts/detail-3/scenes/sc1/report"
+        # Original fields preserved
+        assert scene["kind"] == "code"
+        assert scene["status"] == "completed"
+
+    def test_detail_failed_job_shows_artifacts(self, tmp_path, monkeypatch):
+        """Failed job with partial artifacts still enriches scene detail."""
+        monkeypatch.setattr("videoforge.api.artifacts.ARTIFACTS_DIR", tmp_path)
+        (tmp_path / "detail-4" / "thumbnails").mkdir(parents=True)
+        (tmp_path / "detail-4" / "thumbnails" / "sc_failed.jpg").write_bytes(b"partial")
+        _clear_store()
+        store_job("detail-4", {
+            "id": "detail-4",
+            "title": "Failed job",
+            "status": "failed",
+            "stage": "render",
+            "progressPct": 40,
+            "createdAt": "2025-01-01T00:00:00",
+            "startedAt": "2025-01-01T00:01:00",
+            "completedAt": "2025-01-01T00:02:00",
+            "error": "Render error",
+            "subagents": [],
+            "scenes": [
+                {"id": "sc_failed", "kind": "diagram", "engine": "manim", "status": "failed", "reviewIssues": 2, "retryCount": 2},
+            ],
+            "artifacts": [],
+            "events": [],
+        })
+        client = TestClient(create_app())
+        resp = client.get("/api/jobs/detail-4")
+        assert resp.status_code == 200
+        scene = resp.json()["scenes"][0]
+        assert scene["hasThumbnail"] is True
+        assert scene["thumbnailUrl"] is not None
+        assert scene["status"] == "failed"  # original status preserved
+
+    def test_detail_no_scenes_returns_empty(self):
+        _clear_store()
+        store_job("detail-5", {
+            "id": "detail-5",
+            "title": "No scenes",
+            "status": "queued",
+            "stage": "plan",
+            "progressPct": 0,
+            "createdAt": "2025-01-01T00:00:00",
+            "startedAt": None,
+            "completedAt": None,
+            "error": None,
+            "subagents": [],
+            "scenes": [],
+            "artifacts": [],
+            "events": [],
+        })
+        client = TestClient(create_app())
+        resp = client.get("/api/jobs/detail-5")
+        assert resp.status_code == 200
+        assert resp.json()["scenes"] == []
+
     def test_detail_404_for_missing_job(self):
         _clear_store()
         app = create_app()
@@ -175,8 +272,8 @@ GRILL_PAYLOAD = {
     "prompt": "Explain Kubernetes architecture with code examples",
     "options": {
         "voice": "alba",
-        "provider": "openai",
-        "model": "gpt-4o",
+        "provider": "9router",
+        "model": "ocg/deepseek-v4-flash",
         "maxDuration": 180,
         "fps": 30,
     },
@@ -383,6 +480,96 @@ class TestCreateJobEndpoint:
         assert detail.status_code == 200
         assert detail.json()["status"] == "queued"
         assert len(detail.json()["events"]) == 3
+
+
+# ─── Provider/Model override in job creation ────────────────────────────
+
+
+class TestJobProviderOverride:
+    """Per-run provider/model overrides stored correctly in job detail."""
+
+    def test_create_job_stores_provider_model(self):
+        _clear_store()
+        app = create_app()
+        client = TestClient(app)
+        resp = client.post("/api/jobs", json=GRILL_PAYLOAD)
+        job_id = resp.json()["jobId"]
+        detail = client.get(f"/api/jobs/{job_id}").json()
+        assert detail["provider"] == "9router"
+        assert detail["model"] == "ocg/deepseek-v4-flash"
+
+    def test_create_job_override_provider(self):
+        _clear_store()
+        app = create_app()
+        client = TestClient(app)
+        payload = {
+            **GRILL_PAYLOAD,
+            "runOverride": {"provider": "anthropic", "model": "claude-sonnet-4-20250514"},
+        }
+        resp = client.post("/api/jobs", json=payload)
+        job_id = resp.json()["jobId"]
+        detail = client.get(f"/api/jobs/{job_id}").json()
+        assert detail["provider"] == "anthropic"
+        assert detail["model"] == "claude-sonnet-4-20250514"
+
+    def test_create_job_override_model_only(self):
+        _clear_store()
+        app = create_app()
+        client = TestClient(app)
+        payload = {
+            **GRILL_PAYLOAD,
+            "runOverride": {"model": "gpt-4o-mini"},
+        }
+        resp = client.post("/api/jobs", json=payload)
+        job_id = resp.json()["jobId"]
+        detail = client.get(f"/api/jobs/{job_id}").json()
+        # provider falls back to options.provider since only model overridden
+        assert detail["provider"] == "9router"
+        assert detail["model"] == "gpt-4o-mini"
+
+    def test_create_job_override_none_provider_uses_options(self):
+        _clear_store()
+        app = create_app()
+        client = TestClient(app)
+        payload = {
+            **GRILL_PAYLOAD,
+            "runOverride": {"provider": None, "model": None},
+        }
+        resp = client.post("/api/jobs", json=payload)
+        job_id = resp.json()["jobId"]
+        detail = client.get(f"/api/jobs/{job_id}").json()
+        # Both None → fall back to options defaults
+        assert detail["provider"] == "9router"
+        assert detail["model"] == "ocg/deepseek-v4-flash"
+
+    def test_create_job_override_with_temperature(self):
+        _clear_store()
+        app = create_app()
+        client = TestClient(app)
+        payload = {
+            **GRILL_PAYLOAD,
+            "runOverride": {"provider": "openai", "model": "gpt-4o", "temperature": 0.5},
+        }
+        resp = client.post("/api/jobs", json=payload)
+        assert resp.status_code == 200
+        job_id = resp.json()["jobId"]
+        detail = client.get(f"/api/jobs/{job_id}").json()
+        assert detail["provider"] == "openai"
+        assert detail["model"] == "gpt-4o"
+        assert detail["runOverride"]["temperature"] == 0.5
+
+    def test_create_job_emit_effective_provider_in_event(self):
+        _clear_store()
+        app = create_app()
+        client = TestClient(app)
+        payload = {**GRILL_PAYLOAD, "runOverride": {"provider": "anthropic", "model": "claude-sonnet-4-20250514"}}
+        resp = client.post("/api/jobs", json=payload)
+        job_id = resp.json()["jobId"]
+        detail = client.get(f"/api/jobs/{job_id}").json()
+        # First event (job.started) should contain effectiveProvider
+        first_event = detail["events"][0]
+        assert first_event["payload"]["effectiveProvider"] == "anthropic"
+        assert first_event["payload"]["effectiveModel"] == "claude-sonnet-4-20250514"
 
 
 # ─── Error handling ─────────────────────────────────────────────────────

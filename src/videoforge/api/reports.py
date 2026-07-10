@@ -86,13 +86,41 @@ def _build_summary(report_path: Path) -> dict[str, Any]:
             "error": "unreadable",
         }
 
+    # Derive scene artifact info from the video's job directory (if any)
+    scene_thumbnails = 0
+    scene_frames = 0
+    scene_reports_count = 0
+    scenes_artifact_dir = None
+    content_hash = report.get("content_hash", "")
+    if content_hash:
+        # Try common artifact dirs: /tmp/vfx-artifacts/{hash} or cwd/artifacts
+        for base in (Path("/tmp/vfx-artifacts"), Path("artifacts")):
+            candidate = base / content_hash / "reports"
+            if candidate.is_dir():
+                scenes_artifact_dir = str(candidate)
+                scene_reports_count = len(list(candidate.glob("*.json")))
+                # Also count sibling frames/thumbnails
+                for sub in ("thumbnails", "frames"):
+                    d = candidate.parent / sub
+                    if d.is_dir():
+                        count = len(list(d.iterdir()))
+                        if sub == "thumbnails":
+                            scene_thumbnails = count
+                        else:
+                            scene_frames = count
+                break
+
     return {
         "name": name,
         "artifact": report.get("artifact"),
         "report_timestamp": report.get("report_timestamp"),
-        "content_hash": report.get("content_hash", ""),
+        "content_hash": content_hash,
         "engine_mix": report.get("engine_mix", []),
         "scenes_count": report.get("scenes_summary", {}).get("count", 0),
+        "scene_thumbnails_available": scene_thumbnails,
+        "scene_frames_available": scene_frames,
+        "scene_reports_available": scene_reports_count,
+        "scenes_artifact_dir": scenes_artifact_dir,
         "total_duration_frames": report.get("scenes_summary", {}).get(
             "total_duration_frames", 0
         ),
@@ -135,7 +163,11 @@ async def get_provenance(name: str) -> dict[str, Any]:
 
 @router.get("/{name}/scenes")
 async def get_scenes(name: str) -> list[dict[str, Any]]:
-    """Return per-scene report artifacts for this video."""
+    """Return per-scene report artifacts for this video.
+
+    Each scene report is enriched with ``has_frame``, ``has_thumbnail``,
+    and ``scene_artifacts_url`` fields when matching files exist.
+    """
     report_path = _resolve_report_path(name)
     video_dir = report_path.parent
     # Scan for scene reports matching this video name
@@ -143,7 +175,29 @@ async def get_scenes(name: str) -> list[dict[str, Any]]:
     scene_reports: list[dict[str, Any]] = []
     for p in sorted(video_dir.glob(pattern)):
         try:
-            scene_reports.append(json.loads(p.read_text()))
+            data = json.loads(p.read_text())
         except (json.JSONDecodeError, OSError):
             continue
+
+        # Enrich with artifact info: check for sibling frame/thumbnail
+        scene_id = data.get("scene_id", data.get("id", ""))
+        if scene_id:
+            for kind, ext in (("frames", ".jpg"), ("thumbnails", ".jpg")):
+                candidate = video_dir / kind / f"{scene_id}{ext}"
+                data[f"has_{kind[:-1]}"] = candidate.exists()
+                if not candidate.exists():
+                    # Try other extensions
+                    for alt_ext in (".jpeg", ".png", ".webp"):
+                        candidate = video_dir / kind / f"{scene_id}{alt_ext}"
+                        if candidate.exists():
+                            data[f"has_{kind[:-1]}"] = True
+                            break
+                        data[f"has_{kind[:-1]}"] = False
+            data["scene_artifacts_url"] = f"/api/artifacts/{name}/scenes/{scene_id}"
+        else:
+            data["has_frame"] = False
+            data["has_thumbnail"] = False
+            data["scene_artifacts_url"] = None
+
+        scene_reports.append(data)
     return scene_reports

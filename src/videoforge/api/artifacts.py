@@ -64,6 +64,17 @@ def _read_json_or_404(path: Path) -> dict[str, Any]:
         raise HTTPException(404, f"Cannot read {path.name}: {exc}")
 
 
+def _find_file(directory: Path, stem: str, *exts: str) -> Path | None:
+    """Return first existing file *directory/stem.ext* for any *exts*."""
+    if not directory.is_dir():
+        return None
+    for ext in exts:
+        p = directory / f"{stem}{ext}"
+        if p.is_file():
+            return p
+    return None
+
+
 def _collect_scene_artifacts(job_id: str) -> list[dict[str, Any]]:
     """Enumerate scene artifacts available for a job."""
     job_dir = _safe_job_path(job_id)
@@ -73,6 +84,7 @@ def _collect_scene_artifacts(job_id: str) -> list[dict[str, Any]]:
     thumb_dir = job_dir / "thumbnails"
     frame_dir = job_dir / "frames"
     report_dir = job_dir / "reports"
+    IMG_EXTS = (".jpg", ".jpeg", ".png", ".webp")
 
     # Collect scene IDs from any artifact directory
     seen: set[str] = set()
@@ -84,31 +96,42 @@ def _collect_scene_artifacts(job_id: str) -> list[dict[str, Any]]:
                     seen.add(scene_id)
 
     artifacts: list[dict[str, Any]] = []
+    prefix = f"/api/artifacts/{job_id}/scenes"
     for scene_id in sorted(seen):
-        # Check thumbnail (try common extensions)
-        has_thumbnail = False
-        if thumb_dir.is_dir():
-            for ext in (".jpg", ".jpeg", ".png", ".webp"):
-                if (thumb_dir / f"{scene_id}{ext}").is_file():
-                    has_thumbnail = True
-                    break
-        # Check frame (try common extensions)
-        has_frame = False
-        if frame_dir.is_dir():
-            for ext in (".jpg", ".jpeg", ".png", ".webp"):
-                if (frame_dir / f"{scene_id}{ext}").is_file():
-                    has_frame = True
-                    break
-        has_report = (report_dir / f"{scene_id}.json").is_file() if report_dir.is_dir() else False
+        thumb_path = _find_file(thumb_dir, scene_id, *IMG_EXTS)
+        frame_path = _find_file(frame_dir, scene_id, *IMG_EXTS)
+        report_path = report_dir / f"{scene_id}.json" if report_dir.is_dir() else None
+        has_report = report_path is not None and report_path.is_file()
 
         artifacts.append({
             "sceneId": scene_id,
-            "hasThumbnail": has_thumbnail,
-            "hasFrame": has_frame,
+            "hasThumbnail": thumb_path is not None,
+            "hasFrame": frame_path is not None,
             "hasReport": has_report,
+            "thumbnailUrl": f"{prefix}/{scene_id}/thumbnail" if thumb_path else None,
+            "frameUrl": f"{prefix}/{scene_id}/frame" if frame_path else None,
+            "reportUrl": f"{prefix}/{scene_id}/report" if has_report else None,
         })
 
     return artifacts
+
+
+@router.get("/{job_id}")
+async def get_job_artifact_summary(job_id: str) -> dict[str, Any]:
+    """Aggregate artifact summary for a job across all scenes.
+
+    Returns total counts plus per-scene artifact details.
+    Always returns 200 — empty result if nothing exists on disk.
+    """
+    scenes = _collect_scene_artifacts(job_id)
+    return {
+        "jobId": job_id,
+        "totalScenes": len(scenes),
+        "scenesWithThumbnails": sum(1 for s in scenes if s["hasThumbnail"]),
+        "scenesWithFrames": sum(1 for s in scenes if s["hasFrame"]),
+        "scenesWithReports": sum(1 for s in scenes if s["hasReport"]),
+        "scenes": scenes,
+    }
 
 
 @router.get("/{job_id}/scenes")

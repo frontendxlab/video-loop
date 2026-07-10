@@ -165,6 +165,20 @@ class TestListReports:
         assert entry["policy_verdict"] == "pass"
         assert entry["has_provenance"] is True
 
+    def test_list_includes_scene_artifact_fields(self, tmp_path: Path, monkeypatch):
+        """Report summary includes scene artifact availability counts."""
+        monkeypatch.chdir(tmp_path)
+        _setup_artifacts(tmp_path)
+        client = TestClient(create_app())
+        resp = client.get("/api/reports")
+        data = resp.json()
+        assert len(data) == 1
+        entry = data[0]
+        # Fields exist (may be zero if content_hash doesn't match artifact dir)
+        assert "scene_thumbnails_available" in entry
+        assert "scene_frames_available" in entry
+        assert "scene_reports_available" in entry
+
     def test_list_returns_json_array(self, tmp_path: Path, monkeypatch):
         monkeypatch.chdir(tmp_path)
         _setup_artifacts(tmp_path)
@@ -251,3 +265,21 @@ class TestGetScenes:
         resp = client.get("/api/reports/empty/scenes")
         assert resp.status_code == 200
         assert resp.json() == []
+
+    def test_scene_reports_include_artifact_hints(self, tmp_path: Path, monkeypatch):
+        """Each scene report in /api/reports/{name}/scenes has artifact fields."""
+        monkeypatch.chdir(tmp_path)
+        _setup_artifacts(tmp_path)
+        # Add scene with frame/thumbnail
+        frame_dir = tmp_path / "frames"
+        frame_dir.mkdir(exist_ok=True)
+        (frame_dir / "scene_0000.jpg").write_bytes(b"frame-data")
+        client = TestClient(create_app())
+        resp = client.get("/api/reports/demo/scenes")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data) == 2
+        for scene in data:
+            assert "has_frame" in scene
+            assert "has_thumbnail" in scene
+            assert "scene_artifacts_url" in scene

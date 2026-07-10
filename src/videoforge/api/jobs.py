@@ -48,10 +48,23 @@ router = APIRouter(prefix="/api/jobs", tags=["jobs"])
 
 class CreateOptions(BaseModel):
     voice: str = "alba"
-    provider: str = "openai"
-    model: str = "gpt-4o"
+    provider: str = "9router"
+    model: str = "ocg/deepseek-v4-flash"
     maxDuration: int = 180
     fps: int = 30
+
+
+class RunOverride(BaseModel):
+    """Per-run provider/model overrides — optional, applied at job start.
+
+    Mirrors frontend RunOverrideSchema. Allows operator to override
+    the default provider/model for a specific job without changing
+    persisted settings.
+    """
+    provider: str | None = None
+    model: str | None = None
+    temperature: float = 0.7
+    maxTokens: int = 4096
 
 
 class GrillRequest(BaseModel):
@@ -76,6 +89,7 @@ class GrillResult(BaseModel):
 class CreateJobRequest(BaseModel):
     prompt: str = Field(..., min_length=10)
     options: CreateOptions = Field(default_factory=CreateOptions)
+    runOverride: RunOverride | None = None
 
 
 class CreateJobResponse(BaseModel):
@@ -107,6 +121,13 @@ class SceneDetail(BaseModel):
     status: str  # pending, rendering, completed, failed
     reviewIssues: int = 0
     retryCount: int = 0
+    # Artifact availability — populated from disk when job detail is fetched
+    hasThumbnail: bool = False
+    hasFrame: bool = False
+    hasReport: bool = False
+    thumbnailUrl: str | None = None
+    frameUrl: str | None = None
+    reportUrl: str | None = None
 
 
 class ArtifactRef(BaseModel):
@@ -125,6 +146,9 @@ class JobDetailResponse(BaseModel):
     startedAt: str | None = None
     completedAt: str | None = None
     error: str | None = None
+    provider: str = "9router"
+    model: str = "ocg/deepseek-v4-flash"
+    runOverride: dict[str, Any] | None = None
     subagents: list[SubagentDetail] = []
     scenes: list[SceneDetail] = []
     artifacts: list[ArtifactRef] = []
@@ -318,6 +342,68 @@ def grill_prompt(prompt: str, options: CreateOptions | None = None) -> GrillResu
     )
 
 
+# ─── Artifact enrichment helpers ──────────────────────────────────────────
+
+
+def _enrich_scene_artifacts(
+    job_id: str,
+    scenes: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Enrich scene dicts with artifact availability flags and URLs from disk.
+
+    Scans ``{ARTIFACTS_DIR}/{job_id}/thumbnails|frames|reports/``
+    for known scene IDs. Non-destructive — preserves all existing keys.
+    Returns empty list unchanged (no scene metadata yet).
+    """
+    from videoforge.api.artifacts import ARTIFACTS_DIR, _SAFE_NAME  # noqa: PLC0415
+
+    if not scenes:
+        return scenes
+
+    job_dir = ARTIFACTS_DIR / job_id
+    if not job_dir.is_dir():
+        return scenes
+
+    thumb_dir = job_dir / "thumbnails"
+    frame_dir = job_dir / "frames"
+    report_dir = job_dir / "reports"
+    IMG_EXTS = (".jpg", ".jpeg", ".png", ".webp")
+    prefix = f"/api/artifacts/{job_id}/scenes"
+
+    enriched = []
+    for scene in scenes:
+        sid = scene.get("id", "")
+        if not _SAFE_NAME.match(sid):
+            enriched.append(scene)
+            continue
+
+        def _find(directory):
+            if not directory.is_dir():
+                return None
+            for ext in IMG_EXTS:
+                p = directory / f"{sid}{ext}"
+                if p.is_file():
+                    return p
+            return None
+
+        thumb_path = _find(thumb_dir)
+        frame_path = _find(frame_dir)
+        report_path = (report_dir / f"{sid}.json") if report_dir.is_dir() else None
+        has_rep = report_path is not None and report_path.is_file()
+
+        enriched.append({
+            **scene,
+            "hasThumbnail": thumb_path is not None,
+            "hasFrame": frame_path is not None,
+            "hasReport": has_rep,
+            "thumbnailUrl": f"{prefix}/{sid}/thumbnail" if thumb_path else None,
+            "frameUrl": f"{prefix}/{sid}/frame" if frame_path else None,
+            "reportUrl": f"{prefix}/{sid}/report" if has_rep else None,
+        })
+
+    return enriched
+
+
 # ─── Routes ────────────────────────────────────────────────────────────────
 
 
@@ -335,6 +421,11 @@ async def create_job(
     """Create a new job: grill prompt, emit events, store job detail."""
     result = grill_prompt(req.prompt, req.options)
 
+    # Resolve effective provider/model — runOverride wins over options defaults
+    ro = req.runOverride
+    effective_provider = ro.provider if (ro and ro.provider) else req.options.provider
+    effective_model = ro.model if (ro and ro.model) else req.options.model
+
     job_id = f"job_{uuid.uuid4().hex[:12]}"
 
     # Emit job.started event
@@ -344,6 +435,9 @@ async def create_job(
             "title": req.prompt[:60],
             "prompt": req.prompt,
             "options": req.options.model_dump(),
+            "runOverride": ro.model_dump() if ro else None,
+            "effectiveProvider": effective_provider,
+            "effectiveModel": effective_model,
             "grillResult": result.model_dump(),
         },
     )
@@ -384,6 +478,9 @@ async def create_job(
         "startedAt": None,
         "completedAt": None,
         "error": None,
+        "provider": effective_provider,
+        "model": effective_model,
+        "runOverride": ro.model_dump() if ro else None,
         "subagents": [],
         "scenes": [],
         "artifacts": [],
@@ -412,10 +509,16 @@ async def list_jobs_endpoint() -> list[JobDetailResponse]:
 
 @router.get("/{job_id}")
 async def get_job_endpoint(job_id: str) -> JobDetailResponse:
-    """Get full job detail snapshot: stages, scenes, subagents, artifacts."""
+    """Get full job detail snapshot: stages, scenes, subagents, artifacts.
+
+    Scene artifacts (thumbnail/frame/report flags + URLs) are enriched
+    from disk at request time — available regardless of job status.
+    """
     job = get_job(job_id)
     if job is None:
         raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
+    # Enrich scene artifacts from disk (always, even for failed/in-progress)
+    job = {**job, "scenes": _enrich_scene_artifacts(job_id, job.get("scenes", []))}
     return JobDetailResponse(**job)
 
 
