@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from videoforge.orchestrator.recipe_payload import build_recipe_payload
+from videoforge.orchestrator.recipe_scene_plan import get_recipe_scene_plan
 
 SCENE_TYPES = ["title", "code", "diff", "bullet", "image", "comparison", "diagram", "outro"]
 
@@ -112,33 +113,61 @@ class ScriptWriter:
             scene_idx += 1
 
         # ── Showcase scene insertion (rule-based, deterministic) ──────
+        #   Multi-scene recipes expand into 3-4 scenes (intro, body, outro).
+        #   Single-scene recipes follow the existing pattern.
+        #   Both paths carry recipe enrichment (engine_hint, entrance/exit_,
+        #   recipe_payload, recipe_id) for downstream routing.
         showcase_scene = _detect_showcase_pattern(content)
         if showcase_scene is not None:
-            script_parts.append(
-                f"Next, {showcase_scene['scene_type'].replace('-', ' ')} "
-                f"highlight: {showcase_scene['text'][:80]}."
-            )
-            # Carry recipe enrichment through scene dict:
-            #   engine_hint → director routing override
-            #   entrance/exit_ → ScenePlanner transition choice
-            #   recipe_payload → scene payload shape
-            #   recipe_id → traceability
-            scene_entry: dict[str, Any] = {
-                "title": showcase_scene["title"],
-                "text": script_parts[-1],
-                "scene_type": showcase_scene["scene_type"],
-                "estimated_duration_seconds": showcase_scene["estimated_duration_seconds"],
-                "recipe_id": showcase_scene.get("recipe_id"),
-                "engine_hint": showcase_scene.get("engine_hint"),
-                "entrance": showcase_scene.get("entrance"),
-                "exit_": showcase_scene.get("exit_"),
-                "recipe_payload": showcase_scene.get("recipe_payload", {}),
-            }
-            # Strip None keys for deterministic serialization
-            scenes.append(
-                {k: v for k, v in scene_entry.items() if v is not None}
-            )
-            scene_idx += 1
+            recipe_id = showcase_scene.get("recipe_id")
+            plan = get_recipe_scene_plan(recipe_id, content) if recipe_id else None
+
+            if plan is not None:
+                # ── Multi-scene expansion ─────────────────────────────
+                recipe_enrichment = build_recipe_payload(content, recipe_id)
+                for i, ps in enumerate(plan):
+                    script_parts.append(
+                        f"Next, {ps['scene_type'].replace('-', ' ')} "
+                        f"highlight: {ps['text']}."
+                    )
+                    scene_entry: dict[str, Any] = {
+                        "title": ps["title"],
+                        "text": script_parts[-1],
+                        "scene_type": ps["scene_type"],
+                        "estimated_duration_seconds": ps["estimated_duration_seconds"],
+                        "recipe_id": recipe_id,
+                        "engine_hint": recipe_enrichment.get("engine_hint"),
+                        "entrance": ps.get("entrance"),
+                        "exit_": ps.get("exit_"),
+                        "recipe_payload": recipe_enrichment.get("recipe_payload", {}),
+                        "scene_index": i,
+                        "total_scenes": len(plan),
+                    }
+                    scenes.append(
+                        {k: v for k, v in scene_entry.items() if v is not None}
+                    )
+                    scene_idx += 1
+            else:
+                # ── Single-scene fallback (existing behavior) ─────────
+                script_parts.append(
+                    f"Next, {showcase_scene['scene_type'].replace('-', ' ')} "
+                    f"highlight: {showcase_scene['text'][:80]}."
+                )
+                scene_entry = {
+                    "title": showcase_scene["title"],
+                    "text": script_parts[-1],
+                    "scene_type": showcase_scene["scene_type"],
+                    "estimated_duration_seconds": showcase_scene["estimated_duration_seconds"],
+                    "recipe_id": showcase_scene.get("recipe_id"),
+                    "engine_hint": showcase_scene.get("engine_hint"),
+                    "entrance": showcase_scene.get("entrance"),
+                    "exit_": showcase_scene.get("exit_"),
+                    "recipe_payload": showcase_scene.get("recipe_payload", {}),
+                }
+                scenes.append(
+                    {k: v for k, v in scene_entry.items() if v is not None}
+                )
+                scene_idx += 1
 
         if body:
             sentences = [s.strip() for s in body.replace("\n", " ").split(".") if s.strip()]

@@ -38,8 +38,14 @@ def test_different_recipes_produce_different_scene_graphs():
     assert sf_types != dc_types, (
         "screenflow and dual-chart produce identical scene types"
     )
-    assert "comparison" in sf_types
-    assert "chart" in dc_types
+    # screenflow plan includes "comparison" for demo scenes
+    assert "comparison" in sf_types, (
+        f"screenflow should have comparison, got {sf_types}"
+    )
+    # dual-chart plan includes "chart" for series scenes
+    assert "chart" in dc_types, (
+        f"dual-chart should have chart, got {dc_types}"
+    )
 
 
 def test_recipe_deterministic_scene_graph():
@@ -67,7 +73,12 @@ def test_no_recipe_vs_recipe_produces_different_graph():
 
 
 def test_recipe_entrance_changes_planned_transition():
-    """Recipe entrance from registry overrides default transition selection."""
+    """Recipe entrance from registry overrides default transition selection.
+
+    With multi-scene expansion, screenflow now has 4 scenes.
+    The first demo scene (index 1) should have slide_in_right.
+    The title scene (index 0) should have fade.
+    """
     clear_cache()
     writer = ScriptWriter()
     planner = ScenePlanner()
@@ -76,17 +87,25 @@ def test_recipe_entrance_changes_planned_transition():
     plan = planner.plan_scenes(script, [])
     scene_types = [s["type"] for s in plan["scenes"]]
     assert "comparison" in scene_types
-    # Find the recipe-enriched scene
+    # Find the recipe-enriched scenes
     enrich = [s for s in plan["scenes"] if s.get("recipe_id") == "screenflow"]
-    assert len(enrich) == 1
-    # screenflow recipe entrance = "slide_in_right"
-    assert enrich[0]["transition_in"] == "slide_in_right", (
-        f"Expected slide_in_right, got {enrich[0]['transition_in']}"
+    assert len(enrich) == 4, f"Expected 4 screenflow scenes, got {len(enrich)}"
+    # First scene fades (title intro)
+    assert enrich[0]["transition_in"] == "fade", (
+        f"Expected fade for title, got {enrich[0]['transition_in']}"
+    )
+    # Second scene is the first demo -> slide_in_right from plan
+    assert enrich[1]["transition_in"] == "slide_in_right", (
+        f"Expected slide_in_right for demo, got {enrich[1]['transition_in']}"
     )
 
 
 def test_recipe_exit_appears_in_plan():
-    """Recipe exit from registry flows through planner."""
+    """Recipe exit from registry flows through planner and multi-scene plan.
+
+    With multi-scene expansion, device-rise has 3 scenes.
+    The last scene (screen highlight) should have device_fall_out exit.
+    """
     clear_cache()
     writer = ScriptWriter()
     planner = ScenePlanner()
@@ -94,9 +113,14 @@ def test_recipe_exit_appears_in_plan():
     script = writer.write_script(_content("device-rise"))
     plan = planner.plan_scenes(script, [])
     enrich = [s for s in plan["scenes"] if s.get("recipe_id") == "device-rise"]
-    assert len(enrich) == 1
-    assert enrich[0]["transition_out"] == "device_fall_out", (
-        f"Expected device_fall_out, got {enrich[0]['transition_out']}"
+    assert len(enrich) == 3, f"Expected 3 device-rise scenes, got {len(enrich)}"
+    # Last scene is "Screen Highlight" with device_fall_out exit
+    assert enrich[-1]["transition_out"] == "device_fall_out", (
+        f"Expected device_fall_out on last scene, got {enrich[-1]['transition_out']}"
+    )
+    # Middle scene is "Device Rise" with device_rise_in entrance
+    assert enrich[1]["transition_in"] == "device_rise_in", (
+        f"Expected device_rise_in on rise scene, got {enrich[1]['transition_in']}"
     )
 
 
@@ -161,7 +185,9 @@ def test_recipe_engine_override():
 def test_four_recipes_produce_distinct_outcomes():
     """Each of the 4 showcase recipes produces a unique orchestration signature.
 
-    The signature is (scene_type, engine, entrance) — all 4 must be distinct.
+    Signature is (scene_count, scene_types_tuple, primary_engine) —
+    all 4 must be distinct. Multi-scene recipes produce more scenes and
+    different type sequences than single-scene ones.
     """
     clear_cache()
     writer = ScriptWriter()
@@ -175,10 +201,21 @@ def test_four_recipes_produce_distinct_outcomes():
         script = writer.write_script(_content(recipe_kind))
         plan = planner.plan_scenes(script, [])
         enrich = [s for s in plan["scenes"] if s.get("recipe_id") == recipe_kind]
-        assert len(enrich) == 1, f"Missing recipe scene for {recipe_kind}"
-        s = enrich[0]
-        sig = (s["type"], s.get("engine_hint"), s["transition_in"], s["transition_out"])
+        assert len(enrich) > 0, f"Missing recipe scene for {recipe_kind}"
+        # Signature captures count, types, and primary engine hint
+        sig = (
+            len(enrich),
+            tuple(s["type"] for s in enrich),
+            enrich[0].get("engine_hint"),
+        )
         signatures[recipe_kind] = sig
+
+    # screenflow=4 scenes, dual-chart=4, device-rise=3, audio-spectrum=1
+    counts = {k: v[0] for k, v in signatures.items()}
+    assert counts["screenflow"] == 4
+    assert counts["dual-chart"] == 4
+    assert counts["device-rise"] == 3
+    assert counts["audio-spectrum"] == 1
 
     # All 4 signatures must be unique
     assert len(set(signatures.values())) == 4, (
