@@ -23,8 +23,8 @@ const JOB_SEED: Job[] = [
       { id: 'sa_4', name: 'Review Gate L0', engine: 'review', task: 'Check mixed-engine coherence', status: 'pending', startedAt: null, completedAt: null, durationMs: null, error: null, tokens: 0 },
     ],
     scenes: [
-      { id: 'scene_1', kind: 'title', engine: 'remotion', status: 'completed', reviewIssues: 0, retryCount: 0 },
-      { id: 'scene_2', kind: 'code', engine: 'remotion', status: 'completed', reviewIssues: 0, retryCount: 0 },
+      { id: 'scene_1', kind: 'title', engine: 'remotion', status: 'completed', reviewIssues: 0, retryCount: 0, thumbnailUrl: '/api/artifacts/job_001/scenes/scene_1/thumbnail', frameUrl: '/api/artifacts/job_001/scenes/scene_1/frame', reportUrl: '/api/artifacts/job_001/scenes/scene_1/report' },
+      { id: 'scene_2', kind: 'code', engine: 'remotion', status: 'completed', reviewIssues: 0, retryCount: 0, thumbnailUrl: '/api/artifacts/job_001/scenes/scene_2/thumbnail', frameUrl: '/api/artifacts/job_001/scenes/scene_2/frame', reportUrl: '/api/artifacts/job_001/scenes/scene_2/report' },
       { id: 'scene_3', kind: 'diff', engine: 'remotion', status: 'rendering', reviewIssues: 1, retryCount: 0 },
       { id: 'scene_4', kind: 'bullets', engine: 'remotion', status: 'pending', reviewIssues: 0, retryCount: 0 },
     ],
@@ -84,8 +84,8 @@ const JOB_SEED: Job[] = [
       { id: 'sa_9', name: 'Auto-Repair', engine: 'repair', task: 'Fix overlap in scene_10', status: 'failed', startedAt: ago(90_000), completedAt: ago(50_000), durationMs: 40000, error: 'Retry budget exhausted', tokens: 0 },
     ],
     scenes: [
-      { id: 'scene_9', kind: 'comparison', engine: 'remotion', status: 'completed', reviewIssues: 0, retryCount: 0 },
-      { id: 'scene_10', kind: 'diagram', engine: 'manim', status: 'failed', reviewIssues: 3, retryCount: 3 },
+      { id: 'scene_9', kind: 'comparison', engine: 'remotion', status: 'completed', reviewIssues: 0, retryCount: 0, thumbnailUrl: '/api/artifacts/job_004/scenes/scene_9/thumbnail', frameUrl: '/api/artifacts/job_004/scenes/scene_9/frame', reportUrl: '/api/artifacts/job_004/scenes/scene_9/report' },
+      { id: 'scene_10', kind: 'diagram', engine: 'manim', status: 'failed', reviewIssues: 3, retryCount: 3, thumbnailUrl: '/api/artifacts/job_004/scenes/scene_10/thumbnail', frameUrl: '/api/artifacts/job_004/scenes/scene_10/frame' },
     ],
     events: [
       makeSSEEvent('job_004', 'job.started', { title: 'PR #156 — Fix layout overlap' }),

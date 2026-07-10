@@ -1,5 +1,7 @@
 /* Job types — mirrors Python backend (StateMachine, Pipeline) + SSE events */
 
+export type ArtifactState = 'pending' | 'generating' | 'ready' | 'error' | 'missing'
+
 export type JobStatus = 'queued' | 'running' | 'completed' | 'failed' | 'cancelled'
 
 export type JobStage =
@@ -29,6 +31,9 @@ export interface SceneInfo {
   thumbnailUrl?: string
   frameUrl?: string
   reportUrl?: string
+  /** State-aware artifact status (when backend provides it) */
+  artifactState?: ArtifactState
+  artifactError?: string
 }
 
 export interface Job {

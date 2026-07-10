@@ -3,8 +3,29 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { GitBranch, FileText, Hash, FolderOpen, Film } from "lucide-react";
+import { useState } from "react";
 
 interface Props { provenance: ProvenanceGraph }
+
+function ProvenanceSceneThumb({ src }: { src: string | null }) {
+  const [err, setErr] = useState(false)
+  if (!src || err) return <span className="text-[10px] text-muted-foreground">—</span>
+  return (
+    <div className="h-10 w-18 rounded overflow-hidden border border-border bg-muted shrink-0">
+      <img
+        src={src}
+        alt="scene preview"
+        className="w-full h-full object-cover"
+        onError={() => setErr(true)}
+      />
+    </div>
+  )
+}
+
+/** Derive thumbnail URL from scene_path */
+function thumbFromPath(path: string): string | null {
+  return path.replace(/\.mp4$/, ".thumb.jpg")
+}
 
 export function ReportProvenanceTab({ provenance }: Props) {
   return (
@@ -45,6 +66,7 @@ export function ReportProvenanceTab({ provenance }: Props) {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-[72px]">Preview</TableHead>
                 <TableHead>Scene ID</TableHead>
                 <TableHead>Kind</TableHead>
                 <TableHead>Engine</TableHead>
@@ -56,6 +78,9 @@ export function ReportProvenanceTab({ provenance }: Props) {
             <TableBody>
               {provenance.scenes.map((s) => (
                 <TableRow key={s.id}>
+                  <TableCell>
+                    <ProvenanceSceneThumb src={thumbFromPath(s.scene_path)} />
+                  </TableCell>
                   <TableCell className="font-medium text-xs">{s.id}</TableCell>
                   <TableCell>{s.kind}</TableCell>
                   <TableCell><Badge variant="outline" className="text-[10px]">{s.engine}</Badge></TableCell>

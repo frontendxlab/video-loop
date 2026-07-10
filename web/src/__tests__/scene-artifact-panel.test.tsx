@@ -43,42 +43,54 @@ describe('SceneArtifactPanel', () => {
     expect(screen.getByText('code')).toBeDefined()
   })
 
-  it('shows no thumbnail fallback when no artifact URLs', () => {
-    render(<SceneArtifactPanel scene={makeScene()} jobId="job_001" onClose={onClose} />)
-    expect(screen.getByText('No thumbnail')).toBeDefined()
+  it('shows generating state for rendering scene (no artifactState)', () => {
+    render(<SceneArtifactPanel scene={makeScene({ status: 'rendering' })} jobId="job_001" onClose={onClose} />)
+    // Two previews (thumbnail + frame) — use getAllByText
+    expect(screen.getAllByText('Generating...').length).toBe(2)
+    expect(screen.getAllByText('Render in progress').length).toBe(2)
   })
 
-  it('shows no frame fallback when no artifact URLs', () => {
-    render(<SceneArtifactPanel scene={makeScene()} jobId="job_001" onClose={onClose} />)
-    expect(screen.getByText('No frame sample')).toBeDefined()
+  it('shows generating state for pending scene (no artifactState)', () => {
+    render(<SceneArtifactPanel scene={makeScene({ status: 'pending' })} jobId="job_001" onClose={onClose} />)
+    expect(screen.getAllByText('Generating...').length).toBe(2)
   })
 
-  it('shows load report button when no reportUrl', () => {
-    render(<SceneArtifactPanel scene={makeScene()} jobId="job_001" onClose={onClose} />)
-    expect(screen.getByText('Load Report')).toBeDefined()
+  it('shows artifact error for failed scene (no artifactState)', () => {
+    render(<SceneArtifactPanel scene={makeScene({ status: 'failed' })} jobId="job_001" onClose={onClose} />)
+    expect(screen.getAllByText('Artifact unavailable').length).toBe(2)
+    expect(screen.getAllByText('Generation failed').length).toBe(2)
   })
 
-  it('renders thumbnail img when thumbnailUrl provided', () => {
-    render(<SceneArtifactPanel scene={makeScene({ thumbnailUrl: '/fake/thumb.jpg' })} jobId="job_001" onClose={onClose} />)
-    const img = screen.getByAltText('scene_test thumbnail') as HTMLImageElement
+  it('shows artifact error with custom message from artifactError', () => {
+    render(<SceneArtifactPanel scene={makeScene({ status: 'failed', artifactState: 'error', artifactError: 'Render timeout after 30s' })} jobId="job_001" onClose={onClose} />)
+    expect(screen.getAllByText('Artifact unavailable').length).toBe(2)
+    expect(screen.getAllByText('Render timeout after 30s').length).toBe(2)
+  })
+
+  it('shows not-available state for completed scene without URLs', () => {
+    render(<SceneArtifactPanel scene={makeScene({ status: 'completed' })} jobId="job_001" onClose={onClose} />)
+    expect(screen.getAllByText('Not available yet').length).toBe(2)
+  })
+
+  it('renders thumbnail img when thumbnailUrl provided with artifactState ready', () => {
+    render(<SceneArtifactPanel scene={makeScene({ thumbnailUrl: '/fake/thumb.jpg', artifactState: 'ready' })} jobId="job_001" onClose={onClose} />)
+    const img = screen.getByAltText('scene_test Thumbnail') as HTMLImageElement
     expect(img).toBeDefined()
     expect(img.src).toContain('/fake/thumb.jpg')
   })
 
-  it('renders frame img when frameUrl provided', () => {
-    render(<SceneArtifactPanel scene={makeScene({ frameUrl: '/fake/frame.png' })} jobId="job_001" onClose={onClose} />)
-    const img = screen.getByAltText('scene_test frame') as HTMLImageElement
+  it('renders frame img when frameUrl provided with artifactState ready', () => {
+    render(<SceneArtifactPanel scene={makeScene({ frameUrl: '/fake/frame.png', artifactState: 'ready' })} jobId="job_001" onClose={onClose} />)
+    const img = screen.getByAltText('scene_test Sampled Frame') as HTMLImageElement
     expect(img).toBeDefined()
     expect(img.src).toContain('/fake/frame.png')
   })
 
-  it('falls back to generated URLs when only jobId given', () => {
-    /* With mocks returning undefined, both artifact URLs fail open */
-    render(<SceneArtifactPanel scene={makeScene()} jobId="job_007" onClose={onClose} />)
-    const imgs = screen.queryAllByRole('img')
-    expect(imgs.length).toBe(0)
-    expect(screen.getByText('No thumbnail')).toBeDefined()
-    expect(screen.getByText('No frame sample')).toBeDefined()
+  it('shows thumbnail from URL even on failed scene with artifactState ready', () => {
+    render(<SceneArtifactPanel scene={makeScene({ status: 'failed', thumbnailUrl: '/fake/thumb.jpg', artifactState: 'ready' })} jobId="job_001" onClose={onClose} />)
+    const img = screen.getByAltText('scene_test Thumbnail') as HTMLImageElement
+    expect(img).toBeDefined()
+    expect(img.src).toContain('/fake/thumb.jpg')
   })
 
   it('calls onClose when close button clicked', () => {

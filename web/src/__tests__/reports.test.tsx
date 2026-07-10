@@ -215,4 +215,39 @@ describe('ReportScenesTab', () => {
     render(<ReportScenesTab scenes={baseScenes} />)
     expect(screen.getByText('Per-Scene Reports (2)')).toBeDefined()
   })
+
+  it('renders preview column header', () => {
+    render(<ReportScenesTab scenes={baseScenes} />)
+    expect(screen.getByText('Preview')).toBeDefined()
+  })
+
+  it('renders scene preview thumbnails from scene_path', () => {
+    render(<ReportScenesTab scenes={baseScenes} />)
+    const imgs = screen.getAllByRole('img')
+    // Each scene with .mp4 path gets a thumbnail img
+    imgs.forEach(img => {
+      expect(img.getAttribute('src')).toMatch(/\.thumb\.jpg$/)
+    })
+  })
+
+  it('does not render preview img when scene_path missing', () => {
+    const noPathScenes = baseScenes.map(s => ({ ...s, scene_path: '' }))
+    render(<ReportScenesTab scenes={noPathScenes} />)
+    const imgs = screen.queryAllByRole('img')
+    expect(imgs.length).toBe(0)
+  })
+
+  it('renders preview column in provenance scene lineage', () => {
+    render(<ReportProvenanceTab provenance={baseProvenance} />)
+    expect(screen.getByText('Preview')).toBeDefined()
+  })
+
+  it('renders scene preview thumbnails in provenance', () => {
+    render(<ReportProvenanceTab provenance={baseProvenance} />)
+    const imgs = screen.getAllByRole('img')
+    expect(imgs.length).toBeGreaterThanOrEqual(2)
+    imgs.forEach(img => {
+      expect(img.getAttribute('src')).toMatch(/\.thumb\.jpg$/)
+    })
+  })
 })
