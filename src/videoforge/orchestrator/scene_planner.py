@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from videoforge.orchestrator.recipe_payload import build_recipe_payload
+
 TRANSITIONS = [
     "fade",
     "slide-left",
@@ -101,6 +103,180 @@ class ScenePlanner:
             "fps": fps,
             "resolution": resolution,
             "scenes": planned_scenes,
+        }
+
+    # ── Template-based scene graph generation ─────────────────────
+
+    def plan_from_template(
+        self,
+        template_id: str,
+        content: dict[str, Any],
+        audio_metadata: list[dict[str, Any]] | None = None,
+        **overrides: Any,
+    ) -> dict[str, Any]:
+        """Generate scene graph directly from a template.
+
+        Unlike plan_scenes() which consumes script-writer output, this
+        method works directly with a template from the registry —
+        expanding multi-scene plans, assigning durations, transitions,
+        and engine hints from the template definition.
+
+        Args:
+            template_id: Template identifier from template_registry.
+            content: User content dict (showcase fields, body, etc).
+            audio_metadata: Optional audio timing data (unused, for API compat).
+            **overrides: Override template defaults:
+                fps, resolution, duration_seconds, entrance, exit_.
+
+        Returns:
+            Planned scene dict with scenes[], fps, resolution.
+        """
+        from videoforge.orchestrator.template_registry import get_template
+
+        template = get_template(template_id)
+        if template is None:
+            raise ValueError(f"Unknown template: {template_id}")
+
+        enrichment = build_recipe_payload(content, template_id)
+
+        plan = template.expand(content)
+
+        fps = overrides.get("fps", 30)
+        resolution = overrides.get("resolution", [1920, 1080])
+
+        planned_scenes: list[dict[str, Any]] = []
+        current_frame = 0
+
+        if plan is not None:
+            # ── Multi-scene expansion ──────────────────────────────
+            for i, ps in enumerate(plan):
+                duration_seconds = ps.get("estimated_duration_seconds", 4.0)
+                duration_frames = int(duration_seconds * fps)
+                scene_entry: dict[str, Any] = {
+                    "id": len(planned_scenes) + 1,
+                    "type": ps["scene_type"],
+                    "duration_seconds": duration_seconds,
+                    "duration_frames": duration_frames,
+                    "start_frame": current_frame,
+                    "title": ps["title"],
+                    "text": ps["text"],
+                    "transition_in": (
+                        ps.get("entrance")
+                        or enrichment.get("entrance")
+                        or "fade"
+                    ),
+                    "transition_out": (
+                        ps.get("exit_")
+                        or enrichment.get("exit_")
+                        or "none"
+                    ),
+                    "template_id": template_id,
+                    "engine_hint": enrichment.get(
+                        "engine_hint", template.preferred_engine
+                    ),
+                    "recipe_payload": enrichment.get("recipe_payload", {}),
+                    "scene_index": i,
+                    "total_scenes": len(plan),
+                }
+                planned_scenes.append(scene_entry)
+                current_frame += duration_frames
+        else:
+            # ── Single-scene fallback ──────────────────────────────
+            duration_seconds = overrides.get("duration_seconds", 6.0)
+            duration_frames = int(duration_seconds * fps)
+            scene_entry: dict[str, Any] = {
+                "id": 1,
+                "type": template.scene_kind,
+                "duration_seconds": duration_seconds,
+                "duration_frames": duration_frames,
+                "start_frame": 0,
+                "title": template.name,
+                "text": (
+                    content.get("body", "")[:200]
+                    or f"Showcasing {template.name}"
+                ),
+                "transition_in": (
+                    overrides.get("entrance")
+                    or enrichment.get("entrance")
+                    or template.entrance
+                ),
+                "transition_out": (
+                    overrides.get("exit_")
+                    or enrichment.get("exit_")
+                    or template.exit
+                ),
+                "template_id": template_id,
+                "engine_hint": enrichment.get(
+                    "engine_hint", template.preferred_engine
+                ),
+                "recipe_payload": enrichment.get("recipe_payload", {}),
+            }
+            planned_scenes.append(scene_entry)
+
+        return {
+            "version": 1,
+            "video_type": "TEMPLATE",
+            "fps": fps,
+            "resolution": resolution,
+            "scenes": planned_scenes,
+        }
+
+    def plan_from_templates(
+        self,
+        template_map: dict[str, str],
+        content: dict[str, Any],
+        audio_metadata: list[dict[str, Any]] | None = None,
+        **overrides: Any,
+    ) -> dict[str, Any]:
+        """Combine multiple templates into a single cohesive video plan.
+
+        Each template in the map generates its scene graph. All scenes
+        are concatenated with contiguous frame numbering and section
+        labels for downstream assembly.
+
+        Args:
+            template_map: Dict mapping section names to template ids.
+                Example: {"intro": "hero-intro", "body": "screenflow",
+                          "outro": "overlay-cta"}.
+            content: User content dict (shared across all templates).
+            audio_metadata: Optional audio timing data.
+            **overrides: Global overrides (fps, resolution) or
+                per-section overrides nested by section name:
+                plan_from_templates({...}, content,
+                                    fps=30,
+                                    body={"duration_seconds": 8.0})
+
+        Returns:
+            Planned scene dict with combined scenes[] from all templates.
+        """
+        all_scenes: list[dict[str, Any]] = []
+        fps = overrides.get("fps", 30)
+        resolution = overrides.get("resolution", [1920, 1080])
+        current_frame = 0
+
+        for section_name, template_id in template_map.items():
+            section_overrides = overrides.get(section_name, {})
+            section = self.plan_from_template(
+                template_id,
+                content,
+                audio_metadata,
+                fps=fps,
+                resolution=resolution,
+                **section_overrides,
+            )
+            for s in section["scenes"]:
+                s["section"] = section_name
+                s["start_frame"] = current_frame
+                s["id"] = len(all_scenes) + 1
+                current_frame += s["duration_frames"]
+                all_scenes.append(s)
+
+        return {
+            "version": 1,
+            "video_type": "MULTI_TEMPLATE",
+            "fps": fps,
+            "resolution": resolution,
+            "scenes": all_scenes,
         }
 
     def _select_transition(self, index: int, scene_type: str,
