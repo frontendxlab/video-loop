@@ -527,8 +527,9 @@ class TestCreateJobEndpoint:
         job_id = resp.json()["jobId"]
         detail = client.get(f"/api/jobs/{job_id}")
         assert detail.status_code == 200
-        assert detail.json()["status"] == "queued"
-        assert len(detail.json()["events"]) == 3
+        # Background processing kicks off immediately — status transitions to running
+        assert detail.json()["status"] in ("queued", "running")
+        assert len(detail.json()["events"]) >= 3
 
 
 # ─── Provider/Model override in job creation ────────────────────────────
@@ -619,6 +620,239 @@ class TestJobProviderOverride:
         first_event = detail["events"][0]
         assert first_event["payload"]["effectiveProvider"] == "anthropic"
         assert first_event["payload"]["effectiveModel"] == "claude-sonnet-4-20250514"
+
+
+# ─── Background pipeline processing ─────────────────────────────────────
+
+
+class TestBackgroundProcessing:
+    """Job transitions through pipeline stages after creation."""
+
+    def test_create_job_transitions_to_running(self):
+        """Background task kicks off — job status changes from queued."""
+        _clear_store()
+        app = create_app()
+        client = TestClient(app)
+        resp = client.post("/api/jobs", json=GRILL_PAYLOAD)
+        job_id = resp.json()["jobId"]
+
+        # Give background task time to start
+        import time
+        time.sleep(0.3)
+
+        detail = client.get(f"/api/jobs/{job_id}").json()
+        # Should have moved past "queued" (running or further)
+        assert detail["status"] != "queued"
+
+    def test_create_job_emits_stage_events(self):
+        """Pipeline stages emit stage events visible in job detail."""
+        _clear_store()
+        app = create_app()
+        client = TestClient(app)
+        resp = client.post("/api/jobs", json=GRILL_PAYLOAD)
+        job_id = resp.json()["jobId"]
+
+        import time
+        time.sleep(0.5)
+
+        detail = client.get(f"/api/jobs/{job_id}").json()
+        events = detail.get("events", [])
+        stage_events = [e for e in events if e.get("type") == "job.stage"]
+        # Should have initial events + at least one pipeline stage event
+        assert len(stage_events) >= 2  # grill stage (from create) + plan stage (from runner)
+
+    def test_create_job_with_run_override_starts_processing(self):
+        """Run override doesn't block background processing."""
+        _clear_store()
+        app = create_app()
+        client = TestClient(app)
+        payload = {**GRILL_PAYLOAD, "runOverride": {"provider": "anthropic", "model": "claude-sonnet-4-20250514"}}
+        resp = client.post("/api/jobs", json=payload)
+        assert resp.status_code == 200
+        job_id = resp.json()["jobId"]
+
+        import time
+        time.sleep(0.3)
+
+        detail = client.get(f"/api/jobs/{job_id}").json()
+        assert detail["status"] != "queued"
+
+    def test_create_job_with_grill_session_starts_processing(self):
+        """Session-based job also kicks off background pipeline."""
+        _clear_store()
+        from videoforge.api.jobs import _grill_sessions
+        _grill_sessions.clear()
+        app = create_app()
+        client = TestClient(app)
+        start = client.post("/api/jobs/grill/start", json={"prompt": "Explain Docker networking"}).json()
+        sid = start["sessionId"]
+
+        # Complete session
+        client.post("/api/jobs/grill/turn", json={"sessionId": sid, "answer": "Devs", "done": True}).json()
+
+        resp = client.post("/api/jobs", json={
+            "prompt": "Explain Docker networking",
+            "options": {"voice": "alba", "provider": "9router", "model": "ocg/deepseek-v4-flash", "maxDuration": 180, "fps": 30},
+            "grillSessionId": sid,
+        })
+        assert resp.status_code == 200
+        job_id = resp.json()["jobId"]
+
+        import time
+        time.sleep(0.3)
+
+        detail = client.get(f"/api/jobs/{job_id}").json()
+        assert detail["status"] != "queued"
+
+    def test_background_processing_completes_job(self, monkeypatch):
+        """Pipeline runner completes — job reaches 'completed' status."""
+        from videoforge.orchestrator.runner import PipelineRunner
+        import time
+
+        _clear_store()
+
+        # Mock run_pipeline to complete instantly (no sleeps)
+        async def fake_run(self, topic="", scenes_json="", voice="alba", tts_url=""):
+            if self.stage_callback:
+                self.stage_callback("grill", "running", 0.1, "")
+                self.stage_callback("grill", "complete", 1.0, "")
+                self.stage_callback("plan", "running", 0.1, "")
+                self.stage_callback("plan", "complete", 1.0, "")
+                self.stage_callback("render", "running", 0.1, "")
+                self.stage_callback("render", "complete", 1.0, "")
+                self.stage_callback("done", "complete", 1.0, "")
+
+        monkeypatch.setattr(PipelineRunner, "run_pipeline", fake_run)
+        # Disable ffmpeg check for output generation
+        monkeypatch.setattr("videoforge.api.jobs.shutil.which", lambda _: None)
+
+        app = create_app()
+        client = TestClient(app)
+        resp = client.post("/api/jobs", json=GRILL_PAYLOAD)
+        job_id = resp.json()["jobId"]
+
+        time.sleep(0.3)
+
+        detail = client.get(f"/api/jobs/{job_id}").json()
+        assert detail["status"] == "completed"
+        assert detail["stage"] == "done"
+        assert detail["progressPct"] == 100
+        assert len(detail.get("artifacts", [])) >= 1
+        assert detail["artifacts"][0]["artifactType"] == "video/mp4"
+
+    def test_background_processing_creates_output_file(self, monkeypatch):
+        """Output video file is created at artifact path."""
+        from videoforge.orchestrator.runner import PipelineRunner
+        import time
+        from pathlib import Path
+
+        _clear_store()
+
+        async def fake_run(self, topic="", scenes_json="", voice="alba", tts_url=""):
+            if self.stage_callback:
+                self.stage_callback("grill", "running", 0.1, "")
+                self.stage_callback("grill", "complete", 1.0, "")
+                self.stage_callback("plan", "running", 0.1, "")
+                self.stage_callback("plan", "complete", 1.0, "")
+                self.stage_callback("render", "running", 0.1, "")
+                self.stage_callback("render", "complete", 1.0, "")
+                self.stage_callback("done", "complete", 1.0, "")
+
+        monkeypatch.setattr(PipelineRunner, "run_pipeline", fake_run)
+        # Disable ffmpeg so placeholder is written
+        monkeypatch.setattr("videoforge.api.jobs.shutil.which", lambda _: None)
+
+        app = create_app()
+        client = TestClient(app)
+        resp = client.post("/api/jobs", json=GRILL_PAYLOAD)
+        job_id = resp.json()["jobId"]
+
+        time.sleep(0.3)
+
+        detail = client.get(f"/api/jobs/{job_id}").json()
+        assert len(detail.get("artifacts", [])) >= 1
+        output_path = detail["artifacts"][0]["path"]
+        # Output file should exist
+        assert Path(output_path).exists(), f"Output file not found: {output_path}"
+        content = Path(output_path).read_text()
+        assert "simulated" in content or output_path.endswith(".mp4")
+
+    def test_background_processing_failure_sets_failed_status(self, monkeypatch):
+        """Pipeline failure sets job status to 'failed' with error."""
+        from videoforge.orchestrator.runner import PipelineRunner
+        import time
+
+        _clear_store()
+
+        async def fake_run_fail(self, topic="", scenes_json="", voice="alba", tts_url=""):
+            msg = "Simulated pipeline failure"
+            raise RuntimeError(msg)
+
+        monkeypatch.setattr(PipelineRunner, "run_pipeline", fake_run_fail)
+
+        app = create_app()
+        client = TestClient(app)
+        resp = client.post("/api/jobs", json=GRILL_PAYLOAD)
+        job_id = resp.json()["jobId"]
+
+        time.sleep(0.3)
+
+        detail = client.get(f"/api/jobs/{job_id}").json()
+        assert detail["status"] == "failed"
+        assert detail["error"] is not None
+        assert "Simulated pipeline failure" in detail["error"]
+
+    def test_background_processing_emits_completed_event(self, monkeypatch):
+        """JobCompleted event is emitted on successful pipeline execution."""
+        from videoforge.orchestrator.runner import PipelineRunner
+        import time
+
+        _clear_store()
+
+        async def fake_run(self, topic="", scenes_json="", voice="alba", tts_url=""):
+            if self.stage_callback:
+                self.stage_callback("done", "complete", 1.0, "")
+
+        monkeypatch.setattr(PipelineRunner, "run_pipeline", fake_run)
+        monkeypatch.setattr("videoforge.api.jobs.shutil.which", lambda _: None)
+
+        app = create_app()
+        client = TestClient(app)
+        resp = client.post("/api/jobs", json=GRILL_PAYLOAD)
+        job_id = resp.json()["jobId"]
+
+        time.sleep(0.3)
+
+        detail = client.get(f"/api/jobs/{job_id}").json()
+        events = detail.get("events", [])
+        completed = [e for e in events if e.get("type") == "job.completed"]
+        assert len(completed) == 1
+        assert completed[0]["payload"]["finalVideo"] is not None
+
+    def test_background_processing_emits_failed_event(self, monkeypatch):
+        """JobFailed event is emitted on pipeline failure."""
+        from videoforge.orchestrator.runner import PipelineRunner
+        import time
+
+        _clear_store()
+
+        async def fake_run_fail(self, topic="", scenes_json="", voice="alba", tts_url=""):
+            raise RuntimeError("Kaboom")
+
+        monkeypatch.setattr(PipelineRunner, "run_pipeline", fake_run_fail)
+
+        app = create_app()
+        client = TestClient(app)
+        resp = client.post("/api/jobs", json=GRILL_PAYLOAD)
+        job_id = resp.json()["jobId"]
+
+        time.sleep(0.3)
+
+        detail = client.get(f"/api/jobs/{job_id}").json()
+        events = detail.get("events", [])
+        failed = [e for e in events if e.get("type") == "job.failed"]
+        assert len(failed) == 1
+        assert "Kaboom" in failed[0]["payload"]["error"]
 
 
 # ─── Error handling ─────────────────────────────────────────────────────
