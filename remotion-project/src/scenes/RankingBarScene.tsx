@@ -116,7 +116,7 @@ export function calcBarGrowProgress(frame: number, staggerDelay: number, fps: nu
 }
 
 export function calcBarHeight(value: number, maxValue: number, progress: number): number {
-  const target = Math.max(MIN_BAR_HEIGHT, (value / maxValue) * MAX_BAR_HEIGHT);
+  const target = Math.min(MAX_BAR_HEIGHT, Math.max(MIN_BAR_HEIGHT, (value / maxValue) * MAX_BAR_HEIGHT));
   return interpolate(progress, [0, 1], [MIN_BAR_HEIGHT, target], {
     easing: Easing.out(Easing.cubic),
     extrapolateRight: "clamp",
