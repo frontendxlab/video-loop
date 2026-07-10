@@ -45,10 +45,11 @@ export function FlowCanvasEdges({
         const tgt = nodePositions[edge.target]
         if (!src || !tgt) return null
 
-        const x1 = src.pos.x + src.size.w / 2
-        const y1 = src.pos.y + src.size.h
-        const x2 = tgt.pos.x + tgt.size.w / 2
-        const y2 = tgt.pos.y
+        // Coordinates relative to SVG origin (viewX, viewY)
+        const x1 = src.pos.x + src.size.w / 2 - viewX
+        const y1 = src.pos.y + src.size.h - viewY
+        const x2 = tgt.pos.x + tgt.size.w / 2 - viewX
+        const y2 = tgt.pos.y - viewY
 
         const cy = (y1 + y2) / 2
         const path = `M ${x1} ${y1} C ${x1} ${cy}, ${x2} ${cy}, ${x2} ${y2}`
@@ -59,11 +60,11 @@ export function FlowCanvasEdges({
             <path d={path} fill="none" stroke={color} strokeWidth={2} strokeOpacity={0.15} strokeLinecap="round" />
             {/* Main line */}
             <path d={path} fill="none" stroke={color} strokeWidth={1.5} strokeLinecap="round" />
-            {/* Arrowhead at target */}
+            {/* Arrowhead at target top */}
             <polygon
-              points="-4,-5 4,-5 0,0"
+              points="-5,-6 5,-6 0,0"
               fill={color}
-              transform={`translate(${x2},${y2}) rotate(90)`}
+              transform={`translate(${x2},${y2})`}
             />
             {edge.label && (
               <text
