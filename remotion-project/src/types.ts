@@ -2,6 +2,8 @@ import { z } from "zod";
 import { Hero3DSceneSchema } from "./scenes/Hero3DScene";
 import { ThreeSceneExampleSchema } from "./scenes/ThreeSceneExample";
 import { MapSceneSchema } from "./scenes/MapScene";
+import { CanvasCompositeSceneSchema } from "./scenes/CanvasCompositeScene";
+import { RankingBarSceneSchema } from "./scenes/RankingBarScene";
 
 export const TitleSceneSchema = z.object({
   type: z.literal("title"),
@@ -165,6 +167,7 @@ export const SceneSchema = z.discriminatedUnion("type", [
   AudioVizSceneSchema,
   ThreeSceneExampleSchema,
   MapSceneSchema,
+  CanvasCompositeSceneSchema,
 ]);
 
 export const AudioTrackSchema = z.object({
@@ -213,6 +216,8 @@ export type Hero3DSceneType = z.infer<typeof Hero3DSceneSchema>;
 export type AudioVizScene = z.infer<typeof AudioVizSceneSchema>;
 export type ThreeSceneExample = z.infer<typeof ThreeSceneExampleSchema>;
 export type MapSceneType = z.infer<typeof MapSceneSchema>;
+export type RankingBarSceneType = z.infer<typeof RankingBarSceneSchema>;
+export type CanvasCompositeScene = z.infer<typeof CanvasCompositeSceneSchema>;
 export type Scene = z.infer<typeof SceneSchema>;
 export type AudioTrack = z.infer<typeof AudioTrackSchema>;
 export type Caption = z.infer<typeof CaptionSchema>;

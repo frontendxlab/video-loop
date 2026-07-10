@@ -17,4 +17,6 @@ export { AudioVizScene, AudioVizSceneSchema } from "./AudioVizScene";
 export { ThreeSceneExample, ThreeSceneExampleSchema } from "./ThreeSceneExample";
 export { MapScene, MapSceneSchema } from "./MapScene";
 export { ScreenflowScene, ScreenflowSceneSchema } from "./ScreenflowScene";
+export { CanvasCompositeScene, CanvasCompositeSceneSchema } from "./CanvasCompositeScene";
+export { RankingBarScene, RankingBarSceneSchema, RankingBarItemSchema } from "./RankingBarScene";
 export type { WordTiming } from "../captions/wordTiming";

@@ -138,6 +138,88 @@ export const RemotionRoot: React.FC = () => {
           style: remotionStyleDefaults,
         }}
       />
+      <Composition
+        id="RankingBarComposition"
+        component={VideoComposition}
+        durationInFrames={240}
+        fps={30}
+        width={1920}
+        height={1080}
+        schema={InputPropsSchema}
+        defaultProps={{
+          title: "Top Games Ranking",
+          scenes: [{
+            type: "ranking-bar",
+            title: "Top Games Sold",
+            items: [
+              { rank: 1, label: "Minecraft", value: 300_000_000, color: "#22C55E" },
+              { rank: 2, label: "GTA V", value: 195_000_000, color: "#4A90D9" },
+              { rank: 3, label: "Tetris", value: 170_000_000, color: "#F59E0B" },
+              { rank: 4, label: "Wii Sports", value: 82_900_000, color: "#F87171" },
+              { rank: 5, label: "PUBG", value: 75_000_000, color: "#C4B5FD" },
+            ],
+            cameraPath: "fly-through",
+            showValues: true,
+            duration: 240,
+          }],
+          audioTracks: [],
+          captions: [],
+          voice: "alba",
+          style: remotionStyleDefaults,
+        }}
+      />
+      <Composition
+        id="CanvasCompositeGlitchVintage"
+        component={VideoComposition}
+        durationInFrames={150}
+        fps={30}
+        width={1920}
+        height={1080}
+        schema={InputPropsSchema}
+        defaultProps={{
+          title: "Canvas Composite — Glitch + Vintage",
+          scenes: [{
+            type: "canvas-composite" as const,
+            title: "Glitch+Vintage",
+            subtitle: "Canvas compositing demo",
+            layers: [
+              { type: "glitch" as const, intensity: 0.6, scanlineCount: 16, offsetMax: 10 },
+              { type: "vintage" as const, grainIntensity: 0.2, sepiaMix: 0.5, vignetteStrength: 0.3 },
+            ],
+            duration: 150,
+          }],
+          audioTracks: [],
+          captions: [],
+          voice: "alba",
+          style: remotionStyleDefaults,
+        }}
+      />
+      <Composition
+        id="CanvasCompositeMagnifierGlitch"
+        component={VideoComposition}
+        durationInFrames={150}
+        fps={30}
+        width={1920}
+        height={1080}
+        schema={InputPropsSchema}
+        defaultProps={{
+          title: "Canvas Composite — Magnifier + Glitch",
+          scenes: [{
+            type: "canvas-composite" as const,
+            title: "Magnifier+Lens",
+            subtitle: "Magnifying glass + glitch tear",
+            layers: [
+              { type: "magnifier" as const, radius: 120, zoom: 2.5, centerX: 0.5, centerY: 0.5 },
+              { type: "glitch" as const, intensity: 0.4, scanlineCount: 8, offsetMax: 6 },
+            ],
+            duration: 150,
+          }],
+          audioTracks: [],
+          captions: [],
+          voice: "alba",
+          style: remotionStyleDefaults,
+        }}
+      />
     </>
   );
 };

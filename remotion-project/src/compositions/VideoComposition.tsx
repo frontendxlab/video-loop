@@ -19,6 +19,8 @@ import { TimelineScene } from "../components/scenes/TimelineScene";
 import { KineticTextScene } from "../components/scenes/KineticTextScene";
 import { AudioVizScene } from "../scenes/AudioVizScene";
 import { MapScene } from "../scenes/MapScene";
+import { RankingBarScene } from "../scenes/RankingBarScene";
+import { CanvasCompositeScene } from "../scenes/CanvasCompositeScene";
 import { colors, fonts } from "../design-tokens";
 
 interface WordTimingData {
@@ -132,6 +134,10 @@ const SceneRenderer: React.FC<{ scene: SceneData; frameOffset: number }> = ({ sc
       return <AudioVizScene audioSrc={scene.audioSrc || ""} variant={(scene.variant as "waveform" | "spectrum") || "waveform"} barCount={scene.barCount || 64} duration={dur} wordTimestamps={ts} sceneStartFrame={sf} />;
     case "map-geo":
       return <MapScene centerLat={scene.centerLat ?? 0} centerLng={scene.centerLng ?? 0} zoom={scene.zoom ?? 5} style={(scene.style as "streets" | "satellite" | "dark") || "streets"} title={scene.title} markers={scene.markers || []} routes={scene.routes || []} duration={dur} wordTimestamps={ts} sceneStartFrame={sf} />;
+    case "ranking-bar":
+      return <RankingBarScene title={scene.title} items={(scene as any).items || []} cameraPath={(scene as any).cameraPath} showValues={(scene as any).showValues} duration={dur} />;
+    case "canvas-composite":
+      return <CanvasCompositeScene title={scene.title || ""} subtitle={scene.subtitle} layers={(scene as any).layers || []} duration={dur} wordTimestamps={ts} sceneStartFrame={sf} />;
     default:
       return (
         <AbsoluteFill style={{ background: colors.backgroundGradient, justifyContent: "center", alignItems: "center", color: colors.text, fontFamily: fonts.heading, fontSize: 32 }}>
