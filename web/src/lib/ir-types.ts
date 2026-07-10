@@ -15,6 +15,7 @@ export enum SceneKind {
   CHART = 'chart',
   TIMELINE = 'timeline',
   MAP3D = 'map3d',
+  MAP_GEO = 'map-geo',
   COMPARISON = 'comparison',
   QUOTE = 'quote',
   OUTRO = 'outro',

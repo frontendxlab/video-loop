@@ -15,6 +15,17 @@ const KIND_META: Record<SceneKind, { label: string; color: string }> = {
   [SceneKind.QUOTE]: { label: 'Quote', color: 'bg-yellow-500/20 text-yellow-300' },
   [SceneKind.OUTRO]: { label: 'Outro', color: 'bg-gray-500/20 text-gray-300' },
   [SceneKind.MINDMAP]: { label: 'Mind Map', color: 'bg-emerald-500/20 text-emerald-300' },
+  [SceneKind.DUAL_CHART]: { label: 'Dual Chart', color: 'bg-fuchsia-500/20 text-fuchsia-300' },
+  [SceneKind.THREE_SCENE]: { label: '3D Scene', color: 'bg-sky-500/20 text-sky-300' },
+  [SceneKind.SCREENFLOW]: { label: 'Screenflow', color: 'bg-lime-500/20 text-lime-300' },
+  [SceneKind.OVERLAY_CTA]: { label: 'Overlay CTA', color: 'bg-rose-500/20 text-rose-300' },
+  [SceneKind.AUDIO_REACTIVE]: { label: 'Audio Reactive', color: 'bg-cyan-500/20 text-cyan-300' },
+  [SceneKind.DOCUMENT_HIGHLIGHT]: { label: 'Doc Highlight', color: 'bg-yellow-500/20 text-yellow-300' },
+  [SceneKind.SVG_MORPH]: { label: 'SVG Morph', color: 'bg-purple-500/20 text-purple-300' },
+  [SceneKind.SHOWCASE]: { label: 'Showcase', color: 'bg-pink-500/20 text-pink-300' },
+  [SceneKind.SPLIT]: { label: 'Split', color: 'bg-orange-500/20 text-orange-300' },
+  [SceneKind.MOCKUP]: { label: 'Mockup', color: 'bg-slate-500/20 text-slate-300' },
+  [SceneKind.HERO]: { label: 'Hero', color: 'bg-red-500/20 text-red-300' },
 }
 
 const ENGINE_META: Record<Engine, { label: string; color: string }> = {

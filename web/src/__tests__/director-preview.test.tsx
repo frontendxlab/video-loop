@@ -21,6 +21,9 @@ describe('pickEngine', () => {
     [SceneKind.OUTRO, Engine.REMOTION], [SceneKind.MINDMAP, Engine.REMOTION],
     [SceneKind.CHART, Engine.MANIM], [SceneKind.TIMELINE, Engine.MANIM],
     [SceneKind.MAP3D, Engine.MANIM],
+    /* Showcase kinds */
+    [SceneKind.SHOWCASE, Engine.REMOTION], [SceneKind.SPLIT, Engine.REMOTION],
+    [SceneKind.MOCKUP, Engine.REMOTION], [SceneKind.HERO, Engine.REMOTION],
   ]
   for (const [kind, engine] of cases) {
     it(`routes ${kind} to ${engine}`, () => expect(pickEngine(makeScene({ kind }))).toBe(engine))
@@ -36,6 +39,10 @@ describe('getRoutingReason', () => {
   it('returns reason for code', () => expect(getRoutingReason(makeScene({ kind: SceneKind.CODE }))).toContain('Shiki'))
   it('returns reason for math_graph', () => expect(getRoutingReason(makeScene({ kind: SceneKind.DIAGRAM, payload: JSON.stringify({ layout: 'math_graph' }) }))).toContain('graph'))
   it('returns reason for interactive', () => expect(getRoutingReason(makeScene({ kind: SceneKind.DIAGRAM, payload: JSON.stringify({ interactive: true }) }))).toContain('CSS'))
+  it('returns reason for showcase', () => expect(getRoutingReason(makeScene({ kind: SceneKind.SHOWCASE }))).toContain('showcase'))
+  it('returns reason for split', () => expect(getRoutingReason(makeScene({ kind: SceneKind.SPLIT }))).toMatch(/split/i))
+  it('returns reason for mockup', () => expect(getRoutingReason(makeScene({ kind: SceneKind.MOCKUP }))).toContain('mockup'))
+  it('returns reason for hero', () => expect(getRoutingReason(makeScene({ kind: SceneKind.HERO }))).toContain('hero'))
 })
 
 describe('computeSceneHash', () => {
@@ -71,6 +78,13 @@ describe('SceneGraph', () => {
     const { container } = render(<SceneGraph scenes={[makeScene({ id: 'a' }), makeScene({ id: 'b' })]} selectedId="a" onSelect={() => {}} />)
     const items = container.querySelectorAll('[role="listitem"]')
     expect(items[0].className).toContain('border-primary'); expect(items[1].className).not.toContain('border-primary')
+  })
+  it('renders showcase kind badges', () => {
+    render(<SceneGraph scenes={[makeScene({ id: 's0', kind: SceneKind.SHOWCASE }), makeScene({ id: 's1', kind: SceneKind.SPLIT }), makeScene({ id: 's2', kind: SceneKind.MOCKUP }), makeScene({ id: 's3', kind: SceneKind.HERO })]} onSelect={() => {}} />)
+    expect(screen.getByText('Showcase')).toBeDefined()
+    expect(screen.getByText('Split')).toBeDefined()
+    expect(screen.getByText('Mockup')).toBeDefined()
+    expect(screen.getByText('Hero')).toBeDefined()
   })
 })
 
@@ -108,6 +122,100 @@ describe('SceneDetail', () => {
     fireEvent.click(screen.getByText('Load Report'))
     await screen.findByText('Report not yet generated')
   })
+
+  /* ─── New: Overlay stack ─── */
+  it('renders overlay stack section with layers', () => {
+    const overlayScene = makeScene({
+      overlay_stack: {
+        items: [
+          { id: 'ol_0', type: 'text', content: 'Title Overlay', position: { x: 100, y: 200 }, startFrame: 10, durationFrames: 60, opacity: 0.9, animation: 'fade_in' },
+          { id: 'ol_1', type: 'logo', content: '/logo.png', position: { x: 800, y: 50 }, startFrame: 0, durationFrames: 120, opacity: 0.5 },
+        ],
+      },
+    })
+    render(<SceneDetail scene={overlayScene} />)
+    expect(screen.getByText(/Overlay Stack/)).toBeInTheDocument()
+    expect(screen.getByText(/2 layers/)).toBeInTheDocument()
+    fireEvent.click(screen.getByText(/Overlay Stack/))
+    expect(screen.getByText('Title Overlay')).toBeInTheDocument()
+    expect(screen.getByText('text')).toBeInTheDocument()
+    expect(screen.getByText('logo')).toBeInTheDocument()
+    expect(screen.getByText(/fade_in/)).toBeInTheDocument()
+  })
+
+  it('shows overlay item position and frame info', () => {
+    const scene = makeScene({
+      overlay_stack: {
+        items: [
+          { id: 'ol_pos', type: 'shape', content: 'Box', position: { x: 50, y: 100 }, startFrame: 5, durationFrames: 30, opacity: 1.0 },
+        ],
+      },
+    })
+    render(<SceneDetail scene={scene} />)
+    fireEvent.click(screen.getByText(/Overlay Stack/))
+    expect(screen.getByText(/pos \(50,100\)/)).toBeInTheDocument()
+    expect(screen.getByText(/frame 5–35/)).toBeInTheDocument()
+    expect(screen.getByText(/opacity 100%/)).toBeInTheDocument()
+  })
+
+  /* ─── New: Motion hints ─── */
+  it('renders motion hints section', () => {
+    const scene = makeScene({
+      motion_hints: [
+        { type: 'entrance', animation: 'slide_up', durationMs: 500, easing: 'ease-out' },
+        { type: 'emphasis', animation: 'pulse', durationMs: 2000 },
+      ],
+    })
+    render(<SceneDetail scene={scene} />)
+    expect(screen.getByText(/Motion Hints/)).toBeInTheDocument()
+    expect(screen.getByText(/2/)).toBeInTheDocument()
+    fireEvent.click(screen.getByText(/Motion Hints/))
+    expect(screen.getByText('entrance')).toBeInTheDocument()
+    expect(screen.getByText('emphasis')).toBeInTheDocument()
+    expect(screen.getByText(/slide_up/)).toBeInTheDocument()
+    expect(screen.getByText(/pulse/)).toBeInTheDocument()
+  })
+
+  it('shows motion hint timing details', () => {
+    const scene = makeScene({
+      motion_hints: [
+        { type: 'entrance', animation: 'zoom_in', durationMs: 800, delayMs: 200, easing: 'cubic-bezier(0.16, 1, 0.3, 1)' },
+      ],
+    })
+    render(<SceneDetail scene={scene} />)
+    fireEvent.click(screen.getByText(/Motion Hints/))
+    expect(screen.getByText(/800ms/)).toBeInTheDocument()
+    expect(screen.getByText(/200ms delay/)).toBeInTheDocument()
+    expect(screen.getByText(/cubic-bezier/)).toBeInTheDocument()
+  })
+
+  /* ─── New: Artifact placeholder states ─── */
+  it('renders generating artifact state', () => {
+    const scene = makeScene({
+      artifacts: { thumbnail: { state: 'generating' }, frame: { state: 'pending' }, report: { state: 'missing' } },
+    })
+    render(<SceneDetail scene={scene} jobId="job_001" />)
+    expect(screen.getByText('Generating frame...')).toBeInTheDocument()
+    expect(screen.getByText('Render in progress')).toBeInTheDocument()
+  })
+
+  it('renders error artifact state with message', () => {
+    const scene = makeScene({
+      artifacts: { thumbnail: { state: 'error', errorMessage: 'Render timeout' } },
+    })
+    render(<SceneDetail scene={scene} jobId="job_001" />)
+    expect(screen.getByText('Frame generation failed')).toBeInTheDocument()
+    expect(screen.getByText('Render timeout')).toBeInTheDocument()
+  })
+
+  it('renders ready artifact state shows image', () => {
+    const scene = makeScene({
+      artifacts: { thumbnail: { state: 'ready' } },
+    })
+    render(<SceneDetail scene={scene} jobId="job_001" />)
+    const imgs = screen.getAllByRole('img')
+    expect(imgs.length).toBeGreaterThanOrEqual(1)
+  })
 })
 
 describe('DirectorPreview', () => {
@@ -129,5 +237,17 @@ describe('DirectorPreview', () => {
     const { container } = render(<DirectorPreview project={makeProject([makeScene({ id: 'scene_a' }), makeScene({ id: 'scene_b' })])} />)
     fireEvent.click(container.querySelectorAll('[role="listitem"]')[1])
     expect(Array.from(container.querySelectorAll('h3')).find(h => h.textContent?.startsWith('scene_b'))).toBeDefined()
+  })
+  it('renders showcase kind scenes', () => {
+    render(<DirectorPreview project={makeProject([makeScene({ id: 'show', kind: SceneKind.SHOWCASE }), makeScene({ id: 'spl', kind: SceneKind.SPLIT }), makeScene({ id: 'mck', kind: SceneKind.MOCKUP }), makeScene({ id: 'hr', kind: SceneKind.HERO })])} />)
+    expect(screen.getByText('Showcase')).toBeDefined()
+    expect(screen.getByText('Split')).toBeDefined()
+    expect(screen.getByText('Mockup')).toBeDefined()
+    expect(screen.getByText('Hero')).toBeDefined()
+  })
+  it('routes showcase kinds to remotion by default', () => {
+    render(<DirectorPreview project={makeProject([makeScene({ kind: SceneKind.SHOWCASE }), makeScene({ kind: SceneKind.SPLIT }), makeScene({ kind: SceneKind.MOCKUP }), makeScene({ kind: SceneKind.HERO })])} />)
+    const remotionLabels = screen.getAllByText('Remotion')
+    expect(remotionLabels.length).toBeGreaterThanOrEqual(4)
   })
 })

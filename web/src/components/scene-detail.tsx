@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react'
-import { type SceneNode, Engine } from '@/lib/ir-types'
+import { type SceneNode, Engine, type OverlayItem, type MotionHint } from '@/lib/ir-types'
 import { pickEngine, getRoutingReason } from '@/lib/director'
 import { cn } from '@/lib/utils'
 import { stopJob, retryScene, rerouteScene } from '@/lib/api'
@@ -33,11 +33,7 @@ export function SceneDetail({ scene, jobId }: SceneDetailProps) {
 
   // Build artifact URLs if jobId is provided
   const thumbUrl = jobId ? `/api/artifacts/${encodeURIComponent(jobId)}/scenes/${encodeURIComponent(scene.id)}/thumbnail` : null
-  const frameUrl = jobId ? `/api/artifacts/${encodeURIComponent(jobId)}/scenes/${encodeURIComponent(scene.id)}/frame` : null
   const reportUrl = jobId ? `/api/artifacts/${encodeURIComponent(jobId)}/scenes/${encodeURIComponent(scene.id)}/report` : null
-
-  const hasThumbnail = thumbUrl && !imgError[thumbUrl]
-  const hasFrame = frameUrl && !imgError[frameUrl]
 
   const handleCopyHash = async () => {
     if (scene.contentHash) {
@@ -124,34 +120,22 @@ export function SceneDetail({ scene, jobId }: SceneDetailProps) {
         {showPayload && <pre className="mt-2 text-[11px] font-mono bg-muted p-3 rounded-lg overflow-x-auto max-h-64 overflow-y-auto">{JSON.stringify(payloadObj, null, 2)}</pre>}
       </div>
 
-      <div>
-        <label className="block text-xs font-medium text-muted-foreground mb-1">Frame Preview</label>
-        {hasThumbnail ? (
-          <div className="aspect-video bg-muted rounded-lg overflow-hidden border border-border">
-            <img src={thumbUrl!} alt={`${scene.id} thumbnail`} className="w-full h-full object-cover" onError={() => handleImgError(thumbUrl!)} />
-          </div>
-        ) : (
-          <div className="aspect-video bg-muted rounded-lg flex items-center justify-center border border-dashed border-border">
-            <div className="text-center px-4">
-              <svg className="w-8 h-8 mx-auto mb-1 text-muted-foreground/50" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="2" y="2" width="20" height="20" rx="2" ry="2"/><path d="M8 2v20M16 2v20M2 8h20M2 16h20"/></svg>
-              <p className="text-[11px] text-muted-foreground">Frame thumbnail</p>
-              {!jobId && <p className="text-[10px] text-muted-foreground/60">No image endpoint available yet</p>}
-            </div>
-          </div>
-        )}
-      </div>
+      {scene.overlay_stack && scene.overlay_stack.items.length > 0 && (
+        <OverlayStackSection stack={scene.overlay_stack} />
+      )}
 
-      <div>
-        <label className="block text-xs font-medium text-muted-foreground mb-1">Per-Scene Report</label>
-        {reportUrl ? (
-          <ReportFetcher url={reportUrl} />
-        ) : (
-          <div className="bg-muted rounded-lg px-3 py-3 border border-dashed border-border">
-            <p className="text-xs text-muted-foreground">Report not yet generated</p>
-            <p className="text-[10px] text-muted-foreground/60 mt-0.5">Available after render + review pipeline completes</p>
-          </div>
-        )}
-      </div>
+      {scene.motion_hints && scene.motion_hints.length > 0 && (
+        <MotionHintsSection hints={scene.motion_hints} />
+      )}
+
+      <ArtifactSection
+        scene={scene}
+        jobId={jobId}
+        thumbUrl={thumbUrl}
+        reportUrl={reportUrl}
+        imgError={imgError}
+        handleImgError={handleImgError}
+      />
 
       <div className="flex gap-2 pt-1">
         <button
@@ -193,6 +177,148 @@ export function SceneDetail({ scene, jobId }: SceneDetailProps) {
         >
           {actionState === 'loading' ? '…' : actionState === 'done' ? 'Rerouted' : actionState === 'error' ? 'Failed' : 'Reroute'}
         </button>
+      </div>
+    </div>
+  )
+}
+
+/** Overlay stack section — displays ordered overlay layers on scene */
+function OverlayStackSection({ stack }: { stack: { items: OverlayItem[] } }) {
+  const [expanded, setExpanded] = useState(false)
+  const items = stack.items
+  return (
+    <div>
+      <button type="button" onClick={() => setExpanded(!expanded)} className="flex items-center gap-2 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors">
+        <svg className={cn('w-3 h-3 transition-transform', expanded && 'rotate-90')} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18l6-6-6-6"/></svg>
+        Overlay Stack ({items.length} layer{items.length !== 1 ? 's' : ''})
+      </button>
+      {expanded && (
+        <div className="mt-2 space-y-1.5">
+          {items.map((item) => (
+            <div key={item.id} className="bg-muted/40 rounded-lg px-3 py-2 border border-border/50">
+              <div className="flex items-center gap-2 mb-0.5">
+                <span className={cn(
+                  'inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium',
+                  item.type === 'text' && 'bg-blue-500/20 text-blue-300',
+                  item.type === 'image' && 'bg-green-500/20 text-green-300',
+                  item.type === 'shape' && 'bg-amber-500/20 text-amber-300',
+                  item.type === 'logo' && 'bg-purple-500/20 text-purple-300',
+                )}>{item.type}</span>
+                <code className="text-[10px] font-mono text-muted-foreground">{item.id}</code>
+                {item.animation && <span className="text-[10px] text-muted-foreground/60 ml-auto">anim: {item.animation}</span>}
+              </div>
+              <p className="text-[11px] text-foreground/70 truncate">{item.content}</p>
+              <p className="text-[10px] text-muted-foreground/60">
+                pos ({item.position.x},{item.position.y}) · frame {item.startFrame}–{item.startFrame + item.durationFrames} · opacity {Math.round(item.opacity * 100)}%
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** Motion hints section — displays entrance/exit/emphasis/path motions */
+function MotionHintsSection({ hints }: { hints: MotionHint[] }) {
+  const [expanded, setExpanded] = useState(false)
+  return (
+    <div>
+      <button type="button" onClick={() => setExpanded(!expanded)} className="flex items-center gap-2 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors">
+        <svg className={cn('w-3 h-3 transition-transform', expanded && 'rotate-90')} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18l6-6-6-6"/></svg>
+        Motion Hints ({hints.length})
+      </button>
+      {expanded && (
+        <div className="mt-2 space-y-1.5">
+          {hints.map((hint, i) => (
+            <div key={i} className="bg-muted/40 rounded-lg px-3 py-2 border border-border/50">
+              <div className="flex items-center gap-2 mb-0.5">
+                <span className={cn(
+                  'inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium',
+                  hint.type === 'entrance' && 'bg-emerald-500/20 text-emerald-300',
+                  hint.type === 'exit' && 'bg-red-500/20 text-red-300',
+                  hint.type === 'emphasis' && 'bg-amber-500/20 text-amber-300',
+                  hint.type === 'path' && 'bg-indigo-500/20 text-indigo-300',
+                )}>{hint.type}</span>
+                <code className="text-[10px] font-mono text-muted-foreground">{hint.animation}</code>
+              </div>
+              {hint.durationMs != null && (
+                <p className="text-[10px] text-muted-foreground/60">
+                  {hint.durationMs}ms{hint.delayMs != null ? ` · ${hint.delayMs}ms delay` : ''}{hint.easing ? ` · ${hint.easing}` : ''}
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** Artifact section — displays thumbnail/frame/report with state-aware placeholders */
+interface ArtifactSectionProps {
+  scene: SceneNode
+  jobId?: string
+  thumbUrl: string | null
+  reportUrl: string | null
+  imgError: Record<string, boolean>
+  handleImgError: (url: string) => void
+}
+
+function ArtifactSection({ scene, jobId, thumbUrl, reportUrl, imgError, handleImgError }: ArtifactSectionProps) {
+  const artifactState = scene.artifacts?.thumbnail?.state ?? (jobId ? 'pending' : 'missing')
+  const hasThumbnail = thumbUrl && !imgError[thumbUrl] && artifactState === 'ready'
+
+  return (
+    <>
+      <div>
+        <label className="block text-xs font-medium text-muted-foreground mb-1">Frame Preview</label>
+        {jobId && artifactState === 'generating' ? (
+          <ArtifactPlaceholder icon="spinner" title="Generating frame..." subtitle="Render in progress" />
+        ) : artifactState === 'error' ? (
+          <ArtifactPlaceholder icon="error" title="Frame generation failed" subtitle={scene.artifacts?.thumbnail?.errorMessage ?? 'Render error'} />
+        ) : hasThumbnail ? (
+          <div className="aspect-video bg-muted rounded-lg overflow-hidden border border-border">
+            <img src={thumbUrl!} alt={`${scene.id} thumbnail`} className="w-full h-full object-cover" onError={() => handleImgError(thumbUrl!)} />
+          </div>
+        ) : (
+          <ArtifactPlaceholder icon="frame" title="Frame thumbnail" subtitle={!jobId ? 'No image endpoint available yet' : 'Waiting for render'} />
+        )}
+      </div>
+
+      <div>
+        <label className="block text-xs font-medium text-muted-foreground mb-1">Per-Scene Report</label>
+        {reportUrl ? (
+          <ReportFetcher url={reportUrl} />
+        ) : (
+          <div className="bg-muted rounded-lg px-3 py-3 border border-dashed border-border">
+            <p className="text-xs text-muted-foreground">Report not yet generated</p>
+            <p className="text-[10px] text-muted-foreground/60 mt-0.5">Available after render + review pipeline completes</p>
+          </div>
+        )}
+      </div>
+    </>
+  )
+}
+
+/** State-aware artifact placeholder icon/status */
+function ArtifactPlaceholder({ icon, title, subtitle }: { icon: 'spinner' | 'error' | 'frame'; title: string; subtitle: string }) {
+  return (
+    <div className="aspect-video bg-muted rounded-lg flex items-center justify-center border border-dashed border-border">
+      <div className="text-center px-4">
+        {icon === 'spinner' ? (
+          <div className="w-8 h-8 mx-auto mb-1 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+        ) : icon === 'error' ? (
+          <svg className="w-8 h-8 mx-auto mb-1 text-destructive/60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <circle cx="12" cy="12" r="10"/><path d="M15 9l-6 6M9 9l6 6"/>
+          </svg>
+        ) : (
+          <svg className="w-8 h-8 mx-auto mb-1 text-muted-foreground/50" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <rect x="2" y="2" width="20" height="20" rx="2" ry="2"/><path d="M8 2v20M16 2v20M2 8h20M2 16h20"/>
+          </svg>
+        )}
+        <p className="text-[11px] text-muted-foreground">{title}</p>
+        <p className="text-[10px] text-muted-foreground/60">{subtitle}</p>
       </div>
     </div>
   )

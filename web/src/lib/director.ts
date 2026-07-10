@@ -2,7 +2,7 @@ import { Engine, SceneKind, type SceneNode, type RoutingEntry } from './ir-types
 
 export function pickEngine(node: SceneNode): Engine {
   const k = node.kind
-  if (k === SceneKind.CODE || k === SceneKind.DIFF || k === SceneKind.BULLETS || k === SceneKind.TITLE || k === SceneKind.COMPARISON || k === SceneKind.QUOTE || k === SceneKind.OUTRO || k === SceneKind.MINDMAP || k === SceneKind.SCREENFLOW || k === SceneKind.OVERLAY_CTA || k === SceneKind.AUDIO_REACTIVE || k === SceneKind.DOCUMENT_HIGHLIGHT || k === SceneKind.SVG_MORPH || k === SceneKind.SHOWCASE || k === SceneKind.SPLIT || k === SceneKind.MOCKUP || k === SceneKind.HERO) return Engine.REMOTION
+  if (k === SceneKind.CODE || k === SceneKind.DIFF || k === SceneKind.BULLETS || k === SceneKind.TITLE || k === SceneKind.COMPARISON || k === SceneKind.QUOTE || k === SceneKind.OUTRO || k === SceneKind.MINDMAP || k === SceneKind.SCREENFLOW || k === SceneKind.OVERLAY_CTA || k === SceneKind.AUDIO_REACTIVE || k === SceneKind.DOCUMENT_HIGHLIGHT || k === SceneKind.SVG_MORPH || k === SceneKind.SHOWCASE || k === SceneKind.SPLIT || k === SceneKind.MOCKUP || k === SceneKind.HERO || k === SceneKind.MAP_GEO) return Engine.REMOTION
   if (k === SceneKind.DIAGRAM) {
     const p = tryParse(node.payload)
     if (p?.layout === 'math_graph') return Engine.MANIM
@@ -44,6 +44,7 @@ export function getRoutingReason(node: SceneNode): string {
     [SceneKind.SPLIT]: 'Split-screen comparison with synced playback',
     [SceneKind.MOCKUP]: 'Device mockup frame with inner content scroll',
     [SceneKind.HERO]: 'Full-screen hero section with animated headline',
+    [SceneKind.MAP_GEO]: 'SVG geo map with markers, routes, and grid overlay',
   }
   return reasons[k] ?? 'Default routing'
 }
@@ -74,6 +75,7 @@ export const ROUTING_TABLE: RoutingEntry[] = [
   { kind: 'split', engine: Engine.REMOTION, reason: 'Split-screen comparison with synced playback' },
   { kind: 'mockup', engine: Engine.REMOTION, reason: 'Device mockup frame with inner content scroll' },
   { kind: 'hero', engine: Engine.REMOTION, reason: 'Full-screen hero section with animated headline' },
+  { kind: 'map-geo', engine: Engine.REMOTION, reason: 'SVG geo map with markers, routes, and grid overlay' },
 ]
 
 function tryParse(p: string): Record<string, unknown> | null {
