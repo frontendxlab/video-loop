@@ -6,7 +6,7 @@
   "fps": 30,
   "width": 1920,
   "height": 1080,
-  "content_hash": "83bb10ecf89d87de",
+  "content_hash": "d3a0ccaf303a280a",
   "engine_mix": [
     "animotion",
     "manim",
@@ -22,7 +22,7 @@
       "narration_words": 0,
       "narration_source": "estimated",
       "payload_title": "Remotion Scene",
-      "content_hash": "10bd250db928ec3a"
+      "content_hash": "b30d7ed5147ada33"
     },
     {
       "id": "chart",
@@ -33,7 +33,7 @@
       "narration_words": 0,
       "narration_source": "estimated",
       "payload_title": "Chart Scene",
-      "content_hash": "ca0abd12e419ccc0"
+      "content_hash": "a41f9424e51fad06"
     },
     {
       "id": "diagram",
@@ -44,7 +44,7 @@
       "narration_words": 0,
       "narration_source": "estimated",
       "payload_title": "Interactive Diagram",
-      "content_hash": "d58ed96447612ac4"
+      "content_hash": "b4d8fd8707397250"
     }
   ],
   "scene_order": [
