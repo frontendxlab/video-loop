@@ -372,12 +372,12 @@ class Test9RouterDiscovery:
 
     def test_default_settings_uses_enriched_9router(self, client):
         """GET /api/settings returns 9router entry with models (fallback
-        or discovered). Provider count still 6.
+        or discovered). Provider count reflects all configured providers.
         """
         clear_9router_cache()
         resp = client.get("/api/settings")
         providers = resp.json()["providers"]
-        assert len(providers) == 6
+        assert len(providers) == 7
         router = next(p for p in providers if p["provider"] == "9router")
         assert len(router["models"]) >= 2  # at least fallback models
         assert router["defaultModel"] == "ocg/deepseek-v4-flash"
