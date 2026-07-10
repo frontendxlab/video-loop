@@ -147,13 +147,14 @@ def test_detect_screenflow():
 
 
 def test_all_showcase_rules_have_valid_types():
-    for path, expected, scene_type, label, duration in SHOWCASE_RULES:
+    for path, expected, scene_type, label, duration, recipe_id in SHOWCASE_RULES:
         assert isinstance(path, str) and path, f"Invalid path: {path}"
         assert isinstance(scene_type, str) and scene_type, f"Invalid scene_type: {scene_type}"
         assert isinstance(label, str) and label, f"Invalid label: {label}"
         assert isinstance(duration, (int, float)) and duration > 0, (
             f"Invalid duration: {duration}"
         )
+        assert isinstance(recipe_id, str) and recipe_id, f"Invalid recipe_id: {recipe_id}"
 
 
 def test_all_showcase_rules_paths_start_with_showcase():
@@ -164,6 +165,18 @@ def test_all_showcase_rules_paths_start_with_showcase():
 def test_showcase_rules_have_unique_kinds():
     kinds = [expected for _, expected, *_ in SHOWCASE_RULES]
     assert len(kinds) == len(set(kinds)), f"Duplicate showcase kinds: {kinds}"
+
+
+def test_showcase_rules_recipe_ids_exist_in_registry():
+    """Every recipe_id in SHOWCASE_RULES must exist in config/recipe_registry.json."""
+    from videoforge.engine.recipes import get_recipe
+    for _path, _expected, scene_type, _label, _duration, recipe_id in SHOWCASE_RULES:
+        r = get_recipe(recipe_id)
+        assert r is not None, f"SHOWCASE_RULES references unknown recipe: {recipe_id}"
+        assert r.scene_kind == scene_type, (
+            f"Recipe {recipe_id} scene_kind '{r.scene_kind}' "
+            f"doesn't match rule scene_type '{scene_type}'"
+        )
 
 
 # ── SceneWriter integration ──────────────────────────────────────
@@ -201,6 +214,58 @@ def test_write_script_with_real_estate_includes_showcase_scene():
     result = writer.write_script(_default_content(showcase={"kind": "real-estate"}))
     scene_types = [s["scene_type"] for s in result["scenes"]]
     assert "real-estate" in scene_types
+
+
+def test_write_script_screenflow_recipe_enrichment():
+    """screenflow recipe carries recipe_id, entrance, exit_, engine_hint."""
+    writer = ScriptWriter()
+    result = writer.write_script(_default_content(showcase={"kind": "screenflow"}))
+    scenes = [s for s in result["scenes"] if s.get("recipe_id") == "screenflow"]
+    assert len(scenes) == 1, "Expected exactly one screenflow-recipe scene"
+    s = scenes[0]
+    assert s.get("entrance") == "slide_in_right"
+    assert s.get("exit_") == "slide_out_left"
+    assert s.get("engine_hint") == "remotion"
+
+
+def test_write_script_audio_spectrum_recipe_enrichment():
+    writer = ScriptWriter()
+    result = writer.write_script(_default_content(showcase={"kind": "audio-spectrum"}))
+    scenes = [s for s in result["scenes"] if s.get("recipe_id") == "audio-spectrum"]
+    assert len(scenes) == 1
+    s = scenes[0]
+    assert s["scene_type"] == "audio-reactive"
+    assert s.get("engine_hint") == "remotion"
+
+
+def test_write_script_dual_chart_recipe_enrichment():
+    writer = ScriptWriter()
+    result = writer.write_script(_default_content(showcase={"kind": "dual-chart"}))
+    scenes = [s for s in result["scenes"] if s.get("recipe_id") == "dual-chart"]
+    assert len(scenes) == 1
+    s = scenes[0]
+    assert s["scene_type"] == "chart"
+    # dual-chart prefers manim
+    assert s.get("engine_hint") == "manim"
+
+
+def test_write_script_device_rise_recipe_enrichment():
+    writer = ScriptWriter()
+    result = writer.write_script(_default_content(showcase={"kind": "device-rise"}))
+    scenes = [s for s in result["scenes"] if s.get("recipe_id") == "device-rise"]
+    assert len(scenes) == 1
+    s = scenes[0]
+    assert s["scene_type"] == "three-scene"
+    assert s.get("entrance") == "device_rise_in"
+    assert s.get("exit_") == "device_fall_out"
+    assert s.get("engine_hint") == "remotion"
+
+
+def test_write_script_with_screenflow_includes_showcase_scene():
+    writer = ScriptWriter()
+    result = writer.write_script(_default_content(showcase={"kind": "screenflow"}))
+    scene_types = [s["scene_type"] for s in result["scenes"]]
+    assert "comparison" in scene_types
 
 
 def test_write_script_showcase_preserves_other_scenes():

@@ -150,3 +150,41 @@ def test_routing_table_loads():
 def test_pick_engine_is_deterministic():
     n = _node(SceneKind.CHART)
     assert pick_engine(n) == pick_engine(n)
+
+
+# ── Recipe-aware routing ──────────────────────────────────────────
+
+
+def _recipe_node(kind: SceneKind, recipe_id: str) -> SceneNode:
+    return SceneNode(
+        id=f"n_{kind.value}",
+        kind=kind,
+        payload=json.dumps({"recipe_id": recipe_id}, sort_keys=True),
+        engine_hint=Engine.REMOTION,
+        duration_frames=90,
+        narration=NarrationSpec("t", (), "estimated"),
+    )
+
+
+def test_recipe_dual_chart_routes_manim():
+    """dual-chart recipe forces MANIM regardless of payload."""
+    assert pick_engine(_recipe_node(SceneKind.CHART, "dual-chart")) == Engine.MANIM
+
+
+def test_recipe_audio_spectrum_routes_remotion():
+    assert pick_engine(_recipe_node(SceneKind.AUDIO_REACTIVE, "audio-spectrum")) == Engine.REMOTION
+
+
+def test_recipe_device_rise_routes_remotion():
+    """device-rise is three-scene kind but recipe says remotion."""
+    assert pick_engine(_recipe_node(SceneKind.THREE_SCENE, "device-rise")) == Engine.REMOTION
+
+
+def test_recipe_screenflow_routes_remotion():
+    assert pick_engine(_recipe_node(SceneKind.SCREENFLOW, "screenflow")) == Engine.REMOTION
+
+
+def test_recipe_override_unknown_recipe_falls_back_to_kind():
+    """Unknown recipe_id in payload falls through to kind-based routing."""
+    n = _recipe_node(SceneKind.CHART, "nonexistent-recipe")
+    assert pick_engine(n) == Engine.MANIM  # CHART → MANIM by default

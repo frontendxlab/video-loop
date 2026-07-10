@@ -109,6 +109,53 @@ def test_showcase_entrance_is_deterministic():
     assert a["scenes"][1]["transition_in"] == b["scenes"][1]["transition_in"]
 
 
+# ── Recipe-enriched scene transitions ─────────────────────────────
+
+
+def test_recipe_screenflow_entrance_from_registry():
+    """Scene with recipe_id=screenflow uses recipe entrance, not SHOWCASE_ENTRANCE."""
+    planner = ScenePlanner()
+    script = {
+        "video_type": "SHOWCASE",
+        "scenes": [
+            {"title": "Intro", "text": "a", "scene_type": "title",
+             "estimated_duration_seconds": 3.0},
+            {"title": "Screenflow", "text": "b", "scene_type": "comparison",
+             "estimated_duration_seconds": 8.0,
+             "recipe_id": "screenflow", "entrance": "slide_in_right",
+             "exit_": "slide_out_left", "engine_hint": "remotion"},
+            {"title": "Outro", "text": "c", "scene_type": "outro",
+             "estimated_duration_seconds": 3.0},
+        ],
+    }
+    result = planner.plan_scenes(script, [])
+    s = [sc for sc in result["scenes"] if sc.get("recipe_id") == "screenflow"]
+    assert len(s) == 1
+    assert s[0]["transition_in"] == "slide_in_right"
+    assert s[0]["transition_out"] == "slide_out_left"
+
+
+def test_recipe_device_rise_uses_device_transitions():
+    """device-rise recipe entrance and exit come from registry, not fallback."""
+    planner = ScenePlanner()
+    script = {
+        "video_type": "SHOWCASE",
+        "scenes": [
+            {"title": "Intro", "text": "a", "scene_type": "title",
+             "estimated_duration_seconds": 3.0},
+            {"title": "Device", "text": "b", "scene_type": "three-scene",
+             "estimated_duration_seconds": 7.0,
+             "recipe_id": "device-rise", "entrance": "device_rise_in",
+             "exit_": "device_fall_out", "engine_hint": "remotion"},
+        ],
+    }
+    result = planner.plan_scenes(script, [])
+    s = [sc for sc in result["scenes"] if sc.get("recipe_id") == "device-rise"]
+    assert len(s) == 1
+    assert s[0]["transition_in"] == "device_rise_in"
+    assert s[0]["transition_out"] == "device_fall_out"
+
+
 def test_showcase_durations_preserved():
     planner = ScenePlanner()
     script = {

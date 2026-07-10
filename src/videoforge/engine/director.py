@@ -15,8 +15,19 @@ from videoforge.engine.ir import Engine, SceneKind, SceneNode
 def pick_engine(node: SceneNode) -> Engine:
     """Route a SceneNode to the engine that should render it.
 
-    Deterministic, table-driven. Override per scene by editing the table.
+    Deterministic, table-driven. Two-level override:
+      1. recipe_id in payload → recipe's preferred_engine wins
+         (allows recipe to override default kind→engine routing)
+      2. kind+layout table (below and config/engine_routing.yaml)
     """
+    payload = json.loads(node.payload)
+    recipe_id = payload.get("recipe_id")
+    if recipe_id:
+        from videoforge.engine.recipes import get_recipe as _get_recipe
+        recipe = _get_recipe(recipe_id)
+        if recipe is not None:
+            return Engine(recipe.preferred_engine)
+
     k = node.kind
     if k in (
         SceneKind.CODE, SceneKind.DIFF, SceneKind.BULLETS, SceneKind.TITLE,
@@ -29,7 +40,6 @@ def pick_engine(node: SceneNode) -> Engine:
     ):
         return Engine.REMOTION
     if k == SceneKind.DIAGRAM:
-        payload = json.loads(node.payload)
         if payload.get("layout") == "math_graph":
             return Engine.MANIM
         if payload.get("interactive"):
