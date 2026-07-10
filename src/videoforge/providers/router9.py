@@ -56,9 +56,7 @@ def _parse_models(api_data: dict[str, Any]) -> list[dict[str, Any]]:
         model_id: str = item.get("id", "")
         if not model_id:
             continue
-        # Skip embedding / image / audio models — keep only LLM-ish ids
-        if not any(c in model_id for c in ("/", ":")) and "." not in model_id:
-            continue
+        # Include all models from 9router (it's our local router, all are LLM models)
         models.append({
             "id": model_id,
             "label": item.get("label") or item.get("description") or item.get("owned_by") or _make_label(model_id),
