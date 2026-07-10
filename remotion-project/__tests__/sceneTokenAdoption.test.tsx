@@ -83,6 +83,24 @@ describe("scenes consume design tokens", () => {
     expect(container.innerHTML).not.toContain("#ffeb3b");
   });
 
+  it("CaptionBar: no hardcoded colors, renders with tokens", async () => {
+    const { CaptionBar } = await import("../src/captions/CaptionBar");
+    const { container } = render(
+      <CaptionBar
+        words={[
+          { text: "Hello", startMs: 0, endMs: 200 },
+          { text: "world", startMs: 200, endMs: 400 },
+        ]}
+      />,
+    );
+    const html = container.innerHTML;
+    expect(html).not.toContain("#1a1a2e");
+    expect(html).not.toContain("#ffeb3b");
+    expect(html).not.toContain("#0f3460");
+    expect(html).toContain("Hello");
+    expect(html).toContain("world");
+  });
+
   it("LowerThird: uses token colors (no hardcoded literal hex)", async () => {
     const { LowerThird } = await import("../src/scenes/LowerThird");
     const { container } = render(<LowerThird title="Test" duration={60} />);
@@ -97,6 +115,21 @@ describe("scenes consume design tokens", () => {
     const html = container.innerHTML;
     expect(html).not.toContain("#1a1a2e");
     expect(html).not.toContain("#ffeb3b");
+  });
+
+  it("DualChartScene: no hardcoded colors", async () => {
+    const { DualChartScene } = await import("../src/components/scenes/DualChartScene");
+    const { container } = render(
+      <DualChartScene
+        barData={[{ label: "A", value: 10 }]}
+        lineData={[{ label: "A", value: 5 }]}
+        duration={60}
+      />,
+    );
+    const html = container.innerHTML;
+    expect(html).not.toContain("#0f0f23");
+    expect(html).not.toContain("#1a1a3e");
+    expect(html).not.toContain("#4a90d9");
   });
 
   it("AnimatedMindMap: no hardcoded colors", async () => {

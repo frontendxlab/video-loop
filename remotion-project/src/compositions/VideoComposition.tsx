@@ -6,12 +6,18 @@ import { CodeScene } from "../scenes/CodeScene";
 import { BulletScene } from "../scenes/BulletScene";
 import { ImageScene } from "../scenes/ImageScene";
 import { OutroScene } from "../scenes/OutroScene";
+import { Hero3DScene } from "../scenes/Hero3DScene";
+import { ThreeSceneExample } from "../scenes/ThreeSceneExample";
 import { LowerThird } from "../scenes/LowerThird";
 import { OverlayCTA } from "../scenes/OverlayCTA";
+import { ScreenflowScene } from "../scenes/ScreenflowScene";
 import { AnimatedMindMap, MindMapNode } from "../components/AnimatedMindMap";
 import { AnimatedCodeLines } from "../components/AnimatedCodeLines";
 import { ChartScene } from "../components/scenes/ChartScene";
+import { DualChartScene } from "../components/scenes/DualChartScene";
 import { TimelineScene } from "../components/scenes/TimelineScene";
+import { KineticTextScene } from "../components/scenes/KineticTextScene";
+import { AudioVizScene } from "../scenes/AudioVizScene";
 import { colors, fonts } from "../design-tokens";
 
 interface WordTimingData {
@@ -40,6 +46,21 @@ interface SceneData {
   data?: { label: string; value: number }[];
   yAxisLabel?: string;
   events?: { label: string; date?: string }[];
+  barData?: { label: string; value: number }[];
+  lineData?: { label: string; value: number }[];
+  barLabel?: string;
+  lineLabel?: string;
+  leftAxisLabel?: string;
+  rightAxisLabel?: string;
+  lines?: { text: string; highlightWords?: string[]; animation?: string }[];
+  lineAnimation?: "sequential" | "simultaneous";
+  device?: "phone" | "browser";
+  screenshot?: string;
+  callouts?: { text: string; x: number; y: number }[];
+  cursorPath?: { x: number; y: number; frame: number }[];
+  audioSrc?: string;
+  variant?: "waveform" | "spectrum";
+  barCount?: number;
 }
 
 interface AudioTrack {
@@ -84,12 +105,22 @@ const SceneRenderer: React.FC<{ scene: SceneData; frameOffset: number }> = ({ sc
       return <AnimatedCodeLines code={scene.code || ""} lang={scene.lang || "text"} wordTimestamps={ts || []} sceneStartFrame={sf} title={scene.title} />;
     case "chart":
       return <ChartScene chartType={scene.chartType || "bar"} title={scene.title} data={scene.data || []} yAxisLabel={scene.yAxisLabel} duration={dur} wordTimestamps={ts} sceneStartFrame={sf} />;
+    case "dualChart":
+      return <DualChartScene title={scene.title} barData={scene.barData || []} lineData={scene.lineData || []} barLabel={scene.barLabel} lineLabel={scene.lineLabel} leftAxisLabel={scene.leftAxisLabel} rightAxisLabel={scene.rightAxisLabel} duration={dur} wordTimestamps={ts} sceneStartFrame={sf} />;
     case "timeline":
       return <TimelineScene title={scene.title} events={scene.events || []} duration={dur} wordTimestamps={ts} sceneStartFrame={sf} />;
     case "lowerThird":
       return <LowerThird title={scene.title || ""} subtitle={scene.subtitle} slideDirection={(scene as any).slideDirection} duration={dur} wordTimestamps={ts} sceneStartFrame={sf} />;
     case "overlayCTA":
       return <OverlayCTA title={scene.title || ""} subtitle={scene.subtitle} cta={scene.cta} duration={dur} wordTimestamps={ts} sceneStartFrame={sf} />;
+    case "kinetic":
+      return <KineticTextScene lines={scene.lines || [{ text: "" }]} lineAnimation={scene.lineAnimation} duration={dur} wordTimestamps={ts} sceneStartFrame={sf} />;
+    case "hero3d":
+      return <Hero3DScene title={scene.title || ""} subtitle={scene.subtitle} deviceType={(scene as any).deviceType} duration={dur} />;
+    case "screenflow":
+      return <ScreenflowScene device={scene.device || "browser"} screenshot={scene.screenshot || ""} title={scene.title} callouts={scene.callouts || []} cursorPath={scene.cursorPath || []} duration={dur} wordTimestamps={ts} sceneStartFrame={sf} />;
+    case "audio-viz":
+      return <AudioVizScene audioSrc={scene.audioSrc || ""} variant={(scene.variant as "waveform" | "spectrum") || "waveform"} barCount={scene.barCount || 64} duration={dur} wordTimestamps={ts} sceneStartFrame={sf} />;
     default:
       return (
         <AbsoluteFill style={{ background: colors.backgroundGradient, justifyContent: "center", alignItems: "center", color: colors.text, fontFamily: fonts.heading, fontSize: 32 }}>

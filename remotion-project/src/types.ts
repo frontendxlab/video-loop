@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { Hero3DSceneSchema } from "./scenes/Hero3DScene";
+import { ThreeSceneExampleSchema } from "./scenes/ThreeSceneExample";
 
 export const TitleSceneSchema = z.object({
   type: z.literal("title"),
@@ -116,6 +118,33 @@ export const KineticTextSceneSchema = z.object({
   duration: z.number().positive(),
 });
 
+export const ScreenflowSceneSchema = z.object({
+  type: z.literal("screenflow"),
+  device: z.enum(["phone", "browser"]).default("browser"),
+  screenshot: z.string(),
+  title: z.string().optional(),
+  callouts: z.array(z.object({
+    text: z.string().min(1),
+    x: z.number().min(0).max(100),
+    y: z.number().min(0).max(100),
+  })).optional().default([]),
+  cursorPath: z.array(z.object({
+    x: z.number().min(0).max(100),
+    y: z.number().min(0).max(100),
+    frame: z.number().min(0),
+  })).optional().default([]),
+  duration: z.number().positive(),
+});
+
+export const AudioVizSceneSchema = z.object({
+  type: z.literal("audio-viz"),
+  audioSrc: z.string(),
+  variant: z.enum(["waveform", "spectrum"]).optional().default("waveform"),
+  barCount: z.number().min(8).max(256).optional().default(64),
+  color: z.string().optional(),
+  duration: z.number().positive(),
+});
+
 export const SceneSchema = z.discriminatedUnion("type", [
   TitleSceneSchema,
   CodeSceneSchema,
@@ -131,6 +160,9 @@ export const SceneSchema = z.discriminatedUnion("type", [
   LowerThirdSceneSchema,
   OverlayCTASceneSchema,
   KineticTextSceneSchema,
+  ScreenflowSceneSchema,
+  AudioVizSceneSchema,
+  ThreeSceneExampleSchema,
 ]);
 
 export const AudioTrackSchema = z.object({
@@ -174,6 +206,10 @@ export type DualChartScene = z.infer<typeof DualChartSceneSchema>;
 export type LowerThirdScene = z.infer<typeof LowerThirdSceneSchema>;
 export type OverlayCTAScene = z.infer<typeof OverlayCTASceneSchema>;
 export type KineticTextScene = z.infer<typeof KineticTextSceneSchema>;
+export type ScreenflowScene = z.infer<typeof ScreenflowSceneSchema>;
+export type Hero3DSceneType = z.infer<typeof Hero3DSceneSchema>;
+export type AudioVizScene = z.infer<typeof AudioVizSceneSchema>;
+export type ThreeSceneExample = z.infer<typeof ThreeSceneExampleSchema>;
 export type Scene = z.infer<typeof SceneSchema>;
 export type AudioTrack = z.infer<typeof AudioTrackSchema>;
 export type Caption = z.infer<typeof CaptionSchema>;
