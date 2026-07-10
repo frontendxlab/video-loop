@@ -143,6 +143,14 @@ def test_detect_screenflow():
     assert result["estimated_duration_seconds"] == 8.0
 
 
+def test_detect_device_rise():
+    result = _detect_showcase_pattern(_default_content(showcase={"kind": "device-rise"}))
+    assert result is not None
+    assert result["scene_type"] == "three-scene"
+    assert result["recipe_id"] == "device-rise"
+    assert result["estimated_duration_seconds"] == 7.0
+
+
 # ── SHOWCASE_RULES table invariants ──────────────────────────────
 
 
@@ -217,15 +225,18 @@ def test_write_script_with_real_estate_includes_showcase_scene():
 
 
 def test_write_script_screenflow_recipe_enrichment():
-    """screenflow recipe carries recipe_id, entrance, exit_, engine_hint."""
+    """screenflow recipe now expands to 4+ scenes (title, demos, outro)."""
     writer = ScriptWriter()
     result = writer.write_script(_default_content(showcase={"kind": "screenflow"}))
     scenes = [s for s in result["scenes"] if s.get("recipe_id") == "screenflow"]
-    assert len(scenes) == 1, "Expected exactly one screenflow-recipe scene"
-    s = scenes[0]
-    assert s.get("entrance") == "slide_in_right"
-    assert s.get("exit_") == "slide_out_left"
-    assert s.get("engine_hint") == "remotion"
+    # screenflow plan: title + up to 2 demo comparisons + outro = 4
+    assert len(scenes) >= 4, f"Expected >=4 screenflow-recipe scenes, got {len(scenes)}"
+    # First scene fades in (title), second scene has slide_in_right (first demo)
+    assert scenes[0].get("entrance") == "fade"
+    assert scenes[1].get("entrance") == "slide_in_right"
+    assert scenes[1].get("exit_") == "slide_out_left"
+    assert scenes[0].get("engine_hint") == "remotion"
+    assert scenes[1].get("engine_hint") == "remotion"
 
 
 def test_write_script_audio_spectrum_recipe_enrichment():
@@ -239,26 +250,32 @@ def test_write_script_audio_spectrum_recipe_enrichment():
 
 
 def test_write_script_dual_chart_recipe_enrichment():
+    """dual-chart recipe now expands to 4 scenes (title, bars, line, combined)."""
     writer = ScriptWriter()
     result = writer.write_script(_default_content(showcase={"kind": "dual-chart"}))
     scenes = [s for s in result["scenes"] if s.get("recipe_id") == "dual-chart"]
-    assert len(scenes) == 1
-    s = scenes[0]
-    assert s["scene_type"] == "chart"
-    # dual-chart prefers manim
-    assert s.get("engine_hint") == "manim"
+    assert len(scenes) == 4, f"Expected 4 dual-chart scenes, got {len(scenes)}"
+    assert scenes[0]["scene_type"] == "title"
+    assert scenes[1]["scene_type"] == "chart"  # bar series
+    assert scenes[2]["scene_type"] == "chart"  # line overlay
+    assert scenes[3]["scene_type"] == "dual-chart"  # combined view
+    assert scenes[0].get("engine_hint") == "manim"
+    assert scenes[1].get("engine_hint") == "manim"
 
 
 def test_write_script_device_rise_recipe_enrichment():
+    """device-rise recipe now expands to 3 scenes (title, rise, screen)."""
     writer = ScriptWriter()
     result = writer.write_script(_default_content(showcase={"kind": "device-rise"}))
     scenes = [s for s in result["scenes"] if s.get("recipe_id") == "device-rise"]
-    assert len(scenes) == 1
-    s = scenes[0]
-    assert s["scene_type"] == "three-scene"
-    assert s.get("entrance") == "device_rise_in"
-    assert s.get("exit_") == "device_fall_out"
-    assert s.get("engine_hint") == "remotion"
+    assert len(scenes) == 3, f"Expected 3 device-rise scenes, got {len(scenes)}"
+    assert scenes[0]["scene_type"] == "title"
+    assert scenes[1]["scene_type"] == "three-scene"  # device rise
+    assert scenes[2]["scene_type"] == "three-scene"  # screen highlight
+    assert scenes[1].get("entrance") == "device_rise_in"
+    assert scenes[2].get("exit_") == "device_fall_out"
+    assert scenes[0].get("engine_hint") == "remotion"
+    assert scenes[1].get("engine_hint") == "remotion"
 
 
 def test_write_script_with_screenflow_includes_showcase_scene():

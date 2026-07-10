@@ -1,0 +1,142 @@
+{
+  "artifact": "videoforge-showcase-golden",
+  "version": 1,
+  "description": "Golden fixture metadata for 3 showcase demos (device-rise, dual-chart, screenflow). Deterministic content hashes committed here \u2014 change means golden must be regenerated.",
+  "title": "Showcase Golden Demo",
+  "fps": 30,
+  "width": 1920,
+  "height": 1080,
+  "content_hash": "8570418e8151e6f6",
+  "engine_mix": [
+    "manim",
+    "remotion"
+  ],
+  "scenes": [
+    {
+      "id": "device-rise",
+      "kind": "three-scene",
+      "engine": "remotion",
+      "duration_frames": 210,
+      "narration_text": "Apple-Style Device Rise showcase with 3D device hero animation",
+      "narration_words": 0,
+      "narration_source": "estimated",
+      "payload_keys": ["device_type", "objects", "recipe_id", "reflection_enabled", "rise_height", "screen_content", "device_color"],
+      "content_hash": "257956894e580188"
+    },
+    {
+      "id": "dual-chart",
+      "kind": "dual-chart",
+      "engine": "manim",
+      "duration_frames": 210,
+      "narration_text": "Dual Chart showcase with combined bar and line data visualization",
+      "narration_words": 0,
+      "narration_source": "estimated",
+      "payload_keys": ["bar_data", "chart_title", "dual_axes", "line_data", "primary_label", "recipe_id", "secondary_label", "x_labels"],
+      "content_hash": "26e1cdd0da26f4eb"
+    },
+    {
+      "id": "screenflow",
+      "kind": "screenflow",
+      "engine": "remotion",
+      "duration_frames": 240,
+      "narration_text": "Screenflow Demo showcase with product walkthrough and feature callouts",
+      "narration_words": 0,
+      "narration_source": "estimated",
+      "payload_keys": ["cursor_path", "elements", "feature_steps", "recipe_id", "screenshots"],
+      "content_hash": "2f62c9206927d4e6"
+    }
+  ],
+  "scene_order": [
+    "device-rise",
+    "dual-chart",
+    "screenflow"
+  ],
+  "render_format": {
+    "fps": 30,
+    "width": 1920,
+    "height": 1080,
+    "pixel_format": "yuv420p",
+    "video_codec": "h264",
+    "audio_codec": "aac"
+  },
+  "report_artifact_spec": {
+    "version": 1,
+    "description": "Expected key structure for report artifacts generated from this fixture. Update if generate_video_report / generate_scene_report schema changes.",
+    "video_report": {
+      "artifact": "videoforge-video-report",
+      "version": 1,
+      "top_level_keys": [
+        "artifact",
+        "version",
+        "video_path",
+        "report_timestamp",
+        "content_hash",
+        "engine_mix",
+        "render_format",
+        "scenes_summary",
+        "l0_summary",
+        "l1_summary",
+        "l2_layout_overlap_summary"
+      ],
+      "render_format_keys": [
+        "fps",
+        "width",
+        "height",
+        "pixel_format",
+        "video_codec",
+        "audio_codec"
+      ],
+      "scenes_summary_keys": [
+        "count",
+        "engines",
+        "total_duration_frames"
+      ],
+      "l0_summary_keys": [
+        "status",
+        "passed",
+        "total_issues",
+        "severity_counts",
+        "sampled_frames",
+        "total_frames",
+        "duration_seconds",
+        "issues"
+      ],
+      "l1_summary_keys": [
+        "passed",
+        "total_frames",
+        "total_issues",
+        "issues"
+      ],
+      "l2_summary_keys": [
+        "status",
+        "passed",
+        "total_issues",
+        "severity_counts",
+        "issues"
+      ]
+    },
+    "scene_report": {
+      "artifact": "videoforge-scene-report",
+      "version": 1,
+      "top_level_keys": [
+        "artifact",
+        "version",
+        "scene_index",
+        "engine",
+        "duration_frames",
+        "scene_path",
+        "report_timestamp",
+        "content_hash",
+        "render_format"
+      ],
+      "render_format_keys": [
+        "fps",
+        "width",
+        "height",
+        "pixel_format",
+        "video_codec",
+        "audio_codec"
+      ]
+    }
+  }
+}
