@@ -21,6 +21,11 @@ def pick_engine(node: SceneNode) -> Engine:
     if k in (
         SceneKind.CODE, SceneKind.DIFF, SceneKind.BULLETS, SceneKind.TITLE,
         SceneKind.COMPARISON, SceneKind.QUOTE, SceneKind.OUTRO, SceneKind.MINDMAP,
+        SceneKind.SCREENFLOW, SceneKind.OVERLAY_CTA, SceneKind.AUDIO_REACTIVE,
+        SceneKind.DOCUMENT_HIGHLIGHT, SceneKind.SVG_MORPH,
+        SceneKind.KINETIC_TEXT, SceneKind.CANVAS_COMPOSITE,
+        SceneKind.REAL_ESTATE, SceneKind.PROMO,
+        SceneKind.MAP_GEO,
     ):
         return Engine.REMOTION
     if k == SceneKind.DIAGRAM:
@@ -30,7 +35,8 @@ def pick_engine(node: SceneNode) -> Engine:
         if payload.get("interactive"):
             return Engine.ANIMOTION
         return Engine.REMOTION
-    if k in (SceneKind.CHART, SceneKind.TIMELINE, SceneKind.MAP3D):
+    if k in (SceneKind.CHART, SceneKind.TIMELINE, SceneKind.MAP3D,
+             SceneKind.DUAL_CHART, SceneKind.THREE_SCENE):
         return Engine.MANIM
     return Engine.REMOTION
 

@@ -19,6 +19,18 @@ export enum SceneKind {
   QUOTE = 'quote',
   OUTRO = 'outro',
   MINDMAP = 'mindmap',
+  DUAL_CHART = 'dual-chart',
+  THREE_SCENE = 'three-scene',
+  SCREENFLOW = 'screenflow',
+  OVERLAY_CTA = 'overlay-cta',
+  AUDIO_REACTIVE = 'audio-reactive',
+  DOCUMENT_HIGHLIGHT = 'document-highlight',
+  SVG_MORPH = 'svg-morph',
+  /* Showcase scene kinds */
+  SHOWCASE = 'showcase',
+  SPLIT = 'split',
+  MOCKUP = 'mockup',
+  HERO = 'hero',
 }
 
 export interface WordTiming {
@@ -39,6 +51,44 @@ export interface AudioTrackIR {
   durationFrames: number
 }
 
+export interface OverlayItem {
+  id: string
+  type: 'text' | 'image' | 'shape' | 'logo'
+  content: string
+  position: { x: number; y: number }
+  size?: { width: number; height: number }
+  startFrame: number
+  durationFrames: number
+  opacity: number
+  animation?: string
+}
+
+export interface OverlayStack {
+  items: OverlayItem[]
+}
+
+export interface MotionHint {
+  type: 'entrance' | 'exit' | 'emphasis' | 'path'
+  animation: string
+  durationMs?: number
+  delayMs?: number
+  easing?: string
+}
+
+export type ArtifactState = 'missing' | 'pending' | 'generating' | 'ready' | 'error'
+
+export interface ArtifactRef {
+  state: ArtifactState
+  url?: string
+  errorMessage?: string
+}
+
+export interface ArtifactPlaceholders {
+  thumbnail?: ArtifactRef
+  frame?: ArtifactRef
+  report?: ArtifactRef
+}
+
 export interface SceneNode {
   id: string
   kind: SceneKind
@@ -48,6 +98,9 @@ export interface SceneNode {
   narration: NarrationSpec
   contentHash?: string
   routedEngine?: Engine
+  overlay_stack?: OverlayStack
+  motion_hints?: MotionHint[]
+  artifacts?: ArtifactPlaceholders
 }
 
 export interface VideoProject {
@@ -69,7 +122,7 @@ export interface RoutingEntry {
 }
 
 export function computeSceneHash(scene: Omit<SceneNode, 'contentHash'>): string {
-  const data = { id: scene.id, kind: scene.kind, payload: scene.payload, engine_hint: scene.engine_hint, duration_frames: scene.duration_frames, narration: scene.narration }
+  const data = { id: scene.id, kind: scene.kind, payload: scene.payload, engine_hint: scene.engine_hint, duration_frames: scene.duration_frames, narration: scene.narration, overlay_stack: scene.overlay_stack, motion_hints: scene.motion_hints, artifacts: scene.artifacts }
   return stableHash(JSON.stringify(data, Object.keys(data).sort())).slice(0, 16)
 }
 

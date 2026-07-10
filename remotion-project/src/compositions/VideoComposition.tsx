@@ -119,6 +119,8 @@ const SceneRenderer: React.FC<{ scene: SceneData; frameOffset: number }> = ({ sc
       return <Hero3DScene title={scene.title || ""} subtitle={scene.subtitle} deviceType={(scene as any).deviceType} duration={dur} />;
     case "screenflow":
       return <ScreenflowScene device={scene.device || "browser"} screenshot={scene.screenshot || ""} title={scene.title} callouts={scene.callouts || []} cursorPath={scene.cursorPath || []} duration={dur} wordTimestamps={ts} sceneStartFrame={sf} />;
+    case "three":
+      return <ThreeSceneExample duration={dur} />;
     case "audio-viz":
       return <AudioVizScene audioSrc={scene.audioSrc || ""} variant={(scene.variant as "waveform" | "spectrum") || "waveform"} barCount={scene.barCount || 64} duration={dur} wordTimestamps={ts} sceneStartFrame={sf} />;
     default:

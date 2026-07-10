@@ -285,6 +285,16 @@ def _ir_scene_props(project: VideoProject, index: int) -> dict[str, Any]:
                 "caption", "cta", "src", "nodeprefix", "highlightLines"):
         if key in payload and payload[key]:
             scene_json[key] = payload[key]
+    if node.overlays:
+        scene_json["overlays"] = [
+            {
+                "kind": o.kind,
+                "startOffsetMs": o.start_offset_ms,
+                "endOffsetMs": o.end_offset_ms,
+                "payload": json.loads(o.payload),
+            }
+            for o in node.overlays
+        ]
     audio_tracks_list: list[dict[str, Any]] = []
     if index < len(project.audio_tracks):
         audio_tracks_list.append(asdict(project.audio_tracks[index]))

@@ -37,6 +37,8 @@ export const SceneKindSchema = z.enum([
   "product-promo",
   "audio-reactive",
   "dual-chart",
+  "three-scene",
+  "svg-morph",
   "promo",
 ]);
 export type SceneKind = z.infer<typeof SceneKindSchema>;

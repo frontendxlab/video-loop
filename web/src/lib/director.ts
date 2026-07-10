@@ -2,14 +2,14 @@ import { Engine, SceneKind, type SceneNode, type RoutingEntry } from './ir-types
 
 export function pickEngine(node: SceneNode): Engine {
   const k = node.kind
-  if (k === SceneKind.CODE || k === SceneKind.DIFF || k === SceneKind.BULLETS || k === SceneKind.TITLE || k === SceneKind.COMPARISON || k === SceneKind.QUOTE || k === SceneKind.OUTRO || k === SceneKind.MINDMAP) return Engine.REMOTION
+  if (k === SceneKind.CODE || k === SceneKind.DIFF || k === SceneKind.BULLETS || k === SceneKind.TITLE || k === SceneKind.COMPARISON || k === SceneKind.QUOTE || k === SceneKind.OUTRO || k === SceneKind.MINDMAP || k === SceneKind.SCREENFLOW || k === SceneKind.OVERLAY_CTA || k === SceneKind.AUDIO_REACTIVE || k === SceneKind.DOCUMENT_HIGHLIGHT || k === SceneKind.SVG_MORPH || k === SceneKind.SHOWCASE || k === SceneKind.SPLIT || k === SceneKind.MOCKUP || k === SceneKind.HERO) return Engine.REMOTION
   if (k === SceneKind.DIAGRAM) {
     const p = tryParse(node.payload)
     if (p?.layout === 'math_graph') return Engine.MANIM
     if (p?.interactive) return Engine.ANIMOTION
     return Engine.REMOTION
   }
-  if (k === SceneKind.CHART || k === SceneKind.TIMELINE || k === SceneKind.MAP3D) return Engine.MANIM
+  if (k === SceneKind.CHART || k === SceneKind.TIMELINE || k === SceneKind.MAP3D || k === SceneKind.DUAL_CHART || k === SceneKind.THREE_SCENE) return Engine.MANIM
   return Engine.REMOTION
 }
 
@@ -33,6 +33,17 @@ export function getRoutingReason(node: SceneNode): string {
     [SceneKind.CHART]: 'BarChart, NumberLine, Axes primitives',
     [SceneKind.TIMELINE]: 'MoveAlongPath, deterministic tick math',
     [SceneKind.MAP3D]: '3D geometry and camera movement',
+    [SceneKind.DUAL_CHART]: 'Dual-axis bar/line combination chart with Manim primitives',
+    [SceneKind.THREE_SCENE]: 'Three-dimensional scene with perspective camera movement',
+    [SceneKind.SCREENFLOW]: 'Multi-step screen recording with callout annotations',
+    [SceneKind.OVERLAY_CTA]: 'Transparent overlay with call-to-action text and fade-out',
+    [SceneKind.AUDIO_REACTIVE]: 'Audio waveform visualization with beat-synced React animation',
+    [SceneKind.DOCUMENT_HIGHLIGHT]: 'Document close-up with animated text highlight reveal',
+    [SceneKind.SVG_MORPH]: 'SVG path-to-path morphing with spring physics',
+    [SceneKind.SHOWCASE]: 'Product showcase with highlight cards and transitions',
+    [SceneKind.SPLIT]: 'Split-screen comparison with synced playback',
+    [SceneKind.MOCKUP]: 'Device mockup frame with inner content scroll',
+    [SceneKind.HERO]: 'Full-screen hero section with animated headline',
   }
   return reasons[k] ?? 'Default routing'
 }
@@ -52,6 +63,17 @@ export const ROUTING_TABLE: RoutingEntry[] = [
   { kind: 'chart', engine: Engine.MANIM, reason: 'BarChart, NumberLine, Axes primitives' },
   { kind: 'timeline', engine: Engine.MANIM, reason: 'MoveAlongPath, deterministic tick math' },
   { kind: 'map3d', engine: Engine.MANIM, reason: '3D geometry and camera movement' },
+  { kind: 'dual-chart', engine: Engine.MANIM, reason: 'Dual-axis bar/line combination chart with Manim primitives' },
+  { kind: 'three-scene', engine: Engine.MANIM, reason: 'Three-dimensional scene with perspective camera movement' },
+  { kind: 'screenflow', engine: Engine.REMOTION, reason: 'Multi-step screen recording with callout annotations' },
+  { kind: 'overlay-cta', engine: Engine.REMOTION, reason: 'Transparent overlay with call-to-action text and fade-out' },
+  { kind: 'audio-reactive', engine: Engine.REMOTION, reason: 'Audio waveform visualization with beat-synced React animation' },
+  { kind: 'document-highlight', engine: Engine.REMOTION, reason: 'Document close-up with animated text highlight reveal' },
+  { kind: 'svg-morph', engine: Engine.REMOTION, reason: 'SVG path-to-path morphing with spring physics' },
+  { kind: 'showcase', engine: Engine.REMOTION, reason: 'Product showcase with highlight cards and transitions' },
+  { kind: 'split', engine: Engine.REMOTION, reason: 'Split-screen comparison with synced playback' },
+  { kind: 'mockup', engine: Engine.REMOTION, reason: 'Device mockup frame with inner content scroll' },
+  { kind: 'hero', engine: Engine.REMOTION, reason: 'Full-screen hero section with animated headline' },
 ]
 
 function tryParse(p: string): Record<string, unknown> | null {

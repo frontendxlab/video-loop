@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import json
+
 from videoforge.engine.ir import (
     AudioTrackIR,
     Engine,
     NarrationSpec,
+    OverlayIR,
     SceneKind,
     SceneNode,
     VideoProject,
@@ -158,3 +161,121 @@ def test_audio_track_frozen():
     except Exception:
         return
     raise AssertionError("AudioTrackIR should be frozen")
+
+
+# ── OverlayIR ────────────────────────────────────────────────────────────────
+
+
+def _overlay_node() -> SceneNode:
+    return SceneNode(
+        id="s0", kind=SceneKind.TITLE,
+        payload='{"title":"Hi"}',
+        engine_hint=Engine.REMOTION, duration_frames=90,
+        narration=NarrationSpec("hi", (), "estimated"),
+        overlays=(OverlayIR("cta", 100, 500, '{"title":"Subscribe"}'),),
+    )
+
+
+def test_overlay_ir_frozen():
+    o = OverlayIR("cta", 0, 500, '{"title":"Click"}')
+    try:
+        o.kind = "brand"  # type: ignore[misc]
+    except Exception:
+        return
+    raise AssertionError("OverlayIR should be frozen")
+
+
+def test_scene_node_default_overlays_empty():
+    n = SceneNode(
+        id="s0", kind=SceneKind.TITLE,
+        payload='{"title":"Hi"}',
+        engine_hint=Engine.REMOTION, duration_frames=90,
+        narration=NarrationSpec("hi", (), "estimated"),
+    )
+    assert n.overlays == ()
+
+
+def test_scene_node_accepts_overlays():
+    n = _overlay_node()
+    assert len(n.overlays) == 1
+    assert n.overlays[0].kind == "cta"
+    assert n.overlays[0].start_offset_ms == 100
+    assert n.overlays[0].end_offset_ms == 500
+
+
+def test_overlay_hash_sensitive():
+    a = _overlay_node()
+    b = SceneNode(
+        id="s0", kind=SceneKind.TITLE,
+        payload='{"title":"Hi"}',
+        engine_hint=Engine.REMOTION, duration_frames=90,
+        narration=NarrationSpec("hi", (), "estimated"),
+    )
+    assert a.content_hash() != b.content_hash()
+
+
+def test_overlay_hash_deterministic():
+    assert _overlay_node().content_hash() == _overlay_node().content_hash()
+
+
+def test_overlay_payload_parseable():
+    o = OverlayIR("cta", 0, 500, '{"title":"Click","url":"https://x.com"}')
+    payload = json.loads(o.payload)
+    assert payload["title"] == "Click"
+    assert payload["url"] == "https://x.com"
+
+
+def test_multiple_overlays_stack():
+    o1 = OverlayIR("cta", 0, 500, '{"title":"Subscribe"}')
+    o2 = OverlayIR("brand", 0, 500, '{"logo":"wmark.png"}')
+    n = SceneNode(
+        id="s0", kind=SceneKind.TITLE,
+        payload='{"title":"Hi"}',
+        engine_hint=Engine.REMOTION, duration_frames=90,
+        narration=NarrationSpec("hi", (), "estimated"),
+        overlays=(o1, o2),
+    )
+    assert len(n.overlays) == 2
+    assert n.overlays[0].kind == "cta"
+    assert n.overlays[1].kind == "brand"
+
+
+def test_overlay_order_affects_hash():
+    """Reordering overlays produces different hash (stack order matters)."""
+    o1 = OverlayIR("cta", 0, 500, '{"title":"A"}')
+    o2 = OverlayIR("lower_third", 0, 500, '{"title":"B"}')
+    a = SceneNode(
+        id="s0", kind=SceneKind.TITLE,
+        payload='{"title":"Hi"}',
+        engine_hint=Engine.REMOTION, duration_frames=90,
+        narration=NarrationSpec("hi", (), "estimated"),
+        overlays=(o1, o2),
+    )
+    b = SceneNode(
+        id="s0", kind=SceneKind.TITLE,
+        payload='{"title":"Hi"}',
+        engine_hint=Engine.REMOTION, duration_frames=90,
+        narration=NarrationSpec("hi", (), "estimated"),
+        overlays=(o2, o1),
+    )
+    assert a.content_hash() != b.content_hash()
+
+
+def test_video_project_hash_sensitive_to_overlays():
+    a = SceneNode(
+        id="s0", kind=SceneKind.TITLE,
+        payload='{"title":"Hi"}',
+        engine_hint=Engine.REMOTION, duration_frames=90,
+        narration=NarrationSpec("hi", (), "estimated"),
+    )
+    b = _overlay_node()
+    va = VideoProject("T", (a,), 30, 1920, 1080)
+    vb = VideoProject("T", (b,), 30, 1920, 1080)
+    assert va.content_hash() != vb.content_hash()
+
+
+def test_overlay_ir_exported():
+    """OverlayIR is importable from videoforge.engine.ir."""
+    from videoforge.engine.ir import OverlayIR as OIR
+    o = OIR("cta", 0, 0, "{}")
+    assert o.kind == "cta"

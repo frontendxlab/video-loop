@@ -44,3 +44,36 @@ routing:
   - kind: map3d
     engine: manim
     reason: "3D geometry and camera movement"
+  - kind: dual-chart
+    engine: manim
+    reason: "Dual-axis bar/line combination chart with Manim primitives"
+  - kind: three-scene
+    engine: manim
+    reason: "Three-dimensional scene with perspective camera movement"
+  - kind: screenflow
+    engine: remotion
+    reason: "Multi-step screen recording with callout annotations"
+  - kind: overlay-cta
+    engine: remotion
+    reason: "Transparent overlay with call-to-action text and fade-out"
+  - kind: audio-reactive
+    engine: remotion
+    reason: "Audio waveform visualization with beat-synced React animation"
+  - kind: document-highlight
+    engine: remotion
+    reason: "Document close-up with animated text highlight reveal"
+  - kind: svg-morph
+    engine: remotion
+    reason: "SVG path-to-path morphing with spring physics"
+  - kind: kinetic-text
+    engine: remotion
+    reason: "Per-character kinetic typography with spring physics"
+  - kind: canvas-composite
+    engine: remotion
+    reason: "HTML-in-canvas post-processing composite effects"
+  - kind: real-estate
+    engine: remotion
+    reason: "Metric counters, lower thirds, footage overlay composition"
+  - kind: promo
+    engine: remotion
+    reason: "Layered promo scene with cards, terminal, and narrative"
