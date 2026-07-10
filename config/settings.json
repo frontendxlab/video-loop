@@ -1,78 +1,231 @@
 {
-  "activeProvider": "9router",
   "activeModel": "ocg/deepseek-v4-flash",
+  "activeProvider": "9router",
   "providers": [
     {
-      "provider": "openai",
-      "label": "OpenAI",
       "apiKey": "",
       "baseUrl": "",
       "defaultModel": "gpt-4o",
+      "label": "OpenAI",
       "models": [
-        {"id": "gpt-4o", "label": "GPT-4o", "maxTokens": 16384},
-        {"id": "gpt-4o-mini", "label": "GPT-4o Mini", "maxTokens": 16384}
-      ]
+        {
+          "id": "gpt-4o",
+          "label": "GPT-4o",
+          "maxTokens": 16384
+        },
+        {
+          "id": "gpt-4o-mini",
+          "label": "GPT-4o Mini",
+          "maxTokens": 16384
+        }
+      ],
+      "provider": "openai"
     },
     {
-      "provider": "anthropic",
-      "label": "Anthropic",
       "apiKey": "",
       "baseUrl": "",
       "defaultModel": "claude-sonnet-4-20250514",
+      "label": "Anthropic",
       "models": [
-        {"id": "claude-sonnet-4-20250514", "label": "Claude Sonnet 4", "maxTokens": 8192}
-      ]
+        {
+          "id": "claude-sonnet-4-20250514",
+          "label": "Claude Sonnet 4",
+          "maxTokens": 8192
+        }
+      ],
+      "provider": "anthropic"
     },
     {
-      "provider": "9router",
-      "label": "9router",
       "apiKey": "sk_9router",
       "baseUrl": "http://127.0.0.1:20128/v1",
       "defaultModel": "ocg/deepseek-v4-flash",
+      "label": "9router",
       "models": [
-        {"id": "ocg/deepseek-v4-flash", "label": "DeepSeek V4 Flash (ocg)", "maxTokens": 32768},
-        {"id": "ocg/deepseek-v4-flash:free", "label": "DeepSeek V4 Flash Free (ocg)", "maxTokens": 8192},
-        {"id": "ocg/deepseek-v4-pro", "label": "DeepSeek V4 Pro (ocg)", "maxTokens": 32768},
-        {"id": "ocg/glm-5.2", "label": "GLM 5.2 (ocg)", "maxTokens": 32768},
-        {"id": "cmc/deepseek/deepseek-v4-pro", "label": "DeepSeek V4 Pro (cmc)", "maxTokens": 32768},
-        {"id": "cmc/xiaomi/mimo-v2.5-pro", "label": "Xiaomi MiMo v2.5 Pro (cmc)", "maxTokens": 32768},
-        {"id": "clinepass/cline-pass/deepseek-v4-flash", "label": "DeepSeek V4 Flash (cline)", "maxTokens": 32768},
-        {"id": "clinepass/cline-pass/deepseek-v4-pro", "label": "DeepSeek V4 Pro (cline)", "maxTokens": 32768},
-        {"id": "clinepass/cline-pass/glm-5.2", "label": "GLM 5.2 (cline)", "maxTokens": 32768},
-        {"id": "clinepass/cline-pass/kimi-k2.7-code", "label": "Kimi K2.7 Code (cline)", "maxTokens": 32768},
-        {"id": "clinepass/cline-pass/mimo-v2.5-pro", "label": "MiMo v2.5 Pro (cline)", "maxTokens": 32768},
-        {"id": "cc/claude-sonnet-5", "label": "Claude Sonnet 5 (cc)", "maxTokens": 16384},
-        {"id": "cc/claude-opus-4-7", "label": "Claude Opus 4.7 (cc)", "maxTokens": 32768},
-        {"id": "cc/claude-opus-4-8", "label": "Claude Opus 4.8 (cc)", "maxTokens": 32768},
-        {"id": "cc/claude-haiku-4-5-20251001", "label": "Claude Haiku 4.5 (cc)", "maxTokens": 16384},
-        {"id": "cc/claude-fable-5", "label": "Claude Fable 5 (cc)", "maxTokens": 16384},
-        {"id": "fm/gpt-5.5", "label": "GPT 5.5 (fm)", "maxTokens": 32768},
-        {"id": "fm/gpt-5.4", "label": "GPT 5.4 (fm)", "maxTokens": 32768},
-        {"id": "fm/gpt-5.4-mini", "label": "GPT 5.4 Mini (fm)", "maxTokens": 16384},
-        {"id": "fm/gpt-5.3-codex", "label": "GPT 5.3 Codex (fm)", "maxTokens": 32768},
-        {"id": "nvidia/deepseek-ai/deepseek-v4-flash", "label": "DeepSeek V4 Flash (nvidia)", "maxTokens": 32768},
-        {"id": "nvidia/deepseek-ai/deepseek-v4-pro", "label": "DeepSeek V4 Pro (nvidia)", "maxTokens": 32768},
-        {"id": "nvidia/z-ai/glm-5.2", "label": "GLM 5.2 (nvidia)", "maxTokens": 32768},
-        {"id": "nvidia/minimaxai/minimax-m3", "label": "MiniMax M3 (nvidia)", "maxTokens": 32768},
-        {"id": "ag/claude-sonnet-4-6", "label": "Claude Sonnet 4.6 (ag)", "maxTokens": 16384},
-        {"id": "ag/claude-opus-4-6-thinking", "label": "Claude Opus 4.6 Thinking (ag)", "maxTokens": 32768},
-        {"id": "ag/gemini-3-flash-agent", "label": "Gemini 3 Flash (ag)", "maxTokens": 16384},
-        {"id": "gc/gemini-2.5-pro", "label": "Gemini 2.5 Pro (gc)", "maxTokens": 32768},
-        {"id": "oc/deepseek-v4-flash-free", "label": "DeepSeek V4 Flash Free (oc)", "maxTokens": 8192},
-        {"id": "oc/big-pickle", "label": "Big Pickle (oc)", "maxTokens": 16384},
-        {"id": "mmf/mimo-auto", "label": "MiMo Auto (mmf)", "maxTokens": 32768}
-      ]
+        {
+          "id": "ocg/deepseek-v4-flash",
+          "label": "DeepSeek V4 Flash (ocg)",
+          "maxTokens": 32768
+        },
+        {
+          "id": "ocg/deepseek-v4-flash:free",
+          "label": "DeepSeek V4 Flash Free (ocg)",
+          "maxTokens": 8192
+        },
+        {
+          "id": "ocg/deepseek-v4-pro",
+          "label": "DeepSeek V4 Pro (ocg)",
+          "maxTokens": 32768
+        },
+        {
+          "id": "ocg/glm-5.2",
+          "label": "GLM 5.2 (ocg)",
+          "maxTokens": 32768
+        },
+        {
+          "id": "cmc/deepseek/deepseek-v4-pro",
+          "label": "DeepSeek V4 Pro (cmc)",
+          "maxTokens": 32768
+        },
+        {
+          "id": "cmc/xiaomi/mimo-v2.5-pro",
+          "label": "Xiaomi MiMo v2.5 Pro (cmc)",
+          "maxTokens": 32768
+        },
+        {
+          "id": "clinepass/cline-pass/deepseek-v4-flash",
+          "label": "DeepSeek V4 Flash (cline)",
+          "maxTokens": 32768
+        },
+        {
+          "id": "clinepass/cline-pass/deepseek-v4-pro",
+          "label": "DeepSeek V4 Pro (cline)",
+          "maxTokens": 32768
+        },
+        {
+          "id": "clinepass/cline-pass/glm-5.2",
+          "label": "GLM 5.2 (cline)",
+          "maxTokens": 32768
+        },
+        {
+          "id": "clinepass/cline-pass/kimi-k2.7-code",
+          "label": "Kimi K2.7 Code (cline)",
+          "maxTokens": 32768
+        },
+        {
+          "id": "clinepass/cline-pass/mimo-v2.5-pro",
+          "label": "MiMo v2.5 Pro (cline)",
+          "maxTokens": 32768
+        },
+        {
+          "id": "cc/claude-sonnet-5",
+          "label": "Claude Sonnet 5 (cc)",
+          "maxTokens": 16384
+        },
+        {
+          "id": "cc/claude-opus-4-7",
+          "label": "Claude Opus 4.7 (cc)",
+          "maxTokens": 32768
+        },
+        {
+          "id": "cc/claude-opus-4-8",
+          "label": "Claude Opus 4.8 (cc)",
+          "maxTokens": 32768
+        },
+        {
+          "id": "cc/claude-haiku-4-5-20251001",
+          "label": "Claude Haiku 4.5 (cc)",
+          "maxTokens": 16384
+        },
+        {
+          "id": "cc/claude-fable-5",
+          "label": "Claude Fable 5 (cc)",
+          "maxTokens": 16384
+        },
+        {
+          "id": "fm/gpt-5.5",
+          "label": "GPT 5.5 (fm)",
+          "maxTokens": 32768
+        },
+        {
+          "id": "fm/gpt-5.4",
+          "label": "GPT 5.4 (fm)",
+          "maxTokens": 32768
+        },
+        {
+          "id": "fm/gpt-5.4-mini",
+          "label": "GPT 5.4 Mini (fm)",
+          "maxTokens": 16384
+        },
+        {
+          "id": "fm/gpt-5.3-codex",
+          "label": "GPT 5.3 Codex (fm)",
+          "maxTokens": 32768
+        },
+        {
+          "id": "nvidia/deepseek-ai/deepseek-v4-flash",
+          "label": "DeepSeek V4 Flash (nvidia)",
+          "maxTokens": 32768
+        },
+        {
+          "id": "nvidia/deepseek-ai/deepseek-v4-pro",
+          "label": "DeepSeek V4 Pro (nvidia)",
+          "maxTokens": 32768
+        },
+        {
+          "id": "nvidia/z-ai/glm-5.2",
+          "label": "GLM 5.2 (nvidia)",
+          "maxTokens": 32768
+        },
+        {
+          "id": "nvidia/minimaxai/minimax-m3",
+          "label": "MiniMax M3 (nvidia)",
+          "maxTokens": 32768
+        },
+        {
+          "id": "ag/claude-sonnet-4-6",
+          "label": "Claude Sonnet 4.6 (ag)",
+          "maxTokens": 16384
+        },
+        {
+          "id": "ag/claude-opus-4-6-thinking",
+          "label": "Claude Opus 4.6 Thinking (ag)",
+          "maxTokens": 32768
+        },
+        {
+          "id": "ag/gemini-3-flash-agent",
+          "label": "Gemini 3 Flash (ag)",
+          "maxTokens": 16384
+        },
+        {
+          "id": "gc/gemini-2.5-pro",
+          "label": "Gemini 2.5 Pro (gc)",
+          "maxTokens": 32768
+        },
+        {
+          "id": "oc/deepseek-v4-flash-free",
+          "label": "DeepSeek V4 Flash Free (oc)",
+          "maxTokens": 8192
+        },
+        {
+          "id": "oc/big-pickle",
+          "label": "Big Pickle (oc)",
+          "maxTokens": 16384
+        },
+        {
+          "id": "mmf/mimo-auto",
+          "label": "MiMo Auto (mmf)",
+          "maxTokens": 32768
+        }
+      ],
+      "provider": "9router"
     },
     {
-      "provider": "custom",
-      "label": "Custom",
       "apiKey": "",
       "baseUrl": "",
       "defaultModel": "custom-model",
-      "models": [{"id": "custom-model", "label": "Custom Model", "maxTokens": 4096}]
+      "label": "Custom",
+      "models": [
+        {
+          "id": "custom-model",
+          "label": "Custom Model",
+          "maxTokens": 4096
+        }
+      ],
+      "provider": "custom"
     }
   ],
-  "queue": {"maxConcurrency": 4, "maxQueueSize": 100},
-  "retry": {"maxRetries": 3, "retryDelayMs": 2000, "exponentialBackoff": true},
-  "review": {"l0MinScore": 0.9, "l1MinScore": 0.85, "coherenceGateEnabled": true}
+  "queue": {
+    "maxConcurrency": 4,
+    "maxQueueSize": 100
+  },
+  "retry": {
+    "exponentialBackoff": true,
+    "maxRetries": 3,
+    "retryDelayMs": 2000
+  },
+  "review": {
+    "coherenceGateEnabled": true,
+    "l0MinScore": 0.9,
+    "l1MinScore": 0.85
+  }
 }

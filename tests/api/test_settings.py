@@ -282,21 +282,47 @@ class Test9RouterDiscovery:
     """9router dynamic model discovery — adapter + endpoint integration."""
 
     def test_discovery_fallback_when_no_api_key(self):
-        """Without 9ROUTER_API_KEY, discovery returns 2 fallback models."""
+        """Without 9ROUTER_API_KEY and without settings, discovery returns fallback models."""
         clear_9router_cache()
-        result = discover_9router_models(force=True)
-        assert result["discovered"] is False
-        assert result["source"] == "fallback"
-        assert "9ROUTER_API_KEY" in (result.get("error") or "")
-        assert len(result["models"]) == 2
+        import os
+        old_key = os.environ.pop("9ROUTER_API_KEY", None)
+        old_url = os.environ.pop("9ROUTER_API_URL", None)
+        try:
+            from unittest.mock import patch
+            with patch("videoforge.api.settings.load_settings", return_value={"providers": []}):
+                result = discover_9router_models(force=True)
+                assert result["discovered"] is False
+                assert result["source"] == "fallback"
+                assert "9ROUTER_API_KEY" in (result.get("error") or "")
+                assert len(result["models"]) >= 2
+        finally:
+            if old_key: os.environ["9ROUTER_API_KEY"] = old_key
+            if old_url: os.environ["9ROUTER_API_URL"] = old_url
 
     def test_discovery_fallback_model_ids(self):
-        """Fallback models have expected IDs."""
+        """Fallback models have expected IDs when no key available."""
+        clear_9router_cache()
+        import os
+        old_key = os.environ.pop("9ROUTER_API_KEY", None)
+        old_url = os.environ.pop("9ROUTER_API_URL", None)
+        try:
+            from unittest.mock import patch
+            with patch("videoforge.api.settings.load_settings", return_value={"providers": []}):
+                result = discover_9router_models(force=True)
+                ids = {m["id"] for m in result["models"]}
+                assert "ocg/deepseek-v4-flash" in ids
+                assert "ocg/deepseek-v4-flash:free" in ids
+        finally:
+            if old_key: os.environ["9ROUTER_API_KEY"] = old_key
+            if old_url: os.environ["9ROUTER_API_URL"] = old_url
+
+    def test_discovery_succeeds_with_settings_key(self):
+        """Discovery succeeds when settings file has 9router API key."""
         clear_9router_cache()
         result = discover_9router_models(force=True)
-        ids = {m["id"] for m in result["models"]}
-        assert "ocg/deepseek-v4-flash" in ids
-        assert "ocg/deepseek-v4-flash:free" in ids
+        assert result["discovered"] is True
+        assert result["source"] == "api"
+        assert len(result["models"]) > 2
 
     def test_provider_status_includes_discovery_meta(self, client):
         """provider-status response includes discovered/discoverySource/

@@ -1,0 +1,61 @@
+{
+  "artifact": "videoforge-video-report",
+  "version": 1,
+  "video_path": "/home/rashid/projects/videoforge/test.mp4",
+  "report_timestamp": "2026-07-10T09:50:48.555858+00:00",
+  "content_hash": "",
+  "engine_mix": [
+    "remotion"
+  ],
+  "render_format": {
+    "fps": 30,
+    "width": 1920,
+    "height": 1080,
+    "pixel_format": "yuv420p",
+    "video_codec": "h264",
+    "audio_codec": "aac"
+  },
+  "scenes_summary": {
+    "count": 0,
+    "engines": {},
+    "total_duration_frames": 0
+  },
+  "l0_summary": {
+    "status": "fail",
+    "passed": false,
+    "total_issues": 1,
+    "severity_counts": {
+      "high": 1,
+      "medium": 0,
+      "low": 0
+    },
+    "sampled_frames": 6,
+    "total_frames": 300,
+    "duration_seconds": 0.0,
+    "issues": [
+      {
+        "severity": "high",
+        "type": "blank_frame",
+        "detail": "blank"
+      }
+    ]
+  },
+  "l1_summary": {
+    "passed": true,
+    "total_frames": 300,
+    "total_issues": 0,
+    "issues": []
+  },
+  "l2_layout_overlap_summary": {
+    "status": "pass",
+    "passed": true,
+    "total_issues": 0,
+    "severity_counts": {
+      "high": 0,
+      "medium": 0,
+      "low": 0
+    },
+    "issues": []
+  },
+  "policy_verdict": "<MagicMock name='mock.evaluate().__getitem__()' id='135604590143744'>"
+}

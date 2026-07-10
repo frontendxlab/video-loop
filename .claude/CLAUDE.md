@@ -11,7 +11,7 @@
 > (documentation, ownership, history, decisions). **Always verify against
 > actual source files before making changes** — the index may be stale.
 
-Last indexed: 2026-07-09 (commit bc4169e). Confidence: 100%.
+Last indexed: 2026-07-10 (commit ff8dea8). Confidence: 100%.
 ### Architecture
 **Repo is a video generation and review platform: it ingests source‑code repositories and associated media assets, fetches pull‑request metadata, renders animated scenes with Remotion and Manim, compresses the resulting footage via the *caveman‑compress* skill, and finally serves the polished videos together with an interactive review UI through a FastAPI‑based server.**  
 The monorepo orchestrates this end‑to‑end pipeline across a Python backend, a TypeScript/JavaScript front‑end, and a collection of reusable scripts, enabling developers to produce, validate, and share programmatically generated video content with minimal friction. ---
@@ -29,7 +29,7 @@ The monorepo orchestrates this end‑to‑end pipeline across a Python backend, 
 - `src/videoforge/server.py`
 ### Tech Stack
 **Languages:** Python
-
+**Frameworks:** FastAPI, HTTPX
 
 ### Architectural Layers
 | Layer | Files | Purpose |
@@ -52,26 +52,27 @@ The monorepo orchestrates this end‑to‑end pipeline across a Python backend, 
 ### Hotspots (High Churn)
 | File | Churn | 90d Commits | Owner |
 |------|-------|-------------|-------|
-| `remotion-project/src/scenes/CodeScene.tsx` | 99.4th %ile | 4 | Rashid |
-| `vfx-cli` | 99.2th %ile | 6 | Rashid |
-| `remotion-project/src/scenes/BulletScene.tsx` | 97.0th %ile | 3 | Rashid |
-| `src/videoforge/app.py` | 95.8th %ile | 3 | Rashid |
-| `remotion-project/src/scenes/OutroScene.tsx` | 95.3th %ile | 3 | Rashid |
+| `tests/api/test_jobs.py` | 100.0th %ile | 3 | Rashid |
+| `src/videoforge/api/jobs.py` | 99.7th %ile | 3 | Rashid |
+| `web/src/contracts/create.ts` | 99.0th %ile | 6 | Rashid |
+| `tests/api/test_settings.py` | 98.7th %ile | 5 | Rashid |
+| `remotion-project/src/scenes/CodeScene.tsx` | 98.5th %ile | 4 | Rashid |
 
 ## Code health
 Three signals: **defect risk** (the overall score), **maintainability** (smells that hurt readability/change-cost without predicting bugs), and **performance** (static performance RISK: I/O-in-loop / N+1 shapes that waste work, high-precision/low-recall). Maintainability and performance are co-equal views, never blended into the defect headline. See `docs/CODE_HEALTH.md`.
 
-Defect risk, Hotspot health: 7.19/10 (stable) ·
-Average: 9.57/10 ·
+Defect risk, Hotspot health: 8.31/10 (stable) ·
+Average: 9.46/10 ·
 Worst: 4.04/10 (`vfx-cli`)
-Maintainability, Average: 9.71/10
-Performance risk, Average: 9.93/10
+Maintainability, Average: 9.58/10
+Performance risk, Average: 9.92/10
 
 ### Critical biomarkers
 - `vfx-cli` — function hotspot (wizard) — impact −2.3
 - `vfx-cli` — complex method (wizard) — impact −0.9
 - `src/videoforge/engine/renderer.py` — brain method (render_scenes) — impact −0.6
 - `src/videoforge/engine/manim_renderer.py` — brain method (scene_to_manim_code) — impact −0.3
+- `src/videoforge/api/jobs.py` — brain method (create_job) — impact −0.3
 
 ### Repowise MCP Tools
 
@@ -115,5 +116,6 @@ This repo has the Repowise MCP server configured. The tools below answer questio
 **Commands:**
 - Test: `pytest`
 - Lint: `ruff check .`
+- Dev: `make dev`
 
 <!-- REPOWISE:END -->

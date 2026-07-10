@@ -16,6 +16,7 @@ import { Route as ReportsIndexRouteImport } from './routes/reports/index'
 import { Route as RecipesIndexRouteImport } from './routes/recipes/index'
 import { Route as JobsIndexRouteImport } from './routes/jobs/index'
 import { Route as CreateIndexRouteImport } from './routes/create/index'
+import { Route as ReportsReportNameRouteImport } from './routes/reports/$reportName'
 import { Route as JobsJobIdRouteImport } from './routes/jobs/$jobId'
 
 const DirectorPreviewRoute = DirectorPreviewRouteImport.update({
@@ -53,6 +54,11 @@ const CreateIndexRoute = CreateIndexRouteImport.update({
   path: '/create/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ReportsReportNameRoute = ReportsReportNameRouteImport.update({
+  id: '/reports/$reportName',
+  path: '/reports/$reportName',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const JobsJobIdRoute = JobsJobIdRouteImport.update({
   id: '/jobs/$jobId',
   path: '/jobs/$jobId',
@@ -63,6 +69,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/director-preview': typeof DirectorPreviewRoute
   '/jobs/$jobId': typeof JobsJobIdRoute
+  '/reports/$reportName': typeof ReportsReportNameRoute
   '/create/': typeof CreateIndexRoute
   '/jobs/': typeof JobsIndexRoute
   '/recipes/': typeof RecipesIndexRoute
@@ -73,6 +80,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/director-preview': typeof DirectorPreviewRoute
   '/jobs/$jobId': typeof JobsJobIdRoute
+  '/reports/$reportName': typeof ReportsReportNameRoute
   '/create': typeof CreateIndexRoute
   '/jobs': typeof JobsIndexRoute
   '/recipes': typeof RecipesIndexRoute
@@ -84,6 +92,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/director-preview': typeof DirectorPreviewRoute
   '/jobs/$jobId': typeof JobsJobIdRoute
+  '/reports/$reportName': typeof ReportsReportNameRoute
   '/create/': typeof CreateIndexRoute
   '/jobs/': typeof JobsIndexRoute
   '/recipes/': typeof RecipesIndexRoute
@@ -96,6 +105,7 @@ export interface FileRouteTypes {
     | '/'
     | '/director-preview'
     | '/jobs/$jobId'
+    | '/reports/$reportName'
     | '/create/'
     | '/jobs/'
     | '/recipes/'
@@ -106,6 +116,7 @@ export interface FileRouteTypes {
     | '/'
     | '/director-preview'
     | '/jobs/$jobId'
+    | '/reports/$reportName'
     | '/create'
     | '/jobs'
     | '/recipes'
@@ -116,6 +127,7 @@ export interface FileRouteTypes {
     | '/'
     | '/director-preview'
     | '/jobs/$jobId'
+    | '/reports/$reportName'
     | '/create/'
     | '/jobs/'
     | '/recipes/'
@@ -127,6 +139,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   DirectorPreviewRoute: typeof DirectorPreviewRoute
   JobsJobIdRoute: typeof JobsJobIdRoute
+  ReportsReportNameRoute: typeof ReportsReportNameRoute
   CreateIndexRoute: typeof CreateIndexRoute
   JobsIndexRoute: typeof JobsIndexRoute
   RecipesIndexRoute: typeof RecipesIndexRoute
@@ -185,6 +198,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CreateIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/reports/$reportName': {
+      id: '/reports/$reportName'
+      path: '/reports/$reportName'
+      fullPath: '/reports/$reportName'
+      preLoaderRoute: typeof ReportsReportNameRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/jobs/$jobId': {
       id: '/jobs/$jobId'
       path: '/jobs/$jobId'
@@ -199,6 +219,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DirectorPreviewRoute: DirectorPreviewRoute,
   JobsJobIdRoute: JobsJobIdRoute,
+  ReportsReportNameRoute: ReportsReportNameRoute,
   CreateIndexRoute: CreateIndexRoute,
   JobsIndexRoute: JobsIndexRoute,
   RecipesIndexRoute: RecipesIndexRoute,
