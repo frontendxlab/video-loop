@@ -6,7 +6,8 @@ export type SceneType =
   | "image"
   | "comparison"
   | "diagram"
-  | "outro";
+  | "outro"
+  | "audio-viz";
 
 export interface SceneBase {
   type: SceneType;
@@ -35,4 +36,5 @@ export const SCENE_TYPES: SceneType[] = [
   "comparison",
   "diagram",
   "outro",
+  "audio-viz",
 ];
