@@ -1,19 +1,137 @@
+import { useState, useRef, useEffect } from "react";
 import {
   Accordion, AccordionContent, AccordionItem, AccordionTrigger,
 } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import type { GrillResult } from "@/contracts/create";
+import { Send, Check, Loader2 } from "lucide-react";
+
+type Message = {
+  role: "assistant" | "user";
+  text: string;
+};
 
 interface GrillPanelProps {
   result: GrillResult | null;
   loading: boolean;
   className?: string;
+  /** Multi-turn conversation mode */
+  conversationMode?: boolean;
+  messages?: Message[];
+  currentQuestion?: string;
+  onSendAnswer?: (answer: string, done: boolean) => void;
 }
 
-export function GrillPanel({ result, loading, className }: GrillPanelProps) {
+export function GrillPanel({
+  result, loading, className,
+  conversationMode, messages, currentQuestion, onSendAnswer,
+}: GrillPanelProps) {
+  const [answer, setAnswer] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (conversationMode && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [currentQuestion, conversationMode]);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  const handleSend = () => {
+    const trimmed = answer.trim();
+    if (!trimmed || !onSendAnswer) return;
+    onSendAnswer(trimmed, false);
+    setAnswer("");
+  };
+
+  const handleDone = () => {
+    const trimmed = answer.trim();
+    if (onSendAnswer) {
+      onSendAnswer(trimmed || "done", true);
+    }
+    setAnswer("");
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
+
+  // Conversation mode — show chat UI
+  if (conversationMode) {
+    return (
+      <Card className={cn("", className)}>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-sm">Grill panel</CardTitle>
+            {loading && <div className="flex items-center gap-2"><Progress value={0} className="h-1.5 w-20" /><span className="text-xs text-muted-foreground">Thinking...</span></div>}
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="max-h-64 space-y-3 overflow-y-auto rounded-md border bg-secondary/10 p-3">
+            {messages?.map((msg, i) => (
+              <div key={i} className={cn("flex", msg.role === "user" ? "justify-end" : "justify-start")}>
+                <div className={cn(
+                  "max-w-[80%] rounded-lg px-3 py-2 text-sm",
+                  msg.role === "user"
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-secondary text-secondary-foreground",
+                )}>
+                  {msg.text}
+                </div>
+              </div>
+            ))}
+            {currentQuestion && (
+              <div className="flex justify-start">
+                <div className="max-w-[80%] rounded-lg bg-secondary px-3 py-2 text-sm text-secondary-foreground">
+                  {currentQuestion}
+                </div>
+              </div>
+            )}
+            <div ref={bottomRef} />
+          </div>
+
+          {loading && (
+            <div className="flex items-center justify-center gap-2 py-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Processing...
+            </div>
+          )}
+
+          {!loading && (
+            <div className="flex gap-2">
+              <Input
+                ref={inputRef}
+                value={answer}
+                onChange={(e) => setAnswer(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="Type your answer..."
+                className="flex-1"
+              />
+              <Button size="sm" onClick={handleSend} disabled={!answer.trim()}>
+                <Send className="h-4 w-4" />
+              </Button>
+              <Button size="sm" variant="outline" onClick={handleDone}>
+                <Check className="h-4 w-4" /><span className="ml-1">Done</span>
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Result mode — show grilled result (original behavior)
   return (
     <Card className={cn("", className)}>
       <CardHeader>

@@ -33,6 +33,20 @@ function mockProviderStatus(providers?: Array<Record<string, unknown>>) {
 }
 
 describe("CreatePage", () => {
+  it("renders template picker", () => {
+    mockProviderStatus();
+    render(<CreatePage />);
+    expect(screen.getByText("Templates")).toBeInTheDocument();
+    expect(screen.getByText("Explainer")).toBeInTheDocument();
+  });
+
+  it("renders genre templates in picker", () => {
+    mockProviderStatus();
+    render(<CreatePage />);
+    expect(screen.getByText("Tutorial")).toBeInTheDocument();
+    expect(screen.getByText("Marketing")).toBeInTheDocument();
+    expect(screen.getByText("Timeline")).toBeInTheDocument();
+  });
   it("renders header and prompt input", () => {
     mockProviderStatus();
     render(<CreatePage />);
@@ -44,7 +58,7 @@ describe("CreatePage", () => {
     mockProviderStatus();
     render(<CreatePage />);
     const buttons = screen.getAllByRole("button");
-    expect(buttons.some(b => b.textContent?.includes("Grill prompt"))).toBe(true);
+    expect(buttons.some(b => b.textContent?.includes("Grill me"))).toBe(true);
   });
 
   it("renders options panel", () => {
@@ -81,7 +95,7 @@ describe("CreatePage", () => {
     mockProviderStatus();
     render(<CreatePage />);
     const buttons = screen.getAllByRole("button");
-    const grillBtn = buttons.find(b => b.textContent?.includes("Grill prompt"));
+    const grillBtn = buttons.find(b => b.textContent?.includes("Grill me"));
     expect(grillBtn?.closest("button")).toBeDisabled();
   });
 

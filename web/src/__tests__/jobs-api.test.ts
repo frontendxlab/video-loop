@@ -9,6 +9,7 @@ const MOCK_GRILL_RESULT = {
     { kind: "code", title: "Code Example", description: "Live code walkthrough", reasoning: "Visual code explanation" },
     { kind: "outro", title: "Summary", description: "Recap and next steps", reasoning: "Closing summary" },
   ],
+  suggestedTemplates: [],
   missingDetails: ["Target audience not specified"],
   confidence: 0.72,
 };
