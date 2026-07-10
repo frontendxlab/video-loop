@@ -33,3 +33,24 @@ def animotion_theme_stub() -> dict[str, Any]:
 def manim_theme() -> dict[str, Any]:
     tokens = load_design_tokens()
     return dict(tokens["manim"])
+
+
+def hud_tokens() -> dict[str, Any]:
+    tokens = load_design_tokens()
+    return dict(tokens["hud"])
+
+
+def glass_tokens() -> dict[str, Any]:
+    return dict(load_design_tokens()["glass"])
+
+
+def device_tokens() -> dict[str, Any]:
+    return dict(load_design_tokens()["device"])
+
+
+def chart_tokens() -> dict[str, Any]:
+    return dict(load_design_tokens()["chart"])
+
+
+def showcase_tokens() -> dict[str, Any]:
+    return dict(load_design_tokens()["showcase"])

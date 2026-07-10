@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import rawTokens from "../../config/design-tokens.json";
-import { animotionTheme, codeTheme, colors, fonts, remotionStyleDefaults, spacing } from "../src/design-tokens";
+import {
+  animotionTheme, chart, codeTheme, colors, device, fonts,
+  glass, hud, remotionStyleDefaults, showcase, spacing,
+} from "../src/design-tokens";
 
 describe("shared design tokens", () => {
   it("loads root token file into Remotion helpers", () => {
@@ -77,5 +80,66 @@ describe("shared design tokens", () => {
     expect(animotionTheme.headingFont).toBe(expected.headingFont);
     expect(animotionTheme.bodyFont).toBe(expected.bodyFont);
     expect(animotionTheme.monoFont).toBe(expected.monoFont);
+  });
+
+  it("hud tokens match raw tokens", () => {
+    const h = rawTokens.hud;
+    expect(hud.scanline).toBe(h.scanline);
+    expect(hud.grid).toBe(h.grid);
+    expect(hud.reticle).toBe(h.reticle);
+    expect(hud.reticleOpacity).toBe(h.reticleOpacity);
+    expect(hud.cornerBracket).toBe(h.cornerBracket);
+    expect(hud.dataReadout.background).toBe(h.dataReadout.background);
+    expect(hud.dataReadout.border).toBe(h.dataReadout.border);
+    expect(hud.dataReadout.label).toBe(h.dataReadout.label);
+    expect(hud.dataReadout.value).toBe(h.dataReadout.value);
+    expect(hud.dataReadout.accent).toBe(h.dataReadout.accent);
+  });
+
+  it("glass tokens match raw tokens", () => {
+    const g = rawTokens.glass;
+    expect(glass.backdropBlur).toBe(g.backdropBlur);
+    expect(glass.background).toBe(g.background);
+    expect(glass.border).toBe(g.border);
+    expect(glass.highlight).toBe(g.highlight);
+    expect(glass.shadow).toBe(g.shadow);
+    expect(glass.borderRadius).toBe(g.borderRadius);
+  });
+
+  it("device tokens match raw tokens", () => {
+    const d = rawTokens.device;
+    expect(device.phone.bezel).toBe(d.phone.bezel);
+    expect(device.phone.shadow).toBe(d.phone.shadow);
+    expect(device.tablet.bezel).toBe(d.tablet.bezel);
+    expect(device.tablet.shadow).toBe(d.tablet.shadow);
+    expect(device.laptop.bezel).toBe(d.laptop.bezel);
+    expect(device.laptop.shadow).toBe(d.laptop.shadow);
+    expect(device.monitor.bezel).toBe(d.monitor.bezel);
+    expect(device.monitor.shadow).toBe(d.monitor.shadow);
+  });
+
+  it("chart tokens match raw tokens", () => {
+    const c = rawTokens.chart;
+    expect(chart.gridLine).toBe(c.gridLine);
+    expect(chart.axisLine).toBe(c.axisLine);
+    expect(chart.axisLabel).toBe(c.axisLabel);
+    expect(chart.series).toEqual(c.series);
+    expect(chart.areaFill).toBe(c.areaFill);
+    expect(chart.barRadius).toBe(c.barRadius);
+    expect(chart.dotRadius).toBe(c.dotRadius);
+    expect(chart.lineWidth).toBe(c.lineWidth);
+  });
+
+  it("showcase tokens match raw tokens", () => {
+    const s = rawTokens.showcase;
+    expect(showcase.overlayGradient).toBe(s.overlayGradient);
+    expect(showcase.heroOverlay).toBe(s.heroOverlay);
+    expect(showcase.cta.background).toBe(s.cta.background);
+    expect(showcase.cta.text).toBe(s.cta.text);
+    expect(showcase.cta.borderRadius).toBe(s.cta.borderRadius);
+    expect(showcase.cta.shadow).toBe(s.cta.shadow);
+    expect(showcase.accentGlow).toBe(s.accentGlow);
+    expect(showcase.particle).toBe(s.particle);
+    expect(showcase.sparkle).toBe(s.sparkle);
   });
 });

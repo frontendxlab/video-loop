@@ -8,9 +8,14 @@ from __future__ import annotations
 
 from videoforge.design_tokens import (
     animotion_theme_stub,
+    chart_tokens,
+    device_tokens,
+    glass_tokens,
+    hud_tokens,
     load_design_tokens,
     manim_theme,
     remotion_style_defaults,
+    showcase_tokens,
 )
 from videoforge.engine.animotion_adapter import get_animotion_render_config
 from videoforge.engine.manim_renderer import (
@@ -291,3 +296,79 @@ def test_mixed_engine_scenes_routable_and_renderable():
                 f"Manim scene {kind.value} missing THEME_PRIMARY"
             )
             assert 'THEME_TEXT' in code, f"Manim scene {kind.value} missing THEME_TEXT"
+
+
+# ── Unit: HUD tokens ──────────────────────────────────────────────────────
+
+
+def test_hud_tokens_loaded():
+    t = hud_tokens()
+    assert t["scanline"] == "rgba(255, 255, 255, 0.03)"
+    assert t["grid"] == "rgba(148, 163, 184, 0.06)"
+    assert t["reticle"] == "#4A90D9"
+    assert isinstance(t["reticleOpacity"], (int, float))
+    assert t["cornerBracket"] == "rgba(148, 163, 184, 0.35)"
+    dr = t["dataReadout"]
+    assert isinstance(dr, dict)
+    assert dr["accent"] == "#4A90D9"
+    assert dr["label"] == "#94A3B8"
+    assert dr["value"] == "#E5EEF8"
+
+
+# ── Unit: Glass tokens ────────────────────────────────────────────────────
+
+
+def test_glass_tokens_loaded():
+    g = glass_tokens()
+    assert g["backdropBlur"] == 12
+    assert g["background"] == "rgba(30, 41, 59, 0.6)"
+    assert g["border"] == "rgba(255, 255, 255, 0.08)"
+    assert g["highlight"] == "rgba(255, 255, 255, 0.03)"
+    assert "shadow" in g
+    assert g["borderRadius"] == 16
+
+
+# ── Unit: Device tokens ───────────────────────────────────────────────────
+
+
+def test_device_tokens_loaded():
+    d = device_tokens()
+    for form in ("phone", "tablet", "laptop", "monitor"):
+        props = d[form]
+        assert isinstance(props, dict), f"device.{form} not a dict"
+        assert "shadow" in props
+        assert "screenRadius" in props or "bezel" in props
+    assert d["phone"]["bezel"] == "#1C1C1E"
+    assert d["laptop"]["bezel"] == "#1A1A1A"
+    assert d["monitor"]["bezel"] == "#222222"
+
+
+# ── Unit: Chart tokens ────────────────────────────────────────────────────
+
+
+def test_chart_tokens_loaded():
+    c = chart_tokens()
+    assert c["gridLine"] == "rgba(255, 255, 255, 0.08)"
+    assert c["axisLine"] == "rgba(255, 255, 255, 0.3)"
+    assert c["axisLabel"] == "#94A3B8"
+    assert isinstance(c["series"], list)
+    assert len(c["series"]) >= 4
+    assert c["areaFill"] == "rgba(74, 144, 217, 0.12)"
+    assert isinstance(c["barRadius"], (int, float))
+    assert isinstance(c["dotRadius"], (int, float))
+    assert isinstance(c["lineWidth"], (int, float))
+
+
+# ── Unit: Showcase tokens ─────────────────────────────────────────────────
+
+
+def test_showcase_tokens_loaded():
+    s = showcase_tokens()
+    assert "overlayGradient" in s
+    assert "heroOverlay" in s
+    assert isinstance(s["cta"], dict)
+    assert s["cta"]["text"] == "#FFFFFF"
+    assert s["cta"]["borderRadius"] == 12
+    assert s["accentGlow"] == "rgba(74, 144, 217, 0.25)"
+    assert s["particle"] == "#38BDF8"
+    assert s["sparkle"] == "#FACC15"

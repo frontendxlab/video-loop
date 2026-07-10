@@ -66,3 +66,13 @@ export const remotionStyleDefaults = {
 } as const;
 
 export const animotionTheme = tokens.animotion.theme;
+
+export const hud = tokens.hud;
+
+export const glass = tokens.glass;
+
+export const device = tokens.device;
+
+export const chart = tokens.chart;
+
+export const showcase = tokens.showcase;

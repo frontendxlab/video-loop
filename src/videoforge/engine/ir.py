@@ -31,10 +31,22 @@ class SceneKind(str, Enum):
     CHART = "chart"
     TIMELINE = "timeline"
     MAP3D = "map3d"
+    MAP_GEO = "map-geo"
     COMPARISON = "comparison"
     QUOTE = "quote"
     OUTRO = "outro"
     MINDMAP = "mindmap"
+    DUAL_CHART = "dual-chart"
+    THREE_SCENE = "three-scene"
+    SCREENFLOW = "screenflow"
+    OVERLAY_CTA = "overlay-cta"
+    AUDIO_REACTIVE = "audio-reactive"
+    DOCUMENT_HIGHLIGHT = "document-highlight"
+    SVG_MORPH = "svg-morph"
+    KINETIC_TEXT = "kinetic-text"
+    CANVAS_COMPOSITE = "canvas-composite"
+    REAL_ESTATE = "real-estate"
+    PROMO = "promo"
 
 
 @dataclass(frozen=True)
@@ -59,6 +71,20 @@ class AudioTrackIR:
 
 
 @dataclass(frozen=True)
+class OverlayIR:
+    """An overlay rendered on top of a scene.
+
+    Stacked in order — later overlays render above earlier ones.
+    Timestamps are relative to scene start in milliseconds.
+    payload is a JSON string (same pattern as SceneNode.payload).
+    """
+    kind: str
+    start_offset_ms: float
+    end_offset_ms: float
+    payload: str  # JSON string
+
+
+@dataclass(frozen=True)
 class SceneNode:
     id: str
     kind: SceneKind
@@ -66,6 +92,7 @@ class SceneNode:
     engine_hint: Engine
     duration_frames: int
     narration: NarrationSpec
+    overlays: tuple[OverlayIR, ...] = ()
 
     def content_hash(self) -> str:
         data = asdict(self)
@@ -135,7 +162,8 @@ class VideoProject:
             scenes.append(
                 SceneNode(
                     id=f"scene_{len(scenes)}", kind=kind, payload=payload,
-                    engine_hint=engine, duration_frames=s.duration, narration=narration,
+                    engine_hint=engine, duration_frames=s.duration,
+                    narration=narration, overlays=(),
                 )
             )
         audio_tracks = tuple(
