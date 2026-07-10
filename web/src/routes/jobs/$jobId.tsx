@@ -1,17 +1,19 @@
 import { useState, useCallback } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowLeft, RefreshCw, Square, RotateCcw } from "lucide-react";
+import { ArrowLeft, RefreshCw, Square, RotateCcw, Film, GitBranch } from "lucide-react";
 import { getJob } from "@/data/mock";
 import { useSSE } from "@/hooks/useSSE";
 import { JobStatusBadge } from "@/components/jobs/JobStatusBadge";
 import { Progress } from "@/components/ui/progress";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { StageTimeline } from "@/components/job-detail/StageTimeline";
 import { EventLog } from "@/components/job-detail/EventLog";
 import { SubagentCard } from "@/components/job-detail/SubagentCard";
 import { SceneTable } from "@/components/job-detail/SceneTable";
+import { FlowJobCanvas } from "@/components/flow-job-canvas";
 import { stopJob, retryJob } from "@/lib/api";
 
 export const Route = createFileRoute("/jobs/$jobId")({
@@ -56,7 +58,7 @@ function JobDetailPage() {
   const isFailed = job.status === "failed";
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
+    <div className="mx-auto max-w-6xl space-y-6">
       <div>
         <Link to="/jobs" className="mb-3 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
           <ArrowLeft className="h-4 w-4" /> Back to Jobs
@@ -73,79 +75,96 @@ function JobDetailPage() {
         </div>
       </div>
 
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex items-center gap-4">
-            <span className="text-sm font-medium">{job.progressPct}%</span>
-            <Progress value={job.progressPct} className="flex-1" />
-            {connected && (
-              <span className="flex items-center gap-1 text-xs text-emerald-500">
-                <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" /> SSE live
-              </span>
-            )}
+      <Tabs defaultValue="detail">
+        <TabsList>
+          <TabsTrigger value="detail" className="flex items-center gap-1.5">
+            <Film className="h-4 w-4" /> Detail
+          </TabsTrigger>
+          <TabsTrigger value="flow" className="flex items-center gap-1.5">
+            <GitBranch className="h-4 w-4" /> Flow Canvas
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="detail" className="space-y-6">
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-4">
+                <span className="text-sm font-medium">{job.progressPct}%</span>
+                <Progress value={job.progressPct} className="flex-1" />
+                {connected && (
+                  <span className="flex items-center gap-1 text-xs text-emerald-500">
+                    <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" /> SSE live
+                  </span>
+                )}
+              </div>
+              {job.error && <p className="mt-2 text-sm text-destructive">{job.error}</p>}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader><CardTitle className="text-sm">Stage Timeline</CardTitle></CardHeader>
+            <CardContent><StageTimeline job={job} /></CardContent>
+          </Card>
+
+          <div className="grid gap-6 lg:grid-cols-2">
+            <Card>
+              <CardHeader><CardTitle className="text-sm">Event Log</CardTitle></CardHeader>
+              <CardContent><EventLog events={allEvents} /></CardContent>
+            </Card>
+            <Card>
+              <CardHeader><CardTitle className="text-sm">Subagents ({job.subagents.length})</CardTitle></CardHeader>
+              <CardContent>
+                {job.subagents.length === 0 ? (
+                  <p className="py-4 text-sm text-muted-foreground italic">No subagents spawned yet.</p>
+                ) : (
+                  <div className="space-y-2">{job.subagents.map((sa) => <SubagentCard key={sa.id} subagent={sa} />)}</div>
+                )}
+              </CardContent>
+            </Card>
           </div>
-          {job.error && <p className="mt-2 text-sm text-destructive">{job.error}</p>}
-        </CardContent>
-      </Card>
 
-      <Card>
-        <CardHeader><CardTitle className="text-sm">Stage Timeline</CardTitle></CardHeader>
-        <CardContent><StageTimeline job={job} /></CardContent>
-      </Card>
+          <Separator />
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card>
-          <CardHeader><CardTitle className="text-sm">Event Log</CardTitle></CardHeader>
-          <CardContent><EventLog events={allEvents} /></CardContent>
-        </Card>
-        <Card>
-          <CardHeader><CardTitle className="text-sm">Subagents ({job.subagents.length})</CardTitle></CardHeader>
-          <CardContent>
-            {job.subagents.length === 0 ? (
-              <p className="py-4 text-sm text-muted-foreground italic">No subagents spawned yet.</p>
-            ) : (
-              <div className="space-y-2">{job.subagents.map((sa) => <SubagentCard key={sa.id} subagent={sa} />)}</div>
+          <Card>
+            <CardHeader><CardTitle className="text-sm">Scenes</CardTitle></CardHeader>
+            <CardContent><SceneTable scenes={job.scenes} jobId={jobId} /></CardContent>
+          </Card>
+
+          <div className="flex gap-3">
+            <button onClick={() => window.location.reload()} className="inline-flex items-center gap-1 rounded-md border px-3 py-1.5 text-sm hover:bg-accent">
+              <RefreshCw className="h-4 w-4" /> Refresh
+            </button>
+
+            {isRunning && (
+              <button
+                onClick={handleStop}
+                disabled={actionState === "stopping"}
+                className="inline-flex items-center gap-1 rounded-md border border-destructive/50 px-3 py-1.5 text-sm text-destructive hover:bg-destructive/10 disabled:opacity-50"
+              >
+                <Square className="h-4 w-4" />
+                {actionState === "stopping" ? "Stopping..." : actionState === "stopped" ? "Stopped" : "Stop"}
+              </button>
             )}
-          </CardContent>
-        </Card>
-      </div>
 
-      <Separator />
+            {isFailed && (
+              <button
+                onClick={handleRetry}
+                disabled={actionState === "retrying"}
+                className="inline-flex items-center gap-1 rounded-md border border-amber-500/50 px-3 py-1.5 text-sm text-amber-500 hover:bg-amber-500/10 disabled:opacity-50"
+              >
+                <RotateCcw className="h-4 w-4" />
+                {actionState === "retrying" ? "Retrying..." : actionState === "retried" ? "Retried" : "Retry"}
+              </button>
+            )}
 
-      <Card>
-        <CardHeader><CardTitle className="text-sm">Scenes</CardTitle></CardHeader>
-        <CardContent><SceneTable scenes={job.scenes} jobId={jobId} /></CardContent>
-      </Card>
+            <span className="self-center text-xs text-muted-foreground">{allEvents.length} events captured</span>
+          </div>
+        </TabsContent>
 
-      <div className="flex gap-3">
-        <button onClick={() => window.location.reload()} className="inline-flex items-center gap-1 rounded-md border px-3 py-1.5 text-sm hover:bg-accent">
-          <RefreshCw className="h-4 w-4" /> Refresh
-        </button>
-
-        {isRunning && (
-          <button
-            onClick={handleStop}
-            disabled={actionState === "stopping"}
-            className="inline-flex items-center gap-1 rounded-md border border-destructive/50 px-3 py-1.5 text-sm text-destructive hover:bg-destructive/10 disabled:opacity-50"
-          >
-            <Square className="h-4 w-4" />
-            {actionState === "stopping" ? "Stopping..." : actionState === "stopped" ? "Stopped" : "Stop"}
-          </button>
-        )}
-
-        {isFailed && (
-          <button
-            onClick={handleRetry}
-            disabled={actionState === "retrying"}
-            className="inline-flex items-center gap-1 rounded-md border border-amber-500/50 px-3 py-1.5 text-sm text-amber-500 hover:bg-amber-500/10 disabled:opacity-50"
-          >
-            <RotateCcw className="h-4 w-4" />
-            {actionState === "retrying" ? "Retrying..." : actionState === "retried" ? "Retried" : "Retry"}
-          </button>
-        )}
-
-        <span className="self-center text-xs text-muted-foreground">{allEvents.length} events captured</span>
-      </div>
+        <TabsContent value="flow">
+          <FlowJobCanvas job={job} className="h-[600px]" />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
