@@ -96,6 +96,9 @@ def generate_speech_mcp_sync(
 ) -> dict[str, Any]:
     """Synchronous wrapper for MCP TTS generation.
 
+    Works both standalone and inside an existing event loop by running
+    the async MCP call in a background thread with its own event loop.
+
     Args:
         text: Text to synthesize
         output_path: Where to save the WAV file
@@ -105,11 +108,38 @@ def generate_speech_mcp_sync(
     Returns:
         dict with: audio_path, duration_seconds, sample_rate, word_timestamps
     """
+    import threading
+
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    # Run async MCP call
-    result = asyncio.run(generate_speech_via_mcp(text, voice, mcp_url))
+    # Run async MCP call in a background thread to avoid event loop conflicts
+    result_holder: dict[str, Any] = {}
+    error_holder: list[Exception] = []
+
+    def _run():
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                result_holder["data"] = loop.run_until_complete(
+                    generate_speech_via_mcp(text, voice, mcp_url)
+                )
+            finally:
+                loop.close()
+        except Exception as e:
+            error_holder.append(e)
+
+    t = threading.Thread(target=_run)
+    t.start()
+    t.join(timeout=60)
+
+    if error_holder:
+        raise error_holder[0]
+    if "data" not in result_holder:
+        raise TimeoutError("MCP TTS call timed out after 60s")
+
+    result = result_holder["data"]
 
     # Save WAV file
     output_path.write_bytes(result["audio_bytes"])
