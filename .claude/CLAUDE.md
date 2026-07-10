@@ -11,7 +11,7 @@
 > (documentation, ownership, history, decisions). **Always verify against
 > actual source files before making changes** — the index may be stale.
 
-Last indexed: 2026-07-10 (commit ac00370). Confidence: 100%.
+Last indexed: 2026-07-10 (commit a6513da). Confidence: 100%.
 ### Architecture
 **Repo is a video generation and review platform: it ingests source‑code repositories and associated media assets, fetches pull‑request metadata, renders animated scenes with Remotion and Manim, compresses the resulting footage via the *caveman‑compress* skill, and finally serves the polished videos together with an interactive review UI through a FastAPI‑based server.**  
 The monorepo orchestrates this end‑to‑end pipeline across a Python backend, a TypeScript/JavaScript front‑end, and a collection of reusable scripts, enabling developers to produce, validate, and share programmatically generated video content with minimal friction. ---
@@ -61,7 +61,7 @@ The monorepo orchestrates this end‑to‑end pipeline across a Python backend, 
 ## Code health
 Three signals: **defect risk** (the overall score), **maintainability** (smells that hurt readability/change-cost without predicting bugs), and **performance** (static performance RISK: I/O-in-loop / N+1 shapes that waste work, high-precision/low-recall). Maintainability and performance are co-equal views, never blended into the defect headline. See `docs/CODE_HEALTH.md`.
 
-Defect risk, Hotspot health: 7.61/10 (stable) ·
+Defect risk, Hotspot health: 7.6/10 (stable) ·
 Average: 9.3/10 ·
 Worst: 3.71/10 (`vfx-cli`)
 Maintainability, Average: 9.49/10
@@ -71,8 +71,8 @@ Performance risk, Average: 9.93/10
 - `vfx-cli` — function hotspot (wizard) — impact −2.3
 - `.claude/CLAUDE.md` — hidden coupling — impact −1.8
 - `.claude/CLAUDE.md` — prior defect — impact −1.8
-- `vfx-cli` — complex method (wizard) — impact −0.9
-- `src/videoforge/engine/renderer.py` — brain method (render_scenes) — impact −0.6
+- `.repowise/state.json` — hidden coupling — impact −1.8
+- `.repowise/state.json` — prior defect — impact −1.8
 
 ### Repowise MCP Tools
 

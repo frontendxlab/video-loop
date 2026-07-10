@@ -169,7 +169,7 @@ def generate_speech_mcp_sync(
 
     return {
         "audio_path": str(output_path.resolve()),
-        "duration_seconds": result["duration_seconds"],
-        "sample_rate": result["sample_rate"],
+        "duration_seconds": duration_seconds,
+        "sample_rate": sample_rate,
         "word_timestamps": word_timestamps,
     }
