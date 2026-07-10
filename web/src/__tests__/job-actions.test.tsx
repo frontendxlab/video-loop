@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 
 /* Mock the job data to control job status */
@@ -75,24 +75,21 @@ describe('SceneDetail with jobId — API wiring', () => {
   it('stop button calls stopJob on click', async () => {
     const { stopJob } = await import('@/lib/api')
     render(<SceneDetail scene={makeScene()} jobId="job_001" />)
-    const btn = screen.getByText('Stop')
-    btn.click()
+    fireEvent.click(screen.getByText('Stop'))
     expect(stopJob).toHaveBeenCalledWith('job_001')
   })
 
   it('retry button calls retryScene on click', async () => {
     const { retryScene } = await import('@/lib/api')
     render(<SceneDetail scene={makeScene({ id: 'scene_42' })} jobId="job_001" />)
-    const btn = screen.getByText('Retry')
-    btn.click()
+    fireEvent.click(screen.getByText('Retry'))
     expect(retryScene).toHaveBeenCalledWith('job_001', 'scene_42')
   })
 
   it('reroute button calls rerouteScene on click', async () => {
     const { rerouteScene } = await import('@/lib/api')
     render(<SceneDetail scene={makeScene({ id: 'scene_42' })} jobId="job_001" />)
-    const btn = screen.getByText('Reroute')
-    btn.click()
+    fireEvent.click(screen.getByText('Reroute'))
     expect(rerouteScene).toHaveBeenCalled()
     // Should pass jobId, sceneId, and an engine
     const args = (rerouteScene as ReturnType<typeof vi.fn>).mock.calls[0]

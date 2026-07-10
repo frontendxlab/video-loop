@@ -345,7 +345,7 @@ describe('DirectorPreview', () => {
     expect(screen.getByText('Hero')).toBeDefined()
   })
   it('routes showcase kinds to remotion by default', () => {
-    render(<DirectorPreview project={makeProject([makeScene({ kind: SceneKind.SHOWCASE }), makeScene({ kind: SceneKind.SPLIT }), makeScene({ kind: SceneKind.MOCKUP }), makeScene({ kind: SceneKind.HERO })])} />)
+    render(<DirectorPreview project={makeProject([makeScene({ id: 'a', kind: SceneKind.SHOWCASE }), makeScene({ id: 'b', kind: SceneKind.SPLIT }), makeScene({ id: 'c', kind: SceneKind.MOCKUP }), makeScene({ id: 'd', kind: SceneKind.HERO })])} />)
     // Switch to list view (canvas uses abbreviated engine names)
     fireEvent.click(screen.getByText('List'))
     const remotionLabels = screen.getAllByText('Remotion')
