@@ -189,6 +189,19 @@ class TestRerouteScene:
         assert routed_events[0].payload["engine"] == "animotion"
         assert routed_events[0].payload["sceneId"] == SCENE_ID
 
+    def test_reroute_with_provider_override(self, feed: MemoryEventFeed, client):
+        resp = client.post(
+            f"/api/jobs/{JOB_ID}/reroute/{SCENE_ID}",
+            json={"engine": "remotion", "provider": "9router", "model": "ocg/deepseek-v4-flash"},
+        )
+        data = resp.json()
+        assert data["provider"] == "9router"
+        assert data["model"] == "ocg/deepseek-v4-flash"
+        events = asyncio.run(feed.replay(JOB_ID))
+        routed = [e for e in events if e.type == "director.scene_routed"]
+        assert routed[0].payload["provider"] == "9router"
+        assert routed[0].payload["model"] == "ocg/deepseek-v4-flash"
+
     def test_reroute_rejects_invalid_job_id(self, client):
         resp = client.post("/api/jobs/../reroute/scene_1")
         assert resp.status_code in (400, 404)

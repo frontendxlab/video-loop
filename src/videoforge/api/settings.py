@@ -53,8 +53,8 @@ class ReviewThresholds(BaseModel):
 
 
 class SettingsPayload(BaseModel):
-    activeProvider: str = "openai"
-    activeModel: str = "gpt-4o"
+    activeProvider: str = "9router"
+    activeModel: str = "ocg/deepseek-v4-flash"
     providers: list[ProviderConfig] = []
     queue: QueueSettings = QueueSettings()
     retry: RetrySettings = RetrySettings()
@@ -67,8 +67,8 @@ class SettingsPayload(BaseModel):
 def _default_settings() -> dict[str, Any]:
     """Default settings matching frontend DEFAULT_SETTINGS."""
     return {
-        "activeProvider": "openai",
-        "activeModel": "gpt-4o",
+        "activeProvider": "9router",
+        "activeModel": "ocg/deepseek-v4-flash",
         "providers": [
             {
                 "provider": "openai",
@@ -113,6 +113,17 @@ def _default_settings() -> dict[str, Any]:
                 "models": [
                     {"id": "llama-3.3-70b", "label": "Llama 3.3 70B", "maxTokens": 8192},
                     {"id": "mixtral-8x7b", "label": "Mixtral 8x7B", "maxTokens": 8192},
+                ],
+            },
+            {
+                "provider": "9router",
+                "label": "9router",
+                "apiKey": "",
+                "baseUrl": "",
+                "defaultModel": "ocg/deepseek-v4-flash",
+                "models": [
+                    {"id": "ocg/deepseek-v4-flash", "label": "DeepSeek V4 Flash", "maxTokens": 32768},
+                    {"id": "ocg/deepseek-v4-flash:free", "label": "DeepSeek V4 Flash Free", "maxTokens": 8192},
                 ],
             },
             {
@@ -168,3 +179,43 @@ async def update_settings(payload: SettingsPayload) -> dict[str, Any]:
     data = payload.model_dump()
     save_settings(data)
     return {"status": "ok"}
+
+
+@router.get("/provider-status")
+async def get_provider_status() -> dict[str, Any]:
+    """Expose current provider + selected model + availability.
+
+    Returns active provider/model, configured status per provider,
+    and available models list. Frontend uses this to show provider
+    state in top bar and settings panels.
+    """
+    settings = load_settings()
+    active_provider = settings.get("activeProvider", "9router")
+    active_model = settings.get("activeModel", "ocg/deepseek-v4-flash")
+    providers = settings.get("providers", [])
+
+    active_cfg = next((p for p in providers if p.get("provider") == active_provider), None)
+
+    return {
+        "activeProvider": active_provider,
+        "activeModel": active_model,
+        "available": active_cfg is not None,
+        "configured": bool(active_cfg and active_cfg.get("apiKey")),
+        "providers": [
+            {
+                "provider": p["provider"],
+                "label": p.get("label", p["provider"]),
+                "defaultModel": p.get("defaultModel", ""),
+                "configured": bool(p.get("apiKey")),
+                "models": [
+                    {
+                        "id": m["id"],
+                        "label": m.get("label", m["id"]),
+                        "maxTokens": m.get("maxTokens", 4096),
+                    }
+                    for m in p.get("models", [])
+                ],
+            }
+            for p in providers
+        ],
+    }

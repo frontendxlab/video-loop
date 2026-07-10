@@ -46,6 +46,8 @@ def _get_runner(job_id: str) -> Any | None:
 class RerouteRequest(BaseModel):
     """Optional body for reroute endpoint."""
     engine: str = "remotion"
+    provider: str | None = None
+    model: str | None = None
 
 
 def _validate_id(component: str, label: str = "ID") -> None:
@@ -159,12 +161,20 @@ async def reroute_scene(
     _validate_id(scene_id, "scene_id")
 
     engine = body.engine if body is not None else "remotion"
+    provider = body.provider if (body and body.provider) else None
+    model = body.model if (body and body.model) else None
 
-    await feed.append(
-        DirectorSceneRouted(
-            jobId=job_id,
-            payload={"sceneId": scene_id, "engine": engine, "reason": "User reroute"},
-        )
-    )
+    payload: dict[str, Any] = {"sceneId": scene_id, "engine": engine, "reason": "User reroute"}
+    if provider:
+        payload["provider"] = provider
+    if model:
+        payload["model"] = model
 
-    return {"status": "rerouted", "job_id": job_id, "scene_id": scene_id, "engine": engine}
+    await feed.append(DirectorSceneRouted(jobId=job_id, payload=payload))
+
+    result: dict[str, Any] = {"status": "rerouted", "job_id": job_id, "scene_id": scene_id, "engine": engine}
+    if provider:
+        result["provider"] = provider
+    if model:
+        result["model"] = model
+    return result

@@ -34,7 +34,7 @@ def client(settings_path: Path):
     return TestClient(app)
 
 
-DEFAULT_PROVIDER_COUNT = 5
+DEFAULT_PROVIDER_COUNT = 6
 
 VALID_PAYLOAD = {
     "activeProvider": "openai",
@@ -62,8 +62,8 @@ class TestGetSettings:
         resp = client.get("/api/settings")
         assert resp.status_code == 200
         data = resp.json()
-        assert data["activeProvider"] == "openai"
-        assert data["activeModel"] == "gpt-4o"
+        assert data["activeProvider"] == "9router"
+        assert data["activeModel"] == "ocg/deepseek-v4-flash"
         assert len(data["providers"]) == DEFAULT_PROVIDER_COUNT
         assert data["queue"] == {"maxConcurrency": 4, "maxQueueSize": 100}
         assert data["retry"] == {"maxRetries": 3, "retryDelayMs": 2000, "exponentialBackoff": True}
@@ -175,5 +175,100 @@ class TestPersistence:
         resp = client.get("/api/settings")
         assert resp.status_code == 200
         data = resp.json()
-        assert data["activeProvider"] == "openai"
+        assert data["activeProvider"] == "9router"
         assert len(data["providers"]) == DEFAULT_PROVIDER_COUNT
+
+
+class Test9RouterDefaults:
+    """9router provider appears correctly in default settings."""
+
+    def test_9router_in_default_providers(self, client):
+        resp = client.get("/api/settings")
+        providers = resp.json()["providers"]
+        router = next((p for p in providers if p["provider"] == "9router"), None)
+        assert router is not None
+        assert router["defaultModel"] == "ocg/deepseek-v4-flash"
+        assert len(router["models"]) == 2
+
+    def test_9router_has_expected_models(self, client):
+        resp = client.get("/api/settings")
+        providers = resp.json()["providers"]
+        router = next(p for p in providers if p["provider"] == "9router")
+        model_ids = {m["id"] for m in router["models"]}
+        assert "ocg/deepseek-v4-flash" in model_ids
+        assert "ocg/deepseek-v4-flash:free" in model_ids
+
+    def test_9router_is_active_provider_by_default(self, client):
+        resp = client.get("/api/settings")
+        data = resp.json()
+        assert data["activeProvider"] == "9router"
+        assert data["activeModel"] == "ocg/deepseek-v4-flash"
+
+
+class TestProviderStatus:
+    """GET /api/settings/provider-status exposes provider/model state."""
+
+    def test_provider_status_returns_200(self, client):
+        resp = client.get("/api/settings/provider-status")
+        assert resp.status_code == 200
+
+    def test_provider_status_has_active_provider(self, client):
+        resp = client.get("/api/settings/provider-status")
+        data = resp.json()
+        assert data["activeProvider"] == "9router"
+        assert data["activeModel"] == "ocg/deepseek-v4-flash"
+
+    def test_provider_status_lists_all_providers(self, client):
+        resp = client.get("/api/settings/provider-status")
+        providers = resp.json()["providers"]
+        assert len(providers) == DEFAULT_PROVIDER_COUNT
+        ids = {p["provider"] for p in providers}
+        assert "9router" in ids
+        assert "openai" in ids
+        assert "custom" in ids
+
+    def test_provider_status_availability_flags(self, client):
+        resp = client.get("/api/settings/provider-status")
+        data = resp.json()
+        # Default settings have no apiKey for any provider
+        assert data["available"] is True  # 9router is in providers list
+        assert data["configured"] is False  # no apiKey
+
+    def test_provider_status_after_put(self, client):
+        payload = {
+            "activeProvider": "openai",
+            "activeModel": "gpt-4o",
+            "providers": [{
+                "provider": "openai", "label": "OpenAI",
+                "apiKey": "sk-configured",
+                "baseUrl": "", "defaultModel": "gpt-4o",
+                "models": [{"id": "gpt-4o", "label": "GPT-4o", "maxTokens": 16384}],
+            }],
+            "queue": {"maxConcurrency": 1, "maxQueueSize": 10},
+            "retry": {"maxRetries": 1, "retryDelayMs": 1000, "exponentialBackoff": False},
+            "review": {"l0MinScore": 0.5, "l1MinScore": 0.5, "coherenceGateEnabled": False},
+        }
+        client.put("/api/settings", json=payload)
+        resp = client.get("/api/settings/provider-status")
+        data = resp.json()
+        assert data["activeProvider"] == "openai"
+        assert data["activeModel"] == "gpt-4o"
+        assert data["available"] is True
+        assert data["configured"] is True  # apiKey set
+
+    def test_provider_status_unknown_active_falls_back(self, client):
+        """Unknown activeProvider still returns gracefully."""
+        payload = {
+            "activeProvider": "nonexistent",
+            "activeModel": "foo",
+            "providers": [],
+            "queue": {"maxConcurrency": 1, "maxQueueSize": 10},
+            "retry": {"maxRetries": 1, "retryDelayMs": 1000, "exponentialBackoff": False},
+            "review": {"l0MinScore": 0.5, "l1MinScore": 0.5, "coherenceGateEnabled": False},
+        }
+        client.put("/api/settings", json=payload)
+        resp = client.get("/api/settings/provider-status")
+        data = resp.json()
+        assert data["available"] is False
+        assert data["configured"] is False
+        assert data["activeProvider"] == "nonexistent"
