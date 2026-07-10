@@ -38,7 +38,7 @@ def client(settings_path: Path):
     return TestClient(app)
 
 
-DEFAULT_PROVIDER_COUNT = 6
+DEFAULT_PROVIDER_COUNT = 7
 
 VALID_PAYLOAD = {
     "activeProvider": "openai",

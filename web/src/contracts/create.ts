@@ -224,7 +224,7 @@ export type Voice = z.infer<typeof VoiceEnum>;
 
 export const CreateOptionsSchema = z.object({
   voice: VoiceEnum.default("alba"),
-  provider: z.enum(["openai","anthropic","google","deepseek","9router","custom"]).default("9router"),
+  provider: z.enum(["openai","anthropic","google","groq","deepseek","9router","custom"]).default("9router"),
   model: z.string().default("ocg/deepseek-v4-flash"),
   maxDuration: z.number().positive().default(180),
   fps: z.number().positive().default(30),

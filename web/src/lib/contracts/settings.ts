@@ -7,6 +7,7 @@ export const PROVIDER_IDS = [
   "anthropic",
   "google",
   "groq",
+  "deepseek",
   "9router",
   "custom",
 ] as const;
@@ -121,6 +122,17 @@ export const DEFAULT_SETTINGS: Settings = {
       models: [
         { id: "llama-3.3-70b", label: "Llama 3.3 70B", maxTokens: 8192 },
         { id: "mixtral-8x7b", label: "Mixtral 8×7B", maxTokens: 8192 },
+      ],
+    },
+    {
+      provider: "deepseek",
+      label: "DeepSeek",
+      apiKey: "",
+      baseUrl: "",
+      defaultModel: "deepseek-chat",
+      models: [
+        { id: "deepseek-chat", label: "DeepSeek Chat", maxTokens: 32_768 },
+        { id: "deepseek-reasoner", label: "DeepSeek Reasoner", maxTokens: 32_768 },
       ],
     },
     {

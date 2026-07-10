@@ -121,14 +121,25 @@ def _default_settings() -> dict[str, Any]:
                 ],
             },
             {
-                "provider": "google",
-                "label": "Google",
+                "provider": "deepseek",
+                "label": "DeepSeek",
                 "apiKey": "",
                 "baseUrl": "",
-                "defaultModel": "gemini-2.0-flash",
+                "defaultModel": "deepseek-chat",
                 "models": [
-                    {"id": "gemini-2.0-flash", "label": "Gemini 2.0 Flash", "maxTokens": 8192},
-                    {"id": "gemini-2.0-pro", "label": "Gemini 2.0 Pro", "maxTokens": 8192},
+                    {"id": "deepseek-chat", "label": "DeepSeek Chat", "maxTokens": 32768},
+                    {"id": "deepseek-reasoner", "label": "DeepSeek Reasoner", "maxTokens": 32768},
+                ],
+            },
+            {
+                "provider": "9router",
+                "label": "9router",
+                "apiKey": "",
+                "baseUrl": "",
+                "defaultModel": "ocg/deepseek-v4-flash",
+                "models": [
+                    {"id": "ocg/deepseek-v4-flash", "label": "DeepSeek V4 Flash", "maxTokens": 32768},
+                    {"id": "ocg/deepseek-v4-flash:free", "label": "DeepSeek V4 Flash Free", "maxTokens": 8192},
                 ],
             },
             {
