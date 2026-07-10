@@ -24,6 +24,7 @@ class SceneType(str, Enum):
     DIFF = "diff"
     OUTRO = "outro"
     MANIM = "manim"  # Rendered via Manim (optional engine)
+    OVERLAY_CTA = "overlay-cta"  # Rendered with alpha, composited over preceding scene
 
 
 @dataclass

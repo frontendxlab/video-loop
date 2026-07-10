@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from videoforge.design_tokens import remotion_style_defaults
-from videoforge.engine.models import VideoDefinition
+from videoforge.engine.models import SceneType, VideoDefinition
 from videoforge.engine.ir import Engine, VideoProject
 
 logger = logging.getLogger("videoforge.engine.render")
@@ -29,6 +29,11 @@ CLIP_FORMAT: dict[str, Any] = {
     "pixel_format": "yuv420p",
     "audio_codec": "aac",
     "video_codec": "h264",
+}
+
+CLIP_FORMAT_ALPHA: dict[str, Any] = {
+    **CLIP_FORMAT,
+    "pixel_format": "yuva420p",  # alpha-capable variant for overlay scenes
 }
 
 
@@ -93,6 +98,103 @@ def _get_track(video: VideoDefinition | VideoProject, index: int) -> Any | None:
     return None
 
 
+_OVERLAY_POSITIONS: dict[str, tuple[str, str]] = {
+    "center": ("(W-w)/2", "(H-h)/2"),
+    "bottom-left": ("0", "H-h"),
+    "bottom-right": ("W-w", "H-h"),
+    "top-left": ("0", "0"),
+    "top-right": ("W-w", "0"),
+    "bottom-center": ("(W-w)/2", "H-h"),
+}
+
+
+def _parse_position(position: str) -> tuple[str, str]:
+    """Parse overlay position string to FFmpeg overlay x:y coordinates."""
+    return _OVERLAY_POSITIONS.get(position, _OVERLAY_POSITIONS["center"])
+
+
+def _is_overlay_scene(scene: Any, is_ir: bool = False) -> bool:
+    """Check if scene is an overlay-type scene.
+
+    Overlay scenes render with alpha and composite over preceding base scene
+    rather than concatenating sequentially.
+    """
+    if is_ir:
+        from videoforge.engine.ir import SceneKind
+        return scene.kind in (SceneKind.OVERLAY_CTA,)
+    return (
+        hasattr(scene, "type")
+        and scene.type == SceneType.OVERLAY_CTA
+    )
+
+
+def _overlay_position_for_scene(scene: Any, is_ir: bool = False) -> str:
+    """Determine overlay position based on scene kind.
+
+    Lower-third overlays position at bottom-left / bottom-center.
+    Center overlays (CTA) stay centered.
+    """
+    if is_ir:
+        return "center"  # default for overlay-cta
+    return "center"
+
+
+def composite_overlay(
+    base_path: str | Path,
+    overlay_path: str | Path,
+    output_path: str | Path,
+    position: str = "center",
+    opacity: float = 1.0,
+) -> str:
+    """Composite overlay video over base video using FFmpeg overlay filter.
+
+    Base video uses pinned format (yuv420p). Overlay video must have alpha
+    (yuva420p). Output is pinned format (yuv420p). Audio preserved from base.
+
+    Returns path to composited MP4.
+    """
+    base_path = Path(base_path)
+    overlay_path = Path(overlay_path)
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    x, y = _parse_position(position)
+
+    if opacity < 1.0:
+        # Scale opacity via colorchannelmixer on overlay
+        filter_complex = (
+            f"[1:v]format=yuva420p,"
+            f"colorchannelmixer=aa={opacity}[overlay_adj];"
+            f"[0:v][overlay_adj]overlay={x}:{y}:format=auto[outv]"
+        )
+    else:
+        filter_complex = (
+            f"[0:v][1:v]overlay={x}:{y}:format=auto[outv]"
+        )
+
+    cmd = [
+        "ffmpeg", "-y",
+        "-i", str(base_path.resolve()),
+        "-i", str(overlay_path.resolve()),
+        "-filter_complex", filter_complex,
+        "-map", "[outv]",
+        "-map", "0:a?",
+        "-c:a", "copy",
+        "-c:v", "libx264",
+        "-pix_fmt", CLIP_FORMAT["pixel_format"],
+        "-r", str(CLIP_FORMAT["fps"]),
+        str(output_path),
+    ]
+
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+    if result.returncode != 0 or not output_path.exists():
+        raise RuntimeError(
+            f"Overlay compositing failed: {(result.stderr or '')[-500:]}"
+        )
+
+    return str(output_path.resolve())
+
+
 def _mux_audio_track(
     track: Any,  # AudioTrack or AudioTrackIR
     output_path: Path,
@@ -134,12 +236,17 @@ def render_scenes(
     tmpdir: str | Path | None = None,
     concurrency: int = 1,
     timeout_per_scene: int = 600,
+    artifacts_dir: str | Path | None = None,
 ) -> list[str]:
     """Render each scene individually, return list of MP4 paths.
 
     Accepts either legacy VideoDefinition or new VideoProject IR. When given
     a VideoProject, uses pick_engine() from the director to route each scene
     to Remotion or Manim. Deterministic: same input always produces same frames.
+
+    When *artifacts_dir* is provided, generates thumbnail + sampled frame
+    for each scene after successful render. Artifacts survive pipeline
+    failures — generated inline, not deferred.
     """
     remotion_dir = Path(remotion_dir)
     output_dir = Path(output_dir)
@@ -167,7 +274,18 @@ def render_scenes(
 
     rendered: list[str] = []
     n_scenes = len(video.scenes)
-    for i in range(n_scenes):
+    i = 0
+    while i < n_scenes:
+        # ── Detect overlay scene following this one ────────────────────────
+        # Overlay scenes composite over predecessor rather than concatenating.
+        # Both scenes render individually, then FFmpeg composites.
+        next_is_overlay = False
+        if i + 1 < n_scenes:
+            if is_ir:
+                next_is_overlay = _is_overlay_scene(video.scenes[i + 1], is_ir=True)
+            else:
+                next_is_overlay = _is_overlay_scene(video.scenes[i + 1])
+
         output_path = output_dir / f"scene_{i:04d}.mp4"
 
         if is_ir:
@@ -196,14 +314,21 @@ def render_scenes(
                     import shutil
                     shutil.copy2(str(src), str(output_path))
 
-                # Mux real narration audio over silent track (both legacy and IR)
                 track = _get_track(video, i)
                 if track is not None:
                     _mux_audio_track(track, output_path, output_dir, i)
 
-                rendered.append(str(output_path.resolve()))
+                if next_is_overlay:
+                    pass  # Defer — composite after overlay rendered
+                else:
+                    rendered.append(str(output_path.resolve()))
             else:
                 raise RuntimeError(f"Scene {i} Animotion render failed: {result.get('log', '')[-300:]}")
+            i += 1
+            if next_is_overlay:
+                overlay_path = _render_overlay_composite(video, i, is_ir, output_dir, output_path, remotion_dir, tmpdir, concurrency, timeout_per_scene)
+                rendered.append(str(overlay_path.resolve()))
+                i += 1
             continue
 
         if engine == Engine.MANIM:
@@ -221,14 +346,21 @@ def render_scenes(
                     import shutil
                     shutil.copy2(str(src), str(output_path))
 
-                # Mux real narration audio over silent track (both legacy and IR)
                 track = _get_track(video, i)
                 if track is not None:
                     _mux_audio_track(track, output_path, output_dir, i)
 
-                rendered.append(str(output_path.resolve()))
+                if next_is_overlay:
+                    pass  # Defer — composite after overlay rendered
+                else:
+                    rendered.append(str(output_path.resolve()))
             else:
                 raise RuntimeError(f"Scene {i} Manim render failed: {result.get('log', '')[-300:]}")
+            i += 1
+            if next_is_overlay:
+                overlay_path = _render_overlay_composite(video, i, is_ir, output_dir, output_path, remotion_dir, tmpdir, concurrency, timeout_per_scene)
+                rendered.append(str(overlay_path.resolve()))
+                i += 1
             continue
 
         # Remotion path
@@ -243,6 +375,9 @@ def render_scenes(
         with open(props_path, "w") as f:
             json.dump(scene_props, f)
 
+        is_overlay = (is_ir and _is_overlay_scene(video.scenes[i], is_ir=True)) or (not is_ir and _is_overlay_scene(video.scenes[i]))
+        render_pix_fmt = CLIP_FORMAT_ALPHA["pixel_format"] if is_overlay else CLIP_FORMAT["pixel_format"]
+
         cmd = [
             "npx", "remotion", "render",
             "src/index.ts", "VideoComposition",
@@ -250,11 +385,12 @@ def render_scenes(
             "--props", str(props_path),
             "--concurrency", str(concurrency),
             "--log", "error",
-            "--enforce-audio-track",
             "--codec", "h264",
-            "--pixel-format", CLIP_FORMAT["pixel_format"],
+            "--pixel-format", render_pix_fmt,
             "--fps", str(CLIP_FORMAT["fps"]),
         ]
+        if not is_overlay:
+            cmd.append("--enforce-audio-track")
 
         logger.info("Rendering scene %d/%d via Remotion (%s, %df)", i + 1, n_scenes, kind, duration)
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout_per_scene, cwd=str(remotion_dir), env={**os.environ, "TMPDIR": str(tmpdir or output_dir / "tmp")})
@@ -263,9 +399,134 @@ def render_scenes(
             stderr = (result.stderr or "")[-500:]
             raise RuntimeError(f"Scene {i} Remotion render failed: {stderr}")
 
-        rendered.append(str(output_path.resolve()))
+        if is_overlay:
+            if rendered:
+                base_path = rendered.pop()
+                composited = output_dir / f"composited_{i:04d}.mp4"
+                pos = _overlay_position_for_scene(video.scenes[i], is_ir)
+                composite_overlay(base_path, output_path, composited, position=pos)
+                rendered.append(str(composited.resolve()))
+            else:
+                logger.warning("Overlay scene %d has no base scene — rendering standalone", i)
+                rendered.append(str(output_path.resolve()))
+        else:
+            if next_is_overlay:
+                i += 1
+                overlay_path = _render_overlay_composite(video, i, is_ir, output_dir, output_path, remotion_dir, tmpdir, concurrency, timeout_per_scene)
+                rendered.append(str(overlay_path.resolve()))
+            else:
+                rendered.append(str(output_path.resolve()))
+
+        i += 1
+
+    # ── Scene artifact generation ──────────────────────────────────────────
+    # Generate thumbnails + sampled frames for all successfully rendered
+    # scenes. Best-effort: errors logged, pipeline not blocked.
+    if artifacts_dir and rendered:
+        try:
+            from videoforge.artifacts.generator import generate_batch_scene_artifacts as _gen_batch
+            _scene_ids = [Path(p).stem for p in rendered]
+            _gen_batch(
+                artifacts_dir=str(artifacts_dir),
+                scene_paths=rendered,
+                scene_ids=_scene_ids,
+                fps=CLIP_FORMAT["fps"],
+            )
+        except Exception:
+            logger.warning("Scene artifact generation failed", exc_info=True)
 
     return rendered
+
+
+def _render_overlay_composite(
+    video: Any, i: int, is_ir: bool,
+    output_dir: Path, base_path: Path,
+    remotion_dir: Path, tmpdir: Any, concurrency: int,
+    timeout_per_scene: int,
+) -> Path:
+    """Render overlay scene with alpha, composite over base scene.
+
+    Called when scene[i] is an overlay scene. The base scene is already
+    rendered at base_path. This renders the overlay with alpha and
+    composites using FFmpeg overlay filter.
+    """
+    overlay_path = output_dir / f"scene_{i:04d}_overlay.mp4"
+
+    if is_ir:
+        from videoforge.engine.director import pick_engine as _pe
+        node = video.scenes[i]
+        engine = _pe(node)
+        kind = node.kind.value
+    else:
+        scene = video.scenes[i]
+        engine = Engine(getattr(scene, "renderer", "remotion"))
+        kind = scene.type.value
+
+    if engine == Engine.MANIM:
+        from videoforge.engine.ir_adapters import node_to_scene_definition
+        sd = node_to_scene_definition(video.scenes[i], video.fps)
+        from videoforge.engine.manim_renderer import render_scene as manim_render_scene
+        result = manim_render_scene(sd, output_dir, fps=video.fps, mode="direct")
+        if not result["success"] or not result["video_path"]:
+            raise RuntimeError(f"Overlay scene {i} Manim render failed: {result.get('log', '')[-300:]}")
+        src = Path(result["video_path"])
+        if src != overlay_path:
+            import shutil
+            shutil.copy2(str(src), str(overlay_path))
+    elif engine == Engine.ANIMOTION:
+        from videoforge.engine.ir_adapters import node_to_scene_definition
+        sd = node_to_scene_definition(video.scenes[i], video.fps)
+        from videoforge.engine.animotion_renderer import render_scene as animotion_render_scene
+        result = animotion_render_scene(sd, output_dir, fps=video.fps)
+        if not result["success"] or not result["video_path"]:
+            raise RuntimeError(f"Overlay scene {i} Animotion render failed: {result.get('log', '')[-300:]}")
+        src = Path(result["video_path"])
+        if src != overlay_path:
+            import shutil
+            shutil.copy2(str(src), str(overlay_path))
+    else:
+        # Remotion path — render with alpha
+        if is_ir:
+            scene_props = _ir_scene_props(video, i)
+        else:
+            scene_props = video.to_remotion_props()
+            scene_props["scenes"] = [scene_props["scenes"][i]]
+
+        props_path = output_dir / f"props_{i:04d}_overlay.json"
+        with open(props_path, "w") as f:
+            json.dump(scene_props, f)
+
+        cmd = [
+            "npx", "remotion", "render",
+            "src/index.ts", "VideoComposition",
+            str(overlay_path),
+            "--props", str(props_path),
+            "--concurrency", str(concurrency),
+            "--log", "error",
+            "--codec", "h264",
+            "--pixel-format", CLIP_FORMAT_ALPHA["pixel_format"],
+            "--fps", str(CLIP_FORMAT["fps"]),
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout_per_scene, cwd=str(remotion_dir), env={**os.environ, "TMPDIR": str(tmpdir or output_dir / "tmp")})
+        if result.returncode != 0 or not overlay_path.exists():
+            stderr = (result.stderr or "")[-500:]
+            raise RuntimeError(f"Overlay scene {i} Remotion render failed: {stderr}")
+
+    # Composite overlay over base
+    composited_path = output_dir / f"composited_{i:04d}.mp4"
+    if is_ir:
+        pos = _overlay_position_for_scene(video.scenes[i], is_ir=True)
+    else:
+        pos = _overlay_position_for_scene(video.scenes[i])
+
+    # No audio mux for overlay scenes — audio comes from base
+    composite_overlay(base_path, overlay_path, composited_path, position=pos)
+
+    # Clean up intermediate overlay file
+    if overlay_path.exists() and overlay_path != composited_path:
+        overlay_path.unlink(missing_ok=True)
+
+    return composited_path
 
 
 def _ir_scene_props(project: VideoProject, index: int) -> dict[str, Any]:

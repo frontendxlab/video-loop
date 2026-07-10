@@ -883,3 +883,408 @@ def test_get_track_legacy_out_of_range():
     video = VideoDefinition(title="T", scenes=[], audioTracks=[], captions=[])
     from videoforge.engine.renderer import _get_track
     assert _get_track(video, 0) is None
+
+
+# ── Overlay compositing ──────────────────────────────────────────────────────
+
+
+def test_is_overlay_scene_ir_true():
+    """OVERLAY_CTA scene node detected as overlay."""
+    from videoforge.engine.renderer import _is_overlay_scene
+    n = SceneNode(
+        id="s0", kind=SceneKind.OVERLAY_CTA,
+        payload='{"title":"Check it out"}',
+        engine_hint=Engine.REMOTION, duration_frames=90,
+        narration=NarrationSpec("check", (), "estimated"),
+    )
+    assert _is_overlay_scene(n, is_ir=True) is True
+
+
+def test_is_overlay_scene_ir_false():
+    """Non-overlay scene node NOT detected as overlay."""
+    from videoforge.engine.renderer import _is_overlay_scene
+    n = SceneNode(
+        id="s0", kind=SceneKind.TITLE,
+        payload='{"title":"Hi"}',
+        engine_hint=Engine.REMOTION, duration_frames=90,
+        narration=NarrationSpec("hi", (), "estimated"),
+    )
+    assert _is_overlay_scene(n, is_ir=True) is False
+
+
+def test_is_overlay_scene_legacy_true():
+    """Legacy overlay-cta scene detected as overlay."""
+    from videoforge.engine.renderer import _is_overlay_scene
+    scene = SceneDefinition(type=SceneType.OVERLAY_CTA, duration=60, title="CTA")
+    assert _is_overlay_scene(scene) is True
+
+
+def test_is_overlay_scene_legacy_false():
+    """Legacy non-overlay scene NOT detected as overlay."""
+    from videoforge.engine.renderer import _is_overlay_scene
+    scene = SceneDefinition(type=SceneType.TITLE, duration=60, title="Title")
+    assert _is_overlay_scene(scene) is False
+
+
+def test_parse_position_center():
+    """_parse_position returns centered FFmpeg expression."""
+    from videoforge.engine.renderer import _parse_position
+    x, y = _parse_position("center")
+    assert x == "(W-w)/2"
+    assert y == "(H-h)/2"
+
+
+def test_parse_position_bottom_left():
+    """_parse_position returns bottom-left FFmpeg expression."""
+    from videoforge.engine.renderer import _parse_position
+    x, y = _parse_position("bottom-left")
+    assert x == "0"
+    assert y == "H-h"
+
+
+def test_parse_position_fallback():
+    """_parse_position falls back to center for unknown position."""
+    from videoforge.engine.renderer import _parse_position
+    x, y = _parse_position("nonexistent")
+    assert x == "(W-w)/2"
+
+
+def test_composite_overlay_ffmpeg_args(tmp_path: Path):
+    """composite_overlay builds correct FFmpeg command with overlay filter."""
+    from videoforge.engine.renderer import composite_overlay
+
+    base = tmp_path / "base.mp4"
+    overlay = tmp_path / "overlay.mp4"
+    output = tmp_path / "out" / "composited.mp4"
+    base.write_text("fake-base")
+    overlay.write_text("fake-overlay")
+
+    with patch("subprocess.run") as mock_run:
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_run.return_value = mock_result
+
+        # Create output file so exists check passes
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text("fake-composited")
+
+        result = composite_overlay(base, overlay, output, position="center")
+
+    assert result == str(output.resolve())
+    assert mock_run.called
+    args = mock_run.call_args[0][0]
+    assert "ffmpeg" in args[0]
+    assert "-filter_complex" in args
+    filter_idx = args.index("-filter_complex")
+    filter_expr = args[filter_idx + 1]
+    assert "overlay=(W-w)/2:(H-h)/2:format=auto" in filter_expr
+    assert "-map" in args
+    map_idx = args.index("-map")
+    assert args[map_idx + 1] == "[outv]"
+    assert "-map" in args[map_idx + 2:]
+    assert args[args.index("-pix_fmt") + 1] == "yuv420p"
+    assert "-c:v" in args
+    assert "libx264" in args[args.index("-c:v") + 1]
+    assert "-c:a" in args
+    assert "copy" in args[args.index("-c:a") + 1]
+
+
+def test_composite_overlay_custom_position(tmp_path: Path):
+    """composite_overlay accepts custom position string."""
+    from videoforge.engine.renderer import composite_overlay
+
+    base = tmp_path / "base.mp4"
+    overlay = tmp_path / "overlay.mp4"
+    output = tmp_path / "out" / "composited.mp4"
+    base.write_text("fake-base")
+    overlay.write_text("fake-overlay")
+
+    with patch("subprocess.run") as mock_run:
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_run.return_value = mock_result
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text("fake-composited")
+
+        composite_overlay(base, overlay, output, position="bottom-left")
+
+    args = mock_run.call_args[0][0]
+    filter_idx = args.index("-filter_complex")
+    filter_expr = args[filter_idx + 1]
+    assert "overlay=0:H-h:format=auto" in filter_expr
+
+
+def test_composite_overlay_opacity(tmp_path: Path):
+    """composite_overlay with opacity <1 uses colorchannelmixer."""
+    from videoforge.engine.renderer import composite_overlay
+
+    base = tmp_path / "base.mp4"
+    overlay = tmp_path / "overlay.mp4"
+    output = tmp_path / "out" / "composited.mp4"
+    base.write_text("fake-base")
+    overlay.write_text("fake-overlay")
+
+    with patch("subprocess.run") as mock_run:
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_run.return_value = mock_result
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text("fake-composited")
+
+        composite_overlay(base, overlay, output, position="center", opacity=0.5)
+
+    args = mock_run.call_args[0][0]
+    filter_idx = args.index("-filter_complex")
+    filter_expr = args[filter_idx + 1]
+    assert "colorchannelmixer=aa=0.5" in filter_expr
+
+
+def test_composite_overlay_failure_raises(tmp_path: Path):
+    """composite_overlay raises RuntimeError on FFmpeg failure."""
+    from videoforge.engine.renderer import composite_overlay
+
+    base = tmp_path / "base.mp4"
+    overlay = tmp_path / "overlay.mp4"
+    output = tmp_path / "out" / "composited.mp4"
+    base.write_text("fake-base")
+    overlay.write_text("fake-overlay")
+
+    with patch("subprocess.run") as mock_run:
+        mock_result = MagicMock()
+        mock_result.returncode = 1
+        mock_result.stderr = "error"
+        mock_run.return_value = mock_result
+
+        with pytest.raises(RuntimeError, match="Overlay compositing failed"):
+            composite_overlay(base, overlay, output)
+
+
+def test_render_scenes_overlay_compositing_ir(tmp_path: Path):
+    """render_scenes composites OVERLAY_CTA over preceding base scene."""
+    from videoforge.engine.renderer import render_scenes
+
+    s0 = SceneNode(
+        id="s0", kind=SceneKind.TITLE,
+        payload='{"title":"Base Scene"}',
+        engine_hint=Engine.REMOTION, duration_frames=90,
+        narration=NarrationSpec("base", (), "estimated"),
+    )
+    s1 = SceneNode(
+        id="s1", kind=SceneKind.OVERLAY_CTA,
+        payload='{"title":"Subscribe","cta":"Click here"}',
+        engine_hint=Engine.REMOTION, duration_frames=60,
+        narration=NarrationSpec("cta", (), "estimated"),
+    )
+    project = VideoProject("Overlay Test", (s0, s1), 30, 1920, 1080)
+
+    with (
+        patch("subprocess.run") as mock_run,
+        patch("pathlib.Path.exists", return_value=True),
+    ):
+        out_dir = tmp_path / "out"
+
+        def _fake_run(cmd, *a, **kw):
+            r = MagicMock()
+            r.returncode = 0
+            for token in cmd:
+                if isinstance(token, str) and token.endswith(".mp4") and not token.startswith("-"):
+                    Path(token).parent.mkdir(parents=True, exist_ok=True)
+                    Path(token).write_text("fake")
+            return r
+
+        mock_run.side_effect = _fake_run
+
+        rendered = render_scenes(
+            project,
+            remotion_dir=tmp_path / "remotion",
+            output_dir=out_dir,
+            tmpdir=tmp_path / "tmp",
+        )
+
+    # Should return 1 composited clip (not 2 separate)
+    assert len(rendered) == 1, f"Expected 1 composited clip, got {len(rendered)}"
+
+    # Path should be composited output
+    composited_path = Path(rendered[0])
+    assert "composited" in composited_path.name
+
+    # Verify FFmpeg overlay filter was called
+    # c[0] is positional args tuple; c[0][0] is the cmd list
+    overlay_calls = [
+        c for c in mock_run.call_args_list
+        if any("overlay=" in str(t) for t in c[0][0])
+    ]
+    assert len(overlay_calls) >= 1, "Expected at least one ffmpeg overlay call"
+    overlay_tokens = overlay_calls[0][0][0]
+    cmd_str = " ".join(str(t) for t in overlay_tokens)
+    assert "overlay=(W-w)/2" in cmd_str
+
+    # Verify base scene was rendered with yuv420p (standard)
+    render_calls = [
+        c for c in mock_run.call_args_list
+        if "remotion" in " ".join(c[0][0]) and "--pixel-format" in c[0][0]
+    ]
+    pix_fmts = [
+        c[0][0][c[0][0].index("--pixel-format") + 1]
+        for c in render_calls
+    ]
+    # At least one yuv420p (base) and one yuva420p (overlay)
+    assert "yuv420p" in pix_fmts
+    assert "yuva420p" in pix_fmts
+
+
+def test_render_scenes_no_overlay_passthrough(tmp_path: Path):
+    """render_scenes with no overlay — backward compat, all scenes concatenated."""
+    from videoforge.engine.renderer import render_scenes
+
+    s0 = SceneNode(
+        id="s0", kind=SceneKind.TITLE,
+        payload='{"title":"Scene 0"}',
+        engine_hint=Engine.REMOTION, duration_frames=90,
+        narration=NarrationSpec("s0", (), "estimated"),
+    )
+    s1 = SceneNode(
+        id="s1", kind=SceneKind.CODE,
+        payload='{"title":"Scene 1","code":"print(1)"}',
+        engine_hint=Engine.REMOTION, duration_frames=120,
+        narration=NarrationSpec("s1", (), "estimated"),
+    )
+    project = VideoProject("No Overlay", (s0, s1), 30, 1920, 1080)
+
+    with (
+        patch("subprocess.run") as mock_run,
+        patch("pathlib.Path.exists", return_value=True),
+    ):
+        out_dir = tmp_path / "out"
+
+        def _fake_run(cmd, *a, **kw):
+            r = MagicMock()
+            r.returncode = 0
+            for token in cmd:
+                if isinstance(token, str) and token.endswith(".mp4") and not token.startswith("-"):
+                    Path(token).parent.mkdir(parents=True, exist_ok=True)
+                    Path(token).write_text("fake")
+            return r
+
+        mock_run.side_effect = _fake_run
+
+        rendered = render_scenes(
+            project,
+            remotion_dir=tmp_path / "remotion",
+            output_dir=out_dir,
+            tmpdir=tmp_path / "tmp",
+        )
+
+    # Should return 2 individual clips (no compositing)
+    assert len(rendered) == 2
+
+    # Both should be scene_* files, not composited
+    names = [Path(p).name for p in rendered]
+    assert all("composited" not in n for n in names)
+    assert "scene_0000.mp4" in names[0]
+    assert "scene_0001.mp4" in names[1]
+
+
+def test_render_scenes_overlay_standalone_fallback(tmp_path: Path):
+    """Overlay scene with no preceding base renders standalone (fallback)."""
+    from videoforge.engine.renderer import render_scenes
+
+    s0 = SceneNode(
+        id="s0", kind=SceneKind.OVERLAY_CTA,
+        payload='{"title":"Standalone Overlay"}',
+        engine_hint=Engine.REMOTION, duration_frames=60,
+        narration=NarrationSpec("overlay", (), "estimated"),
+    )
+    project = VideoProject("Standalone", (s0,), 30, 1920, 1080)
+
+    with (
+        patch("subprocess.run") as mock_run,
+        patch("pathlib.Path.exists", return_value=True),
+    ):
+        out_dir = tmp_path / "out"
+
+        def _fake_run(cmd, *a, **kw):
+            r = MagicMock()
+            r.returncode = 0
+            for token in cmd:
+                if isinstance(token, str) and token.endswith(".mp4") and not token.startswith("-"):
+                    Path(token).parent.mkdir(parents=True, exist_ok=True)
+                    Path(token).write_text("fake")
+            return r
+
+        mock_run.side_effect = _fake_run
+
+        rendered = render_scenes(
+            project,
+            remotion_dir=tmp_path / "remotion",
+            output_dir=out_dir,
+            tmpdir=tmp_path / "tmp",
+        )
+
+    assert len(rendered) == 1
+    # Should be standalone scene (no compositing), rendered with yuva420p
+    overlay_render_calls = [
+        c for c in mock_run.call_args_list
+        if "remotion" in " ".join(c[0][0])
+        and "--pixel-format" in c[0][0]
+        and "yuva420p" in c[0][0][c[0][0].index("--pixel-format") + 1]
+    ]
+    assert len(overlay_render_calls) >= 1
+
+
+def test_render_scenes_overlay_after_non_overlay_works(tmp_path: Path):
+    """Non-overlay scene after overlay composite renders normally."""
+    from videoforge.engine.renderer import render_scenes
+
+    s0 = SceneNode(
+        id="s0", kind=SceneKind.TITLE,
+        payload='{"title":"Base"}',
+        engine_hint=Engine.REMOTION, duration_frames=90,
+        narration=NarrationSpec("base", (), "estimated"),
+    )
+    s1 = SceneNode(
+        id="s1", kind=SceneKind.OVERLAY_CTA,
+        payload='{"title":"Overlay","cta":"Click"}',
+        engine_hint=Engine.REMOTION, duration_frames=60,
+        narration=NarrationSpec("cta", (), "estimated"),
+    )
+    s2 = SceneNode(
+        id="s2", kind=SceneKind.OUTRO,
+        payload='{"title":"The End"}',
+        engine_hint=Engine.REMOTION, duration_frames=60,
+        narration=NarrationSpec("end", (), "estimated"),
+    )
+    project = VideoProject("Multi", (s0, s1, s2), 30, 1920, 1080)
+
+    with (
+        patch("subprocess.run") as mock_run,
+        patch("pathlib.Path.exists", return_value=True),
+    ):
+        out_dir = tmp_path / "out"
+
+        def _fake_run(cmd, *a, **kw):
+            r = MagicMock()
+            r.returncode = 0
+            for token in cmd:
+                if isinstance(token, str) and token.endswith(".mp4") and not token.startswith("-"):
+                    Path(token).parent.mkdir(parents=True, exist_ok=True)
+                    Path(token).write_text("fake")
+            return r
+
+        mock_run.side_effect = _fake_run
+
+        rendered = render_scenes(
+            project,
+            remotion_dir=tmp_path / "remotion",
+            output_dir=out_dir,
+            tmpdir=tmp_path / "tmp",
+        )
+
+    # 3 scenes: (base+overlay → composited) + outro = 2 clips
+    assert len(rendered) == 2, f"Expected 2 clips, got {len(rendered)}"
+
+    # First clip should be composited (base+overlay)
+    assert "composited" in Path(rendered[0]).name
+    # Second clip should be normal outro
+    assert "composited" not in Path(rendered[1]).name
+    assert Path(rendered[1]).suffix == ".mp4"
