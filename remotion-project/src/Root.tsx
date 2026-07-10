@@ -105,6 +105,23 @@ export const RemotionRoot: React.FC = () => {
         }}
       />
       <Composition
+        id="ThreeComposition"
+        component={VideoComposition}
+        durationInFrames={150}
+        fps={30}
+        width={1920}
+        height={1080}
+        schema={InputPropsSchema}
+        defaultProps={{
+          title: "Three Demo",
+          scenes: [{ type: "three", duration: 150 }],
+          audioTracks: [],
+          captions: [],
+          voice: "alba",
+          style: remotionStyleDefaults,
+        }}
+      />
+      <Composition
         id="TimelineComposition"
         component={VideoComposition}
         durationInFrames={300}
