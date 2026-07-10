@@ -224,8 +224,8 @@ export type Voice = z.infer<typeof VoiceEnum>;
 
 export const CreateOptionsSchema = z.object({
   voice: VoiceEnum.default("alba"),
-  provider: z.enum(["openai","anthropic","google","deepseek","custom"]).default("openai"),
-  model: z.string().default("gpt-4o"),
+  provider: z.enum(["openai","anthropic","google","deepseek","9router","custom"]).default("9router"),
+  model: z.string().default("ocg/deepseek-v4-flash"),
   maxDuration: z.number().positive().default(180),
   fps: z.number().positive().default(30),
 });
@@ -252,7 +252,7 @@ export const GrillResultSchema = z.object({
 export type GrillResult = z.infer<typeof GrillResultSchema>;
 
 export const DEFAULT_OPTIONS: CreateOptions = {
-  voice: "alba", provider: "openai", model: "gpt-4o", maxDuration: 180, fps: 30,
+  voice: "alba", provider: "9router", model: "ocg/deepseek-v4-flash", maxDuration: 180, fps: 30,
 };
 
 export const CREATE_STAGES = [

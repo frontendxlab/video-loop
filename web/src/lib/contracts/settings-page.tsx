@@ -21,6 +21,7 @@ const PROVIDER_LABELS: Record<ProviderId, string> = {
   anthropic: "Anthropic",
   google: "Google",
   groq: "Groq",
+  "9router": "9router",
   custom: "Custom",
 };
 

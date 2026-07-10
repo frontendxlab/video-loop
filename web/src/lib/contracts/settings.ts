@@ -7,6 +7,7 @@ export const PROVIDER_IDS = [
   "anthropic",
   "google",
   "groq",
+  "9router",
   "custom",
 ] as const;
 
@@ -74,8 +75,8 @@ export type Settings = z.infer<typeof SettingsSchema>;
 /* ─── Defaults ─── */
 
 export const DEFAULT_SETTINGS: Settings = {
-  activeProvider: "openai",
-  activeModel: "gpt-4o",
+  activeProvider: "9router",
+  activeModel: "ocg/deepseek-v4-flash",
   providers: [
     {
       provider: "openai",
@@ -119,7 +120,18 @@ export const DEFAULT_SETTINGS: Settings = {
       defaultModel: "llama-3.3-70b",
       models: [
         { id: "llama-3.3-70b", label: "Llama 3.3 70B", maxTokens: 8192 },
-        { id: "mixtral-8x7b", label: "Mixtral 8\u00d77B", maxTokens: 8192 },
+        { id: "mixtral-8x7b", label: "Mixtral 8×7B", maxTokens: 8192 },
+      ],
+    },
+    {
+      provider: "9router",
+      label: "9router",
+      apiKey: "",
+      baseUrl: "",
+      defaultModel: "ocg/deepseek-v4-flash",
+      models: [
+        { id: "ocg/deepseek-v4-flash", label: "DeepSeek V4 Flash", maxTokens: 32_768 },
+        { id: "ocg/deepseek-v4-flash:free", label: "DeepSeek V4 Flash Free", maxTokens: 8_192 },
       ],
     },
     {

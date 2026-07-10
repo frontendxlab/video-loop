@@ -1,8 +1,45 @@
 import { describe, it, expect } from "vitest";
 import {
-  CreateJobRequestSchema, GrillResultSchema, RecipeSchema,
+  CreateJobRequestSchema, CreateOptionsSchema, GrillResultSchema, RecipeSchema,
   DEFAULT_OPTIONS, CREATE_STAGES, RECIPE_PRESETS,
 } from "@/contracts/create";
+
+describe("CreateOptionsSchema", () => {
+  it("accepts 9router as provider", () => {
+    const r = CreateOptionsSchema.safeParse({ provider: "9router", model: "ocg/deepseek-v4-flash" });
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.provider).toBe("9router");
+      expect(r.data.model).toBe("ocg/deepseek-v4-flash");
+    }
+  });
+
+  it("defaults to 9router and ocg/deepseek-v4-flash model", () => {
+    const r = CreateOptionsSchema.safeParse({});
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.provider).toBe("9router");
+      expect(r.data.model).toBe("ocg/deepseek-v4-flash");
+    }
+  });
+
+  it("accepts 9router free tier model", () => {
+    const r = CreateOptionsSchema.safeParse({ provider: "9router", model: "ocg/deepseek-v4-flash:free" });
+    expect(r.success).toBe(true);
+  });
+
+  it("rejects invalid provider", () => {
+    const r = CreateOptionsSchema.safeParse({ provider: "invalid-provider" });
+    expect(r.success).toBe(false);
+  });
+});
+
+describe("DEFAULT_OPTIONS", () => {
+  it("defaults provider to 9router", () => {
+    expect(DEFAULT_OPTIONS.provider).toBe("9router");
+    expect(DEFAULT_OPTIONS.model).toBe("ocg/deepseek-v4-flash");
+  });
+});
 
 describe("CreateJobRequestSchema", () => {
   it("validates minimal request", () => expect(CreateJobRequestSchema.safeParse({ prompt: "Explain Kubernetes architecture", options: DEFAULT_OPTIONS }).success).toBe(true));

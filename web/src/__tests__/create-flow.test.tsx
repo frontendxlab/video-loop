@@ -31,6 +31,11 @@ describe("CreatePage", () => {
     expect(screen.getByText("Options")).toBeInTheDocument();
   });
 
+  it("renders model select field", () => {
+    render(<CreatePage />);
+    expect(screen.getByLabelText("Model")).toBeInTheDocument();
+  });
+
   it("renders progress section", () => {
     render(<CreatePage />);
     expect(screen.getByText("Progress")).toBeInTheDocument();

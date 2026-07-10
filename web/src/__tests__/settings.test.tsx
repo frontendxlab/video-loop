@@ -65,7 +65,7 @@ describe("SettingsSchema", () => {
   });
 
   it("accepts valid provider ids", () => {
-    for (const pid of ["openai", "anthropic", "google", "groq", "custom"] as const) {
+    for (const pid of ["openai", "anthropic", "google", "groq", "9router", "custom"] as const) {
       const result = SettingsSchema.safeParse({
         ...DEFAULT_SETTINGS,
         activeProvider: pid,
@@ -116,6 +116,30 @@ describe("SettingsSchema", () => {
     });
     expect(high.success).toBe(false);
     expect(low.success).toBe(false);
+  });
+});
+
+describe("9router provider", () => {
+  it("is a valid provider id in settings", () => {
+    const result = SettingsSchema.safeParse({
+      ...DEFAULT_SETTINGS,
+      activeProvider: "9router",
+      activeModel: "ocg/deepseek-v4-flash",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("has models in default providers", () => {
+    const r9 = DEFAULT_SETTINGS.providers.find(p => p.provider === "9router");
+    expect(r9).toBeDefined();
+    expect(r9!.models.length).toBeGreaterThanOrEqual(2);
+    expect(r9!.models[0].id).toBe("ocg/deepseek-v4-flash");
+    expect(r9!.models[1].id).toBe("ocg/deepseek-v4-flash:free");
+  });
+
+  it("defaults to 9router as active provider", () => {
+    expect(DEFAULT_SETTINGS.activeProvider).toBe("9router");
+    expect(DEFAULT_SETTINGS.activeModel).toBe("ocg/deepseek-v4-flash");
   });
 });
 
