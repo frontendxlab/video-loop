@@ -18,6 +18,19 @@ TRANSITIONS = [
     "warp",
 ]
 
+# Showcase scene types get bespoke entrance transitions by rule.
+SHOWCASE_ENTRANCE: dict[str, str] = {
+    "svg-morph": "morph",
+    "kinetic-text": "scale",
+    "canvas-composite": "glitch",
+    "real-estate": "slide-right",
+    "promo": "zoom",
+    "three-scene": "flip",
+    "hero-intro": "zoom",
+    "screenflow": "slide-right",
+    "trajectory-timeline": "wipe",
+}
+
 
 class ScenePlanner:
     def plan_scenes(self, script: dict[str, Any], audio_metadata: list[dict[str, Any]]) -> dict[str, Any]:
@@ -71,6 +84,9 @@ class ScenePlanner:
         }
 
     def _select_transition(self, index: int, scene_type: str) -> str:
+        # Showcase types get a bespoke entrance transition first only.
+        if index > 0 and scene_type in SHOWCASE_ENTRANCE:
+            return SHOWCASE_ENTRANCE[scene_type]
         return TRANSITIONS[index % (len(TRANSITIONS) - 2) + 1] if index > 0 else "fade"
 
     def _select_next_transition(self, index: int, scenes: list[dict[str, Any]]) -> str:
