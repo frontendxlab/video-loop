@@ -28,6 +28,16 @@ describe("CreateOptionsSchema", () => {
     expect(r.success).toBe(true);
   });
 
+  it("accepts OpenCode Zen free model", () => {
+    const r = CreateOptionsSchema.safeParse({ provider: "9router", model: "oc/deepseek-v4-flash-free" });
+    expect(r.success).toBe(true);
+  });
+
+  it("accepts 9router pro model", () => {
+    const r = CreateOptionsSchema.safeParse({ provider: "9router", model: "ocg/deepseek-v4-pro" });
+    expect(r.success).toBe(true);
+  });
+
   it("rejects invalid provider", () => {
     const r = CreateOptionsSchema.safeParse({ provider: "invalid-provider" });
     expect(r.success).toBe(false);

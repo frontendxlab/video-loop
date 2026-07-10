@@ -36,6 +36,9 @@ const FALLBACK_MODELS: Record<string, ModelOption[]> = {
   "9router": [
     { value: "ocg/deepseek-v4-flash", label: "DeepSeek V4 Flash" },
     { value: "ocg/deepseek-v4-flash:free", label: "DeepSeek V4 Flash Free" },
+    { value: "ocg/deepseek-v4-pro", label: "DeepSeek V4 Pro" },
+    { value: "oc/deepseek-v4-flash-free", label: "OpenCode Zen" },
+    { value: "oc/big-pickle", label: "Big Pickle" },
   ],
   custom:    [{ value: "custom-model", label: "Custom Model" }],
 };

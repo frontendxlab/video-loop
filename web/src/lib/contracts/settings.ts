@@ -144,6 +144,9 @@ export const DEFAULT_SETTINGS: Settings = {
       models: [
         { id: "ocg/deepseek-v4-flash", label: "DeepSeek V4 Flash", maxTokens: 32_768 },
         { id: "ocg/deepseek-v4-flash:free", label: "DeepSeek V4 Flash Free", maxTokens: 8_192 },
+        { id: "ocg/deepseek-v4-pro", label: "DeepSeek V4 Pro", maxTokens: 32_768 },
+        { id: "oc/deepseek-v4-flash-free", label: "OpenCode Zen", maxTokens: 8_192 },
+        { id: "oc/big-pickle", label: "Big Pickle", maxTokens: 16_384 },
       ],
     },
     {

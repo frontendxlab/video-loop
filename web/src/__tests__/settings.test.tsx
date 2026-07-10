@@ -132,9 +132,20 @@ describe("9router provider", () => {
   it("has models in default providers", () => {
     const r9 = DEFAULT_SETTINGS.providers.find(p => p.provider === "9router");
     expect(r9).toBeDefined();
-    expect(r9!.models.length).toBeGreaterThanOrEqual(2);
+    expect(r9!.models.length).toBeGreaterThanOrEqual(5);
     expect(r9!.models[0].id).toBe("ocg/deepseek-v4-flash");
     expect(r9!.models[1].id).toBe("ocg/deepseek-v4-flash:free");
+    expect(r9!.models[2].id).toBe("ocg/deepseek-v4-pro");
+    expect(r9!.models[3].id).toBe("oc/deepseek-v4-flash-free");
+    expect(r9!.models[4].id).toBe("oc/big-pickle");
+  });
+
+  it("includes OpenCode Zen free model", () => {
+    const r9 = DEFAULT_SETTINGS.providers.find(p => p.provider === "9router");
+    expect(r9).toBeDefined();
+    const zen = r9!.models.find(m => m.id === "oc/deepseek-v4-flash-free");
+    expect(zen).toBeDefined();
+    expect(zen!.maxTokens).toBe(8192);
   });
 
   it("defaults to 9router as active provider", () => {
