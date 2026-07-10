@@ -70,3 +70,54 @@ describe("RECIPE_PRESETS", () => {
     expect(RECIPE_PRESETS.find(r => r.id === "map3d")).toBeTruthy();
   });
 });
+
+describe("RECIPE_PRESETS — showcase metadata", () => {
+  it("every recipe has useCases", () => {
+    for (const r of RECIPE_PRESETS) {
+      expect(Array.isArray(r.useCases)).toBe(true);
+      expect(r.useCases.length).toBeGreaterThanOrEqual(2);
+    }
+  });
+  it("every recipe has motionHints with entrance and exit", () => {
+    for (const r of RECIPE_PRESETS) {
+      expect(r.motionHints).toBeDefined();
+      expect(typeof r.motionHints.entrance).toBe("string");
+      expect(r.motionHints.entrance.length).toBeGreaterThan(5);
+      expect(typeof r.motionHints.exit).toBe("string");
+      expect(r.motionHints.exit.length).toBeGreaterThan(5);
+    }
+  });
+  it("every recipe has reviewHints", () => {
+    for (const r of RECIPE_PRESETS) {
+      expect(Array.isArray(r.reviewHints)).toBe(true);
+      expect(r.reviewHints.length).toBeGreaterThanOrEqual(1);
+    }
+  });
+  it("every recipe has engineBadges", () => {
+    for (const r of RECIPE_PRESETS) {
+      expect(Array.isArray(r.engineBadges)).toBe(true);
+      expect(r.engineBadges.length).toBeGreaterThanOrEqual(1);
+      for (const b of r.engineBadges) {
+        expect(typeof b.engine).toBe("string");
+        expect(typeof b.label).toBe("string");
+      }
+    }
+  });
+  it("3d-ranking has two engine badges (primary + fallback)", () => {
+    const recipe = RECIPE_PRESETS.find(r => r.id === "3d-ranking");
+    expect(recipe).toBeDefined();
+    expect(recipe!.engineBadges.length).toBe(2);
+    expect(recipe!.engineBadges[0].engine).toBe("remotion");
+    expect(recipe!.engineBadges[1].engine).toBe("manim");
+  });
+  it("useCases unique per recipe", () => {
+    for (const r of RECIPE_PRESETS) {
+      expect(new Set(r.useCases).size).toBe(r.useCases.length);
+    }
+  });
+  it("RecipeSchema validates showcase metadata", () => {
+    const r = RECIPE_PRESETS[0];
+    const parsed = RecipeSchema.safeParse(r);
+    expect(parsed.success).toBe(true);
+  });
+});

@@ -15,4 +15,5 @@ export { LowerThird, LowerThirdSchema } from "./LowerThird";
 export { OverlayCTA, OverlayCTASchema } from "./OverlayCTA";
 export { AudioVizScene, AudioVizSceneSchema } from "./AudioVizScene";
 export { ThreeSceneExample, ThreeSceneExampleSchema } from "./ThreeSceneExample";
+export { MapScene, MapSceneSchema } from "./MapScene";
 export type { WordTiming } from "../captions/wordTiming";

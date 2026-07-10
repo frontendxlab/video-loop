@@ -10,6 +10,13 @@ export const RecipeAllowedInputSchema = z.object({
 });
 export type RecipeAllowedInput = z.infer<typeof RecipeAllowedInputSchema>;
 
+export const RecipeEngineBadgeSchema = z.object({
+  engine: z.string(),
+  label: z.string(),
+  variant: z.enum(["default", "secondary", "outline", "success", "warning"]).optional(),
+});
+export type RecipeEngineBadge = z.infer<typeof RecipeEngineBadgeSchema>;
+
 export const RecipeSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -21,6 +28,14 @@ export const RecipeSchema = z.object({
   entrance: z.string(),
   exit: z.string(),
   tags: z.array(z.string()),
+  // Showcase metadata
+  useCases: z.array(z.string()),
+  motionHints: z.object({
+    entrance: z.string(),
+    exit: z.string(),
+  }),
+  reviewHints: z.array(z.string()),
+  engineBadges: z.array(RecipeEngineBadgeSchema),
 });
 export type Recipe = z.infer<typeof RecipeSchema>;
 
@@ -39,6 +54,10 @@ export const RECIPE_PRESETS: Recipe[] = [
     entrance: "glitch_in",
     exit: "shatter_out",
     tags: ["hero", "title", "3d", "glow"],
+    useCases: ["Video intros", "Channel branding", "Opening sequences"],
+    motionHints: { entrance: "Glitch distortion reveal with scan lines", exit: "Shatter into particles and fade" },
+    reviewHints: ["Verify 3D text renders without z-fighting", "Check glow effect intensity on target display"],
+    engineBadges: [{ engine: "remotion", label: "Primary renderer", variant: "default" }],
   },
   {
     id: "document-highlight",
@@ -55,6 +74,10 @@ export const RECIPE_PRESETS: Recipe[] = [
     entrance: "unfold",
     exit: "blur_out",
     tags: ["text", "highlight", "document", "news"],
+    useCases: ["News segments", "Documentary titles", "Quote displays"],
+    motionHints: { entrance: "Document unrolls from center", exit: "Content blurs and dissolves" },
+    reviewHints: ["Confirm focus_phrase appears in body_snippet", "Check highlight color contrast"],
+    engineBadges: [{ engine: "remotion", label: "Primary renderer", variant: "default" }],
   },
   {
     id: "screenflow",
@@ -70,6 +93,10 @@ export const RECIPE_PRESETS: Recipe[] = [
     entrance: "zoom_in",
     exit: "slide_out_left",
     tags: ["product", "demo", "screenflow", "ui"],
+    useCases: ["Product demos", "UI walkthroughs", "Tutorials"],
+    motionHints: { entrance: "Zoom in from screenshot center", exit: "Slide left to reveal next scene" },
+    reviewHints: ["Verify screenshot resolution matches output", "Check callout text legibility at target size"],
+    engineBadges: [{ engine: "remotion", label: "Primary renderer", variant: "default" }],
   },
   {
     id: "map3d",
@@ -85,6 +112,10 @@ export const RECIPE_PRESETS: Recipe[] = [
     entrance: "fly_in",
     exit: "fade_out",
     tags: ["geospatial", "3d", "travel", "map"],
+    useCases: ["Geospatial stories", "Travel routes", "Location-based narratives"],
+    motionHints: { entrance: "Camera flies down from high orbit to target location", exit: "Fade to black with route overlay" },
+    reviewHints: ["Verify camera path doesn't clip through terrain", "Check marker labels are readable at zoom level"],
+    engineBadges: [{ engine: "manim", label: "Primary renderer", variant: "default" }],
   },
   {
     id: "trajectory-timeline",
@@ -99,6 +130,10 @@ export const RECIPE_PRESETS: Recipe[] = [
     entrance: "slide_in_right",
     exit: "shrink_to_right",
     tags: ["timeline", "trajectory", "path", "motion"],
+    useCases: ["Historical timelines", "Project roadmaps", "Sequence of events"],
+    motionHints: { entrance: "Timeline slides in from right edge", exit: "Timeline shrinks and collapses to right" },
+    reviewHints: ["Verify event markers align with dates", "Check trajectory path doesn't overlap labels"],
+    engineBadges: [{ engine: "manim", label: "Primary renderer", variant: "default" }],
   },
   {
     id: "3d-ranking",
@@ -113,6 +148,13 @@ export const RECIPE_PRESETS: Recipe[] = [
     entrance: "rise_up",
     exit: "fade_out",
     tags: ["3d", "ranking", "bars", "chart", "data"],
+    useCases: ["Leaderboards", "Top-N lists", "Competitive rankings"],
+    motionHints: { entrance: "Bars rise from floor with sequential reveal", exit: "Scene fades to neutral" },
+    reviewHints: ["Verify bars are sorted by value descending", "Check camera fly-through targets each bar"],
+    engineBadges: [
+      { engine: "remotion", label: "Primary renderer", variant: "default" },
+      { engine: "manim", label: "Fallback renderer", variant: "outline" },
+    ],
   },
   {
     id: "dual-chart",
@@ -128,6 +170,10 @@ export const RECIPE_PRESETS: Recipe[] = [
     entrance: "grow_from_bottom",
     exit: "fade_out",
     tags: ["chart", "dual", "bar", "line", "data"],
+    useCases: ["Financial reports", "Data comparisons", "Trend analysis"],
+    motionHints: { entrance: "Bar and line series grow from bottom axis", exit: "Both series fade simultaneously" },
+    reviewHints: ["Verify dual axes have separate scales", "Check bar and line data points align on x-axis"],
+    engineBadges: [{ engine: "manim", label: "Primary renderer", variant: "default" }],
   },
   {
     id: "audio-reactive",
@@ -142,6 +188,10 @@ export const RECIPE_PRESETS: Recipe[] = [
     entrance: "wave_in",
     exit: "fade_out",
     tags: ["audio", "reactive", "music", "waveform", "visualizer"],
+    useCases: ["Music visualizations", "Podcast intros", "Audio branding"],
+    motionHints: { entrance: "Waveform pulses in from left with beat sync", exit: "Waveform fades and disperses" },
+    reviewHints: ["Verify waveform syncs with audio peaks", "Check bar count matches FFT bin resolution"],
+    engineBadges: [{ engine: "remotion", label: "Primary renderer", variant: "default" }],
   },
   {
     id: "overlay-cta",
@@ -157,6 +207,10 @@ export const RECIPE_PRESETS: Recipe[] = [
     entrance: "slide_up",
     exit: "fade_out",
     tags: ["cta", "overlay", "lower-third", "transparent"],
+    useCases: ["End screens", "Call-to-action overlays", "Lower thirds"],
+    motionHints: { entrance: "Content slides up from bottom edge", exit: "Fades to transparent for compositing" },
+    reviewHints: ["Verify alpha channel exports correctly", "Check text contrast over varied background colors"],
+    engineBadges: [{ engine: "remotion", label: "Primary renderer", variant: "default" }],
   },
 ];
 

@@ -11,13 +11,17 @@
     "format": "prettier --write src"
   },
   "dependencies": {
+    "@react-three/drei": "^10.7.7",
+    "@react-three/fiber": "^9.6.1",
     "@remotion/bundler": "^4.0.228",
     "@remotion/captions": "4.0.486",
     "@remotion/cli": "4.0.486",
     "@remotion/google-fonts": "^4.0.228",
     "@remotion/media-utils": "^4.0.228",
     "@remotion/renderer": "^4.0.228",
+    "@remotion/three": "^4.0.486",
     "@remotion/transitions": "4.0.486",
+    "@types/three": "^0.185.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^1.24.0",
@@ -26,9 +30,11 @@
     "remotion": "^4.0.228",
     "shiki": "^4.3.1",
     "tailwind-merge": "^3.6.0",
+    "three": "^0.185.1",
     "zod": "4.3.6"
   },
   "devDependencies": {
+    "@testing-library/dom": "^10.4.1",
     "@testing-library/react": "^16.0",
     "eslint": "^9.0",
     "jsdom": "^24.0",

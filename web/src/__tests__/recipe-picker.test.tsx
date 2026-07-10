@@ -69,4 +69,48 @@ describe("RecipePicker", () => {
     fireEvent.click(screen.getByText("Recipe"));
     expect(screen.queryByText("Hero intro")).not.toBeInTheDocument();
   });
+
+  it("shows engine badges with labels on recipe items", () => {
+    render(<RecipePicker selected={null} onSelect={onSelect} />);
+    fireEvent.click(screen.getByText("Recipe"));
+    // Engine names appear as badges
+    expect(screen.getAllByText("remotion").length).toBeGreaterThan(0);
+  });
+
+  it("shows use cases on recipe items", () => {
+    render(<RecipePicker selected={null} onSelect={onSelect} />);
+    fireEvent.click(screen.getByText("Recipe"));
+    // First recipe use case should be visible
+    const first = RECIPE_PRESETS[0];
+    expect(screen.getByText(first.useCases[0])).toBeInTheDocument();
+  });
+
+  it("shows motion hints when recipe is selected", () => {
+    const recipe = RECIPE_PRESETS[0];
+    render(<RecipePicker selected={recipe} onSelect={onSelect} />);
+    fireEvent.click(screen.getByText("Recipe"));
+    expect(screen.getByText(`In: ${recipe.motionHints.entrance}`)).toBeInTheDocument();
+    expect(screen.getByText(`Out: ${recipe.motionHints.exit}`)).toBeInTheDocument();
+  });
+
+  it("shows review hints when recipe is selected", () => {
+    const recipe = RECIPE_PRESETS[0];
+    render(<RecipePicker selected={recipe} onSelect={onSelect} />);
+    fireEvent.click(screen.getByText("Recipe"));
+    for (const hint of recipe.reviewHints) {
+      expect(screen.getByText(hint)).toBeInTheDocument();
+    }
+  });
+
+  it("does not show motion hints when no recipe selected", () => {
+    render(<RecipePicker selected={null} onSelect={onSelect} />);
+    fireEvent.click(screen.getByText("Recipe"));
+    expect(screen.queryByText("In:")).not.toBeInTheDocument();
+  });
+
+  it("does not show review hints when no recipe selected", () => {
+    render(<RecipePicker selected={null} onSelect={onSelect} />);
+    fireEvent.click(screen.getByText("Recipe"));
+    expect(screen.queryByText("⚠")).not.toBeInTheDocument();
+  });
 });
