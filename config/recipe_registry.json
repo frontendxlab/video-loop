@@ -205,6 +205,436 @@
         {"check": "bar width does not occlude line markers", "severity": "warn"},
         {"check": "legend clearly distinguishes bar from line series", "severity": "info"}
       ]
+    },
+    {
+      "id": "launch-promo",
+      "name": "Launch Video Promo",
+      "description": "Multi-sequence narrative launch video with terminal/cards and layered promo scenes",
+      "scene_kind": "promo",
+      "preferred_engine": "remotion",
+      "fallback_engines": ["animotion"],
+      "allowed_inputs": [
+        {"key": "title", "type": "string", "required": true, "description": "Launch title text"},
+        {"key": "tagline", "type": "string", "required": false, "description": "Short supporting tagline"},
+        {"key": "launch_date", "type": "string", "required": false, "description": "Launch date or countdown target"},
+        {"key": "cta_text", "type": "string", "required": false, "description": "Final call-to-action text"},
+        {"key": "color_scheme", "type": "string", "required": false, "description": "Brand color scheme identifier"}
+      ],
+      "entrance": "slide_in_right",
+      "exit": "zoom_out",
+      "tags": ["promo", "launch", "narrative", "multi-sequence"],
+      "review_hints": [
+        {"check": "cta visible on final frame for minimum hold duration", "severity": "error"},
+        {"check": "title text readable against background at all times", "severity": "error"},
+        {"check": "multi-sequence pacing feels natural not rushed", "severity": "warn"}
+      ]
+    },
+    {
+      "id": "real-estate",
+      "name": "Real Estate Investing",
+      "description": "Metric counters, lower thirds, footage overlays for real estate investment content",
+      "scene_kind": "real-estate",
+      "preferred_engine": "remotion",
+      "fallback_engines": ["manim"],
+      "allowed_inputs": [
+        {"key": "metrics", "type": "array", "required": true, "description": "Array of metric objects with label, value, prefix"},
+        {"key": "property_images", "type": "array", "required": false, "description": "Array of property image URLs"},
+        {"key": "lower_third_text", "type": "string", "required": false, "description": "Persistent lower-third caption"},
+        {"key": "counter_targets", "type": "array", "required": false, "description": "Array of counter end values"}
+      ],
+      "entrance": "count_up",
+      "exit": "fade_out",
+      "tags": ["real-estate", "metrics", "counters", "lower-thirds", "investment"],
+      "review_hints": [
+        {"check": "counter numbers match input values exactly", "severity": "error"},
+        {"check": "lower third text does not overlap metric counters", "severity": "warn"},
+        {"check": "property image aspect ratio fits output canvas", "severity": "warn"}
+      ]
+    },
+    {
+      "id": "product-promo",
+      "name": "Product Hero Promo",
+      "description": "Product hero image plus feature walkthrough with staggered callouts",
+      "scene_kind": "promo",
+      "preferred_engine": "remotion",
+      "fallback_engines": ["animotion"],
+      "allowed_inputs": [
+        {"key": "product_name", "type": "string", "required": true, "description": "Name of the product"},
+        {"key": "features", "type": "array", "required": false, "description": "Array of feature objects with title, description"},
+        {"key": "hero_image", "type": "string", "required": false, "description": "URL or path to product hero image"},
+        {"key": "tagline", "type": "string", "required": false, "description": "Short product tagline"},
+        {"key": "demo_url", "type": "string", "required": false, "description": "Link to live demo or video"}
+      ],
+      "entrance": "zoom_in",
+      "exit": "dissolve",
+      "tags": ["product", "promo", "walkthrough", "hero", "features"],
+      "review_hints": [
+        {"check": "feature callout text fully readable without overlap", "severity": "error"},
+        {"check": "hero image positioned without clipping important detail", "severity": "warn"},
+        {"check": "transition between features smooth with consistent cadence", "severity": "warn"}
+      ]
+    },
+    {
+      "id": "svg-morph",
+      "name": "SVG Shape Morph",
+      "description": "Shape-to-words or shape-to-shape SVG path morph transformation",
+      "scene_kind": "svg-morph",
+      "preferred_engine": "remotion",
+      "fallback_engines": ["animotion"],
+      "allowed_inputs": [
+        {"key": "source_shape", "type": "string", "required": true, "description": "SVG path data for source shape"},
+        {"key": "target_shape", "type": "string", "required": true, "description": "SVG path data for target shape"},
+        {"key": "morph_duration", "type": "number", "required": false, "description": "Duration of morph in seconds"},
+        {"key": "path_defs", "type": "array", "required": false, "description": "Array of intermediate SVG path definitions"}
+      ],
+      "entrance": "path_draw",
+      "exit": "morph_out",
+      "tags": ["svg", "morph", "shape", "path", "transformation"],
+      "review_hints": [
+        {"check": "source and target path have matching anchor point count for smooth morph", "severity": "error"},
+        {"check": "morph progression smooth with no visual tearing", "severity": "warn"},
+        {"check": "fill and stroke interpolated consistently during morph", "severity": "warn"}
+      ]
+    },
+    {
+      "id": "three-scene",
+      "name": "Generic Three.js Scene",
+      "description": "Three.js 3D scene with camera rig, objects, and lighting suitable for product or abstract scenes",
+      "scene_kind": "three-scene",
+      "preferred_engine": "remotion",
+      "fallback_engines": ["manim"],
+      "allowed_inputs": [
+        {"key": "scene_type", "type": "string", "required": true, "description": "Scene type: product, abstract, environment, data"},
+        {"key": "camera_rig", "type": "string", "required": false, "description": "Camera movement: orbit, fly-through, static, follow"},
+        {"key": "objects", "type": "array", "required": false, "description": "Array of 3D object descriptors with geometry and material"},
+        {"key": "lighting", "type": "string", "required": false, "description": "Lighting preset: studio, dramatic, natural, neon"}
+      ],
+      "entrance": "fade_in_3d",
+      "exit": "fade_out_3d",
+      "tags": ["3d", "threejs", "scene", "camera", "lighting"],
+      "review_hints": [
+        {"check": "camera path does not clip or intersect scene objects", "severity": "error"},
+        {"check": "object materials visible under chosen lighting preset", "severity": "warn"},
+        {"check": "no z-fighting between overlapping geometry", "severity": "warn"}
+      ]
+    },
+    {
+      "id": "kinetic-text",
+      "name": "Kinetic Typography",
+      "description": "Per-character kinetic text animation with timing, bounce, and emphasis effects",
+      "scene_kind": "kinetic-text",
+      "preferred_engine": "remotion",
+      "fallback_engines": ["animotion"],
+      "allowed_inputs": [
+        {"key": "text", "type": "string", "required": true, "description": "Text content for kinetic animation"},
+        {"key": "per_char_timing", "type": "array", "required": false, "description": "Array of per-character timing overrides in ms"},
+        {"key": "animation_style", "type": "string", "required": false, "description": "Animation: bounce, wave, fade, typewriter, scatter"},
+        {"key": "font_family", "type": "string", "required": false, "description": "CSS font family for text"},
+        {"key": "accent_chars", "type": "array", "required": false, "description": "Array of character indices to accent-emphasize"}
+      ],
+      "entrance": "characters_fly_in",
+      "exit": "characters_scatter",
+      "tags": ["kinetic", "text", "typography", "per-character", "animation"],
+      "review_hints": [
+        {"check": "each character legible at peak animation speed", "severity": "error"},
+        {"check": "character spacing consistent after animation settles", "severity": "warn"},
+        {"check": "accent characters visually distinguishable from rest", "severity": "warn"}
+      ]
+    },
+    {
+      "id": "canvas-composite",
+      "name": "Canvas Post-Processing",
+      "description": "HTML canvas post-processing pipeline with configurable effect layers",
+      "scene_kind": "canvas-composite",
+      "preferred_engine": "remotion",
+      "fallback_engines": [],
+      "allowed_inputs": [
+        {"key": "source_frames", "type": "array", "required": true, "description": "Array of source frame image data URIs or paths"},
+        {"key": "effect_type", "type": "string", "required": false, "description": "Effect: glitch, vintage, magnifier, blur, pixelate"},
+        {"key": "effect_intensity", "type": "number", "required": false, "description": "Effect intensity 0.0-1.0"},
+        {"key": "blend_mode", "type": "string", "required": false, "description": "Canvas blend mode: source-over, multiply, screen"}
+      ],
+      "entrance": "fade_in",
+      "exit": "fade_out",
+      "tags": ["canvas", "composite", "post-processing", "effects", "pipeline"],
+      "review_hints": [
+        {"check": "effect intensity matches user setting within 5% tolerance", "severity": "error"},
+        {"check": "effect does not completely obscure original subject", "severity": "warn"},
+        {"check": "frame rate remains stable with effect pipeline active", "severity": "warn"}
+      ]
+    },
+    {
+      "id": "cursor-agent-skills",
+      "name": "Cursor Agent Skills Announcement",
+      "description": "Animated announcement card for AI agent skills with icon, demo snippet, and description",
+      "scene_kind": "promo",
+      "preferred_engine": "remotion",
+      "fallback_engines": ["animotion"],
+      "allowed_inputs": [
+        {"key": "skill_name", "type": "string", "required": true, "description": "Name of the agent skill being announced"},
+        {"key": "skill_description", "type": "string", "required": false, "description": "Short skill description"},
+        {"key": "icon_url", "type": "string", "required": false, "description": "URL to skill or agent icon"},
+        {"key": "demo_snippet", "type": "string", "required": false, "description": "Short code or CLI demo snippet"}
+      ],
+      "entrance": "card_flip_in",
+      "exit": "card_zoom_out",
+      "tags": ["cursor", "agent", "skills", "announcement", "promo"],
+      "review_hints": [
+        {"check": "demo snippet syntax highlighted and readable", "severity": "error"},
+        {"check": "skill name remains prominent throughout animation", "severity": "warn"},
+        {"check": "icon and text layout balance within card bounds", "severity": "warn"}
+      ]
+    },
+    {
+      "id": "svg-3d-glitch",
+      "name": "3D Glitch SVG Logo",
+      "description": "Spinning 3D SVG logo with glitch artifacts, RGB split, and scanline distortion",
+      "scene_kind": "three-scene",
+      "preferred_engine": "remotion",
+      "fallback_engines": [],
+      "allowed_inputs": [
+        {"key": "svg_logo_url", "type": "string", "required": true, "description": "URL or path to SVG logo"},
+        {"key": "glitch_frequency", "type": "number", "required": false, "description": "Glitch burst frequency in Hz"},
+        {"key": "spin_speed", "type": "number", "required": false, "description": "Rotation speed in degrees per second"},
+        {"key": "glitch_colors", "type": "array", "required": false, "description": "Array of CSS colors for RGB split offset"}
+      ],
+      "entrance": "logo_spin_in",
+      "exit": "glitch_burst_out",
+      "tags": ["svg", "3d", "glitch", "logo", "spinning", "rgb"],
+      "review_hints": [
+        {"check": "glitch effect does not hide core logo identity", "severity": "error"},
+        {"check": "spin axis remains stable and centered", "severity": "warn"},
+        {"check": "RGB split offset within 5px tolerance of intended shift", "severity": "warn"}
+      ]
+    },
+    {
+      "id": "retro-pixel-font",
+      "name": "3D Retro Pixel Font",
+      "description": "Three-dimensional retro pixel font with depth extrusion and grid-aligned rendering",
+      "scene_kind": "three-scene",
+      "preferred_engine": "remotion",
+      "fallback_engines": [],
+      "allowed_inputs": [
+        {"key": "text", "type": "string", "required": true, "description": "Text to render in retro pixel style"},
+        {"key": "pixel_size", "type": "number", "required": false, "description": "Size of each pixel block in px"},
+        {"key": "color_palette", "type": "array", "required": false, "description": "Array of CSS colors for pixel depth layers"},
+        {"key": "depth_offset", "type": "number", "required": false, "description": "3D extrusion depth factor"},
+        {"key": "animation_type", "type": "string", "required": false, "description": "Animation: build-up, rainbow-cycle, pulse"}
+      ],
+      "entrance": "pixels_build",
+      "exit": "pixels_fall",
+      "tags": ["retro", "pixel", "font", "3d", "text", "extrusion"],
+      "review_hints": [
+        {"check": "pixels aligned to integer grid for crisp retro look", "severity": "error"},
+        {"check": "text remains readable after depth extrusion", "severity": "warn"},
+        {"check": "color palette layers distinguishable from each other", "severity": "warn"}
+      ]
+    },
+    {
+      "id": "strava-run",
+      "name": "Strava Run Visualization",
+      "description": "Running route visualization on map with elevation profile, pace zones, and start/end markers",
+      "scene_kind": "map3d",
+      "preferred_engine": "remotion",
+      "fallback_engines": ["manim"],
+      "allowed_inputs": [
+        {"key": "route_coords", "type": "array", "required": true, "description": "Array of [lat, lng] waypoints along run route"},
+        {"key": "elevation_data", "type": "array", "required": false, "description": "Array of elevation values matching route_coords"},
+        {"key": "pace_zones", "type": "array", "required": false, "description": "Array of pace zone segments with color and label"},
+        {"key": "start_label", "type": "string", "required": false, "description": "Label for route start point"},
+        {"key": "end_label", "type": "string", "required": false, "description": "Label for route end point"}
+      ],
+      "entrance": "route_trace",
+      "exit": "map_dissolve",
+      "tags": ["strava", "run", "route", "map", "fitness", "elevation"],
+      "review_hints": [
+        {"check": "route trace clips accurately to map bounds without overflow", "severity": "error"},
+        {"check": "elevation profile curve matches route elevation data", "severity": "warn"},
+        {"check": "pace zone colors distinguishable from each other", "severity": "warn"}
+      ]
+    },
+    {
+      "id": "kinetic-marketing",
+      "name": "Kinetic Marketing Presentation",
+      "description": "Branded kinetic marketing presentation with animated headline, body lines, and logo reveal",
+      "scene_kind": "kinetic-text",
+      "preferred_engine": "remotion",
+      "fallback_engines": ["animotion"],
+      "allowed_inputs": [
+        {"key": "headline", "type": "string", "required": true, "description": "Marketing headline text"},
+        {"key": "body_lines", "type": "array", "required": false, "description": "Array of body text lines for staggered animation"},
+        {"key": "transition_style", "type": "string", "required": false, "description": "Transition: slide, fade, scale-between-lines"},
+        {"key": "brand_color", "type": "string", "required": false, "description": "Primary brand color as CSS color"},
+        {"key": "logo_url", "type": "string", "required": false, "description": "URL to brand logo for reveal animation"}
+      ],
+      "entrance": "headline_reveal",
+      "exit": "brand_fade",
+      "tags": ["kinetic", "marketing", "presentation", "text", "brand"],
+      "review_hints": [
+        {"check": "headline prominent and fully visible on first frame", "severity": "error"},
+        {"check": "body line cadence matches natural reading pace", "severity": "warn"},
+        {"check": "brand colors applied consistently across all text elements", "severity": "warn"}
+      ]
+    },
+    {
+      "id": "audio-spectrum",
+      "name": "Audio Spectrum Analyzer",
+      "description": "Frequency spectrum bars or circular visualization synced to audio input",
+      "scene_kind": "audio-reactive",
+      "preferred_engine": "remotion",
+      "fallback_engines": ["animotion"],
+      "allowed_inputs": [
+        {"key": "audio_source", "type": "string", "required": true, "description": "Path or URL to audio file"},
+        {"key": "bar_count", "type": "number", "required": false, "description": "Number of frequency bars (16-128)"},
+        {"key": "spectrum_style", "type": "string", "required": false, "description": "Style: bars, circular, waveform, ring"},
+        {"key": "color_mode", "type": "string", "required": false, "description": "Color: solid, gradient, frequency-based"},
+        {"key": "mirror", "type": "boolean", "required": false, "description": "Mirror spectrum vertically for symmetric display"}
+      ],
+      "entrance": "bars_rise",
+      "exit": "fade_out",
+      "tags": ["audio", "spectrum", "visualizer", "bars", "frequency"],
+      "review_hints": [
+        {"check": "bar heights proportional to frequency amplitude bins", "severity": "error"},
+        {"check": "no visual aliasing or bar overlap at peak levels", "severity": "warn"},
+        {"check": "frequency color mapping consistent across full range", "severity": "warn"}
+      ]
+    },
+    {
+      "id": "canvas-magnifier",
+      "name": "Canvas Magnifying Glass",
+      "description": "HTML canvas magnifying glass lens effect with configurable zoom factor and lens radius",
+      "scene_kind": "canvas-composite",
+      "preferred_engine": "remotion",
+      "fallback_engines": [],
+      "allowed_inputs": [
+        {"key": "source_image", "type": "string", "required": true, "description": "URL or data URI of source image"},
+        {"key": "magnify_factor", "type": "number", "required": false, "description": "Zoom magnification factor 1.0-5.0"},
+        {"key": "lens_radius", "type": "number", "required": false, "description": "Lens radius in pixels"},
+        {"key": "lens_position", "type": "array", "required": false, "description": "Lens center [x, y] position as fraction of canvas"},
+        {"key": "border_style", "type": "string", "required": false, "description": "Lens border: circle, ring, none"}
+      ],
+      "entrance": "lens_appear",
+      "exit": "lens_disappear",
+      "tags": ["canvas", "magnifier", "lens", "zoom", "effect"],
+      "review_hints": [
+        {"check": "magnified region centered precisely on lens position", "severity": "error"},
+        {"check": "distortion at lens edge smooth without hard cutoff", "severity": "warn"},
+        {"check": "lens border visible against both dark and light backgrounds", "severity": "warn"}
+      ]
+    },
+    {
+      "id": "canvas-glitch",
+      "name": "Canvas Glitch Effect",
+      "description": "Digital glitch distortion with RGB channel split, horizontal displacement, and noise overlay",
+      "scene_kind": "canvas-composite",
+      "preferred_engine": "remotion",
+      "fallback_engines": [],
+      "allowed_inputs": [
+        {"key": "source_media", "type": "string", "required": true, "description": "URL or data URI of source image or video frame"},
+        {"key": "glitch_intensity", "type": "number", "required": false, "description": "Intensity 0.0-1.0 controlling displacement amount"},
+        {"key": "glitch_frequency", "type": "number", "required": false, "description": "Glitch burst frequency in bursts per second"},
+        {"key": "rgb_split", "type": "number", "required": false, "description": "RGB channel separation in pixels"},
+        {"key": "noise_level", "type": "number", "required": false, "description": "Static noise overlay opacity 0.0-1.0"}
+      ],
+      "entrance": "glitch_in",
+      "exit": "glitch_out",
+      "tags": ["canvas", "glitch", "distortion", "rgb", "noise", "effect"],
+      "review_hints": [
+        {"check": "glitch displacement does not obscure readable text areas", "severity": "error"},
+        {"check": "RGB channel split within configurable tolerance limit", "severity": "warn"},
+        {"check": "glitch intensity visibly responds to user setting", "severity": "warn"}
+      ]
+    },
+    {
+      "id": "canvas-vintage",
+      "name": "Canvas Vintage Film Effect",
+      "description": "Vintage film look with scanlines, sepia tone, vignette, and optional grain noise",
+      "scene_kind": "canvas-composite",
+      "preferred_engine": "remotion",
+      "fallback_engines": [],
+      "allowed_inputs": [
+        {"key": "source_media", "type": "string", "required": true, "description": "URL or data URI of source image or video frame"},
+        {"key": "scanline_opacity", "type": "number", "required": false, "description": "Scanline overlay opacity 0.0-1.0"},
+        {"key": "sepia_strength", "type": "number", "required": false, "description": "Sepia tone strength 0.0-1.0"},
+        {"key": "vignette_amount", "type": "number", "required": false, "description": "Vignette darkening at edges 0.0-1.0"},
+        {"key": "noise_enabled", "type": "boolean", "required": false, "description": "Add film grain noise overlay"}
+      ],
+      "entrance": "fade_in_vintage",
+      "exit": "fade_out",
+      "tags": ["canvas", "vintage", "scanline", "sepia", "film", "effect"],
+      "review_hints": [
+        {"check": "scanline spacing consistent across full frame height", "severity": "error"},
+        {"check": "sepia tone preserves sufficient contrast for readability", "severity": "warn"},
+        {"check": "vignette darkening does not clip important content at edges", "severity": "warn"}
+      ]
+    },
+    {
+      "id": "bms-animation",
+      "name": "BMS Cell Balancing Animation",
+      "description": "Battery management system cell balancing diagram with energy flow visualization",
+      "scene_kind": "diagram",
+      "preferred_engine": "manim",
+      "fallback_engines": ["remotion"],
+      "allowed_inputs": [
+        {"key": "cell_count", "type": "number", "required": true, "description": "Number of battery cells in series (4-16)"},
+        {"key": "topology", "type": "string", "required": false, "description": "Cell topology: series, parallel, series-parallel"},
+        {"key": "energy_flow_path", "type": "array", "required": false, "description": "Array of [from, to] cell indices for energy flow"},
+        {"key": "balancing_active", "type": "boolean", "required": false, "description": "Show active balancing animation between cells"}
+      ],
+      "entrance": "cells_appear",
+      "exit": "diagram_dissolve",
+      "tags": ["bms", "battery", "cell-balancing", "energy", "diagram", "technical"],
+      "review_hints": [
+        {"check": "cell layout visually matches selected topology", "severity": "error"},
+        {"check": "energy flow arrows direction correct per circuit", "severity": "error"},
+        {"check": "cell labels and voltage text readable at output resolution", "severity": "warn"}
+      ]
+    },
+    {
+      "id": "solar-system",
+      "name": "Solar System Orbit",
+      "description": "3D solar system orbit animation with planets, orbital paths, and adjustable camera angle",
+      "scene_kind": "three-scene",
+      "preferred_engine": "remotion",
+      "fallback_engines": ["manim"],
+      "allowed_inputs": [
+        {"key": "show_planets", "type": "array", "required": true, "description": "Array of planet names to include in animation"},
+        {"key": "orbit_speed", "type": "number", "required": false, "description": "Orbit speed multiplier 0.1-5.0"},
+        {"key": "camera_angle", "type": "number", "required": false, "description": "Camera elevation angle in degrees"},
+        {"key": "scale_factor", "type": "number", "required": false, "description": "Planet and orbit scale relative to default"},
+        {"key": "labels_enabled", "type": "boolean", "required": false, "description": "Show planet name labels"}
+      ],
+      "entrance": "stars_fade_in",
+      "exit": "zoom_out_deep",
+      "tags": ["solar-system", "orbit", "planets", "3d", "space", "astronomy"],
+      "review_hints": [
+        {"check": "planet sizes proportional to each other within scale factor", "severity": "error"},
+        {"check": "orbits rendered as ellipses not circles unless scale adjusted", "severity": "warn"},
+        {"check": "planet labels track position accurately during orbit", "severity": "warn"}
+      ]
+    },
+    {
+      "id": "device-rise",
+      "name": "Apple-Style Device Rise",
+      "description": "3D device hero animation with device rising into view, reflection, and screen content mapping",
+      "scene_kind": "three-scene",
+      "preferred_engine": "remotion",
+      "fallback_engines": ["manim"],
+      "allowed_inputs": [
+        {"key": "device_type", "type": "string", "required": true, "description": "Device: phone, tablet, laptop, monitor, watch"},
+        {"key": "screen_content", "type": "string", "required": false, "description": "URL or data URI for screen content image"},
+        {"key": "device_color", "type": "string", "required": false, "description": "Device chassis color as CSS color"},
+        {"key": "rise_height", "type": "number", "required": false, "description": "Rise height as fraction of canvas height 0.1-1.0"},
+        {"key": "reflection_enabled", "type": "boolean", "required": false, "description": "Show ground reflection beneath device"}
+      ],
+      "entrance": "device_rise_in",
+      "exit": "device_fall_out",
+      "tags": ["device", "rise", "3d", "hero", "product", "apple-style"],
+      "review_hints": [
+        {"check": "device reflection matches device orientation and position", "severity": "error"},
+        {"check": "screen content UV-mapped correctly without distortion", "severity": "warn"},
+        {"check": "device edges anti-aliased against background", "severity": "warn"}
+      ]
     }
   ]
 }

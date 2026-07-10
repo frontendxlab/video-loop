@@ -29,7 +29,7 @@ def _clear_cache():
 
 def test_loads_all_recipes():
     recipes = load_recipes()
-    assert len(recipes) >= 9, f"Expected >=9 recipes, got {len(recipes)}"
+    assert len(recipes) >= 28, f"Expected >=28 recipes, got {len(recipes)}"
 
 
 def test_all_recipes_have_required_fields():
@@ -186,6 +186,139 @@ def test_dual_chart_recipe():
     assert r is not None
     assert r.scene_kind == "chart"
     assert r.preferred_engine == "manim"
+
+
+def test_launch_promo_recipe():
+    r = get_recipe("launch-promo")
+    assert r is not None
+    assert r.scene_kind == "promo"
+    assert r.preferred_engine == "remotion"
+
+
+def test_real_estate_recipe():
+    r = get_recipe("real-estate")
+    assert r is not None
+    assert r.scene_kind == "real-estate"
+    assert r.preferred_engine == "remotion"
+
+
+def test_product_promo_recipe():
+    r = get_recipe("product-promo")
+    assert r is not None
+    assert r.scene_kind == "promo"
+    assert r.preferred_engine == "remotion"
+
+
+def test_svg_morph_recipe():
+    r = get_recipe("svg-morph")
+    assert r is not None
+    assert r.scene_kind == "svg-morph"
+    assert r.preferred_engine == "remotion"
+
+
+def test_three_scene_recipe():
+    r = get_recipe("three-scene")
+    assert r is not None
+    assert r.scene_kind == "three-scene"
+    assert r.preferred_engine == "remotion"
+
+
+def test_kinetic_text_recipe():
+    r = get_recipe("kinetic-text")
+    assert r is not None
+    assert r.scene_kind == "kinetic-text"
+    assert r.preferred_engine == "remotion"
+
+
+def test_canvas_composite_recipe():
+    r = get_recipe("canvas-composite")
+    assert r is not None
+    assert r.scene_kind == "canvas-composite"
+    assert r.preferred_engine == "remotion"
+
+
+def test_cursor_agent_skills_recipe():
+    r = get_recipe("cursor-agent-skills")
+    assert r is not None
+    assert r.scene_kind == "promo"
+    assert r.preferred_engine == "remotion"
+
+
+def test_svg_3d_glitch_recipe():
+    r = get_recipe("svg-3d-glitch")
+    assert r is not None
+    assert r.scene_kind == "three-scene"
+    assert r.preferred_engine == "remotion"
+
+
+def test_retro_pixel_font_recipe():
+    r = get_recipe("retro-pixel-font")
+    assert r is not None
+    assert r.scene_kind == "three-scene"
+    assert r.preferred_engine == "remotion"
+
+
+def test_strava_run_recipe():
+    r = get_recipe("strava-run")
+    assert r is not None
+    assert r.scene_kind == "map3d"
+    assert r.preferred_engine == "remotion"
+
+
+def test_kinetic_marketing_recipe():
+    r = get_recipe("kinetic-marketing")
+    assert r is not None
+    assert r.scene_kind == "kinetic-text"
+    assert r.preferred_engine == "remotion"
+
+
+def test_audio_spectrum_recipe():
+    r = get_recipe("audio-spectrum")
+    assert r is not None
+    assert r.scene_kind == "audio-reactive"
+    assert r.preferred_engine == "remotion"
+
+
+def test_canvas_magnifier_recipe():
+    r = get_recipe("canvas-magnifier")
+    assert r is not None
+    assert r.scene_kind == "canvas-composite"
+    assert r.preferred_engine == "remotion"
+
+
+def test_canvas_glitch_recipe():
+    r = get_recipe("canvas-glitch")
+    assert r is not None
+    assert r.scene_kind == "canvas-composite"
+    assert r.preferred_engine == "remotion"
+
+
+def test_canvas_vintage_recipe():
+    r = get_recipe("canvas-vintage")
+    assert r is not None
+    assert r.scene_kind == "canvas-composite"
+    assert r.preferred_engine == "remotion"
+
+
+def test_bms_animation_recipe():
+    r = get_recipe("bms-animation")
+    assert r is not None
+    assert r.scene_kind == "diagram"
+    assert r.preferred_engine == "manim"
+
+
+def test_solar_system_recipe():
+    r = get_recipe("solar-system")
+    assert r is not None
+    assert r.scene_kind == "three-scene"
+    assert r.preferred_engine == "remotion"
+
+
+def test_device_rise_recipe():
+    r = get_recipe("device-rise")
+    assert r is not None
+    assert r.scene_kind == "three-scene"
+    assert r.preferred_engine == "remotion"
 
 
 # ── query functions ────────────────────────────────────────────────
