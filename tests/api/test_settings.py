@@ -17,6 +17,10 @@ import pytest
 from fastapi.testclient import TestClient
 
 from videoforge.api.app import create_app
+import requests
+
+from videoforge.providers import discover_9router_models
+from videoforge.providers.router9 import clear_cache as clear_9router_cache
 
 
 @pytest.fixture
@@ -272,3 +276,108 @@ class TestProviderStatus:
         assert data["available"] is False
         assert data["configured"] is False
         assert data["activeProvider"] == "nonexistent"
+
+
+class Test9RouterDiscovery:
+    """9router dynamic model discovery — adapter + endpoint integration."""
+
+    def test_discovery_fallback_when_no_api_key(self):
+        """Without 9ROUTER_API_KEY, discovery returns 2 fallback models."""
+        clear_9router_cache()
+        result = discover_9router_models(force=True)
+        assert result["discovered"] is False
+        assert result["source"] == "fallback"
+        assert "9ROUTER_API_KEY" in (result.get("error") or "")
+        assert len(result["models"]) == 2
+
+    def test_discovery_fallback_model_ids(self):
+        """Fallback models have expected IDs."""
+        clear_9router_cache()
+        result = discover_9router_models(force=True)
+        ids = {m["id"] for m in result["models"]}
+        assert "ocg/deepseek-v4-flash" in ids
+        assert "ocg/deepseek-v4-flash:free" in ids
+
+    def test_provider_status_includes_discovery_meta(self, client):
+        """provider-status response includes discovered/discoverySource/
+        discoveryError fields for 9router provider.
+        """
+        clear_9router_cache()
+        resp = client.get("/api/settings/provider-status")
+        providers = resp.json()["providers"]
+        router = next(p for p in providers if p["provider"] == "9router")
+        assert "discovered" in router
+        assert router["discovered"] is False  # no API key in test env
+        assert router["discoverySource"] == "fallback"
+        assert router["discoveryError"] is not None
+
+    def test_provider_status_other_providers_no_discovery_meta(self, client):
+        """Non-9router providers omit discovery fields."""
+        resp = client.get("/api/settings/provider-status")
+        providers = resp.json()["providers"]
+        for p in providers:
+            if p["provider"] == "9router":
+                continue
+            assert "discovered" not in p, f"{p['provider']} has discovered"
+            assert "discoverySource" not in p, f"{p['provider']} has discoverySource"
+
+    def test_discovery_with_mocked_api(self, monkeypatch):
+        """Mocked successful API response returns discovered models."""
+        import json
+
+        clear_9router_cache()
+
+        class _MockResponse:
+            def __init__(self):
+                self.status_code = 200
+
+            def json(self):
+                return {
+                    "data": [
+                        {"id": "ocg/deepseek-v4-flash", "owned_by": "deepseek"},
+                        {"id": "ocg/deepseek-v4-flash:free", "owned_by": "deepseek"},
+                        {"id": "ocg/qwen-72b", "owned_by": "alibaba"},
+                    ]
+                }
+
+            def raise_for_status(self):
+                pass
+
+        monkeypatch.setattr("videoforge.providers.router9.requests.get", lambda *a, **kw: _MockResponse())
+        monkeypatch.setenv("9ROUTER_API_KEY", "sk-test-key")
+
+        result = discover_9router_models(force=True)
+        assert result["discovered"] is True
+        assert result["source"] == "api"
+        assert result["error"] is None
+        assert len(result["models"]) == 3
+        ids = {m["id"] for m in result["models"]}
+        assert "ocg/qwen-72b" in ids
+
+    def test_discovery_network_error_falls_back(self, monkeypatch):
+        """Network error during discovery falls back gracefully."""
+        clear_9router_cache()
+
+        def _fail(*a, **kw):
+            raise requests.ConnectionError("Network unreachable")
+
+        monkeypatch.setattr("videoforge.providers.router9.requests.get", _fail)
+        monkeypatch.setenv("9ROUTER_API_KEY", "sk-test-key")
+
+        result = discover_9router_models(force=True)
+        assert result["discovered"] is False
+        assert result["source"] == "fallback"
+        assert "Network unreachable" in (result.get("error") or "")
+        assert len(result["models"]) == 2  # fallback models
+
+    def test_default_settings_uses_enriched_9router(self, client):
+        """GET /api/settings returns 9router entry with models (fallback
+        or discovered). Provider count still 6.
+        """
+        clear_9router_cache()
+        resp = client.get("/api/settings")
+        providers = resp.json()["providers"]
+        assert len(providers) == 6
+        router = next(p for p in providers if p["provider"] == "9router")
+        assert len(router["models"]) >= 2  # at least fallback models
+        assert router["defaultModel"] == "ocg/deepseek-v4-flash"

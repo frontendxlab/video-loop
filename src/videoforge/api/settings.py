@@ -10,6 +10,8 @@ from typing import Any
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
+from videoforge.providers import discover_9router_models
+
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 
 
@@ -64,8 +66,33 @@ class SettingsPayload(BaseModel):
 # ─── Defaults ────────────────────────────────────────────────────────────────
 
 
+def _enrich_9router_provider(provider: dict[str, Any]) -> dict[str, Any]:
+    """Replace hardcoded 9router models with live-discovered list if available.
+
+    Keeps ``apiKey``, ``baseUrl``, ``defaultModel`` from config; only
+    overrides ``models`` when discovery succeeds. Falls back silently.
+    """
+    result = discover_9router_models()
+    if result["discovered"]:
+        provider = dict(provider)
+        provider["models"] = result["models"]
+    return provider
+
+
 def _default_settings() -> dict[str, Any]:
     """Default settings matching frontend DEFAULT_SETTINGS."""
+    _9ROUTER_BASE: dict[str, Any] = {
+        "provider": "9router",
+        "label": "9router",
+        "apiKey": "",
+        "baseUrl": "",
+        "defaultModel": "ocg/deepseek-v4-flash",
+        "models": [
+            {"id": "ocg/deepseek-v4-flash", "label": "DeepSeek V4 Flash", "maxTokens": 32768},
+            {"id": "ocg/deepseek-v4-flash:free", "label": "DeepSeek V4 Flash Free", "maxTokens": 8192},
+        ],
+    }
+
     return {
         "activeProvider": "9router",
         "activeModel": "ocg/deepseek-v4-flash",
@@ -115,17 +142,7 @@ def _default_settings() -> dict[str, Any]:
                     {"id": "mixtral-8x7b", "label": "Mixtral 8x7B", "maxTokens": 8192},
                 ],
             },
-            {
-                "provider": "9router",
-                "label": "9router",
-                "apiKey": "",
-                "baseUrl": "",
-                "defaultModel": "ocg/deepseek-v4-flash",
-                "models": [
-                    {"id": "ocg/deepseek-v4-flash", "label": "DeepSeek V4 Flash", "maxTokens": 32768},
-                    {"id": "ocg/deepseek-v4-flash:free", "label": "DeepSeek V4 Flash Free", "maxTokens": 8192},
-                ],
-            },
+            _enrich_9router_provider(_9ROUTER_BASE),
             {
                 "provider": "custom",
                 "label": "Custom",
@@ -196,6 +213,8 @@ async def get_provider_status() -> dict[str, Any]:
 
     active_cfg = next((p for p in providers if p.get("provider") == active_provider), None)
 
+    discovery_meta = discover_9router_models()
+
     return {
         "activeProvider": active_provider,
         "activeModel": active_model,
@@ -215,6 +234,15 @@ async def get_provider_status() -> dict[str, Any]:
                     }
                     for m in p.get("models", [])
                 ],
+                **(
+                    {
+                        "discovered": discovery_meta.get("discovered", False),
+                        "discoverySource": discovery_meta.get("source", "fallback"),
+                        "discoveryError": discovery_meta.get("error"),
+                    }
+                    if p["provider"] == "9router"
+                    else {}
+                ),
             }
             for p in providers
         ],
