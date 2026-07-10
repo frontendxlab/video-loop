@@ -6,6 +6,8 @@ import { CodeScene } from "../scenes/CodeScene";
 import { BulletScene } from "../scenes/BulletScene";
 import { ImageScene } from "../scenes/ImageScene";
 import { OutroScene } from "../scenes/OutroScene";
+import { LowerThird } from "../scenes/LowerThird";
+import { OverlayCTA } from "../scenes/OverlayCTA";
 import { AnimatedMindMap, MindMapNode } from "../components/AnimatedMindMap";
 import { AnimatedCodeLines } from "../components/AnimatedCodeLines";
 import { ChartScene } from "../components/scenes/ChartScene";
@@ -84,6 +86,10 @@ const SceneRenderer: React.FC<{ scene: SceneData; frameOffset: number }> = ({ sc
       return <ChartScene chartType={scene.chartType || "bar"} title={scene.title} data={scene.data || []} yAxisLabel={scene.yAxisLabel} duration={dur} wordTimestamps={ts} sceneStartFrame={sf} />;
     case "timeline":
       return <TimelineScene title={scene.title} events={scene.events || []} duration={dur} wordTimestamps={ts} sceneStartFrame={sf} />;
+    case "lowerThird":
+      return <LowerThird title={scene.title || ""} subtitle={scene.subtitle} slideDirection={(scene as any).slideDirection} duration={dur} wordTimestamps={ts} sceneStartFrame={sf} />;
+    case "overlayCTA":
+      return <OverlayCTA title={scene.title || ""} subtitle={scene.subtitle} cta={scene.cta} duration={dur} wordTimestamps={ts} sceneStartFrame={sf} />;
     default:
       return (
         <AbsoluteFill style={{ background: colors.backgroundGradient, justifyContent: "center", alignItems: "center", color: colors.text, fontFamily: fonts.heading, fontSize: 32 }}>

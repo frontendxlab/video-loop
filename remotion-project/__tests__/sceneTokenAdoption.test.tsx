@@ -83,6 +83,22 @@ describe("scenes consume design tokens", () => {
     expect(container.innerHTML).not.toContain("#ffeb3b");
   });
 
+  it("LowerThird: uses token colors (no hardcoded literal hex)", async () => {
+    const { LowerThird } = await import("../src/scenes/LowerThird");
+    const { container } = render(<LowerThird title="Test" duration={60} />);
+    const html = container.innerHTML;
+    expect(html).not.toContain("#1a1a2e");
+    expect(html).not.toContain("#ffeb3b");
+  });
+
+  it("OverlayCTA: uses token colors (no hardcoded literal hex)", async () => {
+    const { OverlayCTA } = await import("../src/scenes/OverlayCTA");
+    const { container } = render(<OverlayCTA title="Test" duration={60} />);
+    const html = container.innerHTML;
+    expect(html).not.toContain("#1a1a2e");
+    expect(html).not.toContain("#ffeb3b");
+  });
+
   it("AnimatedMindMap: no hardcoded colors", async () => {
     const { AnimatedMindMap } = await import("../src/components/AnimatedMindMap");
     const { container } = render(

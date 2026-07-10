@@ -8,4 +8,7 @@ export { DiagramScene, DiagramSceneSchema } from "./DiagramScene";
 export { OutroScene, OutroSceneSchema } from "./OutroScene";
 export { ChartScene, ChartSceneSchema } from "../components/scenes/ChartScene";
 export { TimelineScene, TimelineSceneSchema } from "../components/scenes/TimelineScene";
+export { KineticTextScene, KineticTextSceneSchema } from "../components/scenes/KineticTextScene";
+export { LowerThird, LowerThirdSchema } from "./LowerThird";
+export { OverlayCTA, OverlayCTASchema } from "./OverlayCTA";
 export type { WordTiming } from "../captions/wordTiming";
