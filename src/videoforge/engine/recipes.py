@@ -193,6 +193,24 @@ def recipes_by_tag(tag: str, path: str | Path | None = None) -> tuple[Recipe, ..
     )
 
 
+def review_hints_to_dicts(hints: tuple[ReviewHint, ...]) -> list[dict[str, str]]:
+    """Convert ReviewHint tuple to list of serializable dicts."""
+    return [{"check": h.check, "severity": h.severity} for h in hints]
+
+
+def load_review_hints_for_recipe(
+    recipe_id: str, path: str | Path | None = None
+) -> list[dict[str, str]]:
+    """Load a recipe by id and return its review hints as serializable dicts.
+
+    Returns empty list when recipe not found or has no hints.
+    """
+    recipe = get_recipe(recipe_id, path)
+    if recipe is None:
+        return []
+    return review_hints_to_dicts(recipe.review_hints)
+
+
 def clear_cache() -> None:
     """Clear the module-level recipe cache (for testing)."""
     global _RecipeRegistryCache

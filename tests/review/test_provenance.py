@@ -275,6 +275,129 @@ class TestBuildProvenanceScenes:
         assert "audio_src" not in scenes_data[0]["assets"]
 
 
+class TestGenerateProvenanceGraphReviewHints:
+    """Tests for review_hints propagation in provenance graph."""
+
+    def test_not_included_when_omitted(self) -> None:
+        """No review_hints key when not provided."""
+        graph = generate_provenance_graph(video_path="/tmp/t.mp4")
+        assert "review_hints" not in graph
+
+    def test_included_when_provided(self) -> None:
+        """Review hints appear when provided."""
+        hints = [{"check": "check 1", "severity": "error"}]
+        graph = generate_provenance_graph(
+            video_path="/tmp/t.mp4", review_hints=hints,
+        )
+        assert graph["review_hints"] == hints
+
+    def test_empty_list_omitted(self) -> None:
+        """Empty list not included."""
+        graph = generate_provenance_graph(video_path="/tmp/t.mp4", review_hints=[])
+        assert "review_hints" not in graph
+
+    def test_serializable(self, temp_dir: Path) -> None:
+        """Provenance with hints serializes to JSON."""
+        hints = [{"check": "camera speed smooth", "severity": "warn"}]
+        graph = generate_provenance_graph(
+            video_path=str(temp_dir / "out.mp4"),
+            review_hints=hints,
+        )
+        dumped = json.dumps(graph, indent=2, default=str)
+        loaded = json.loads(dumped)
+        assert loaded["review_hints"] == hints
+
+
+class TestBuildProvenanceScenesWithRecipeIds:
+    """Tests for recipe_id → review_hints propagation in provenance scenes."""
+
+    def test_recipe_id_not_provided_no_hints(self) -> None:
+        """No recipe_ids means no hints on scene entries."""
+        video = VideoDefinition(
+            title="Test",
+            scenes=[SceneDefinition(type=SceneType.TITLE, duration=90, title="Intro")],
+            audioTracks=[AudioTrack(src="a.wav", startFrame=0, durationFrames=90)],
+            captions=[],
+        )
+        scenes = build_provenance_scenes(video, ["/tmp/s.mp4"])
+        assert "review_hints" not in scenes[0]
+        assert "recipe_id" not in scenes[0]
+
+    def test_recipe_id_empty_string_no_hints(self) -> None:
+        """Empty string recipe_id ignored."""
+        video = VideoDefinition(
+            title="Test",
+            scenes=[SceneDefinition(type=SceneType.TITLE, duration=90, title="Intro")],
+            audioTracks=[AudioTrack(src="a.wav", startFrame=0, durationFrames=90)],
+            captions=[],
+        )
+        scenes = build_provenance_scenes(video, ["/tmp/s.mp4"], recipe_ids=[None])
+        assert "review_hints" not in scenes[0]
+        assert "recipe_id" not in scenes[0]
+
+    def test_known_recipe_id_propagates_hints(self) -> None:
+        """Known recipe_id attaches review_hints to scene entry."""
+        video = VideoDefinition(
+            title="Test",
+            scenes=[SceneDefinition(type=SceneType.TITLE, duration=90, title="Intro")],
+            audioTracks=[AudioTrack(src="a.wav", startFrame=0, durationFrames=90)],
+            captions=[],
+        )
+        scenes = build_provenance_scenes(video, ["/tmp/s.mp4"], recipe_ids=["overlay-cta"])
+        assert "review_hints" in scenes[0]
+        assert scenes[0]["recipe_id"] == "overlay-cta"
+        assert len(scenes[0]["review_hints"]) >= 1
+        for h in scenes[0]["review_hints"]:
+            assert "check" in h
+            assert "severity" in h
+
+    def test_multiple_scenes_respective_recipe_ids(self) -> None:
+        """Each scene gets its own recipe's hints."""
+        video = VideoDefinition(
+            title="Multi",
+            scenes=[
+                SceneDefinition(type=SceneType.TITLE, duration=90, title="A"),
+                SceneDefinition(type=SceneType.CODE, duration=60, title="B"),
+            ],
+            audioTracks=[
+                AudioTrack(src="a.wav", startFrame=0, durationFrames=90),
+                AudioTrack(src="b.wav", startFrame=90, durationFrames=60),
+            ],
+            captions=[],
+        )
+        scenes = build_provenance_scenes(
+            video, ["/tmp/s0.mp4", "/tmp/s1.mp4"],
+            recipe_ids=["overlay-cta", "hero-intro"],
+        )
+        assert scenes[0]["recipe_id"] == "overlay-cta"
+        assert len(scenes[0]["review_hints"]) >= 1
+        assert scenes[1]["recipe_id"] == "hero-intro"
+        assert len(scenes[1]["review_hints"]) >= 1
+
+    def test_mixed_recipe_ids_and_none(self) -> None:
+        """Mix of recipe_id and None is handled."""
+        video = VideoDefinition(
+            title="Mixed",
+            scenes=[
+                SceneDefinition(type=SceneType.TITLE, duration=90, title="A"),
+                SceneDefinition(type=SceneType.DIAGRAM, duration=60, title="B"),
+            ],
+            audioTracks=[
+                AudioTrack(src="a.wav", startFrame=0, durationFrames=90),
+                AudioTrack(src="b.wav", startFrame=90, durationFrames=60),
+            ],
+            captions=[],
+        )
+        scenes = build_provenance_scenes(
+            video, ["/tmp/s0.mp4", "/tmp/s1.mp4"],
+            recipe_ids=["map3d", None],
+        )
+        assert scenes[0]["recipe_id"] == "map3d"
+        assert "review_hints" in scenes[0]
+        assert "recipe_id" not in scenes[1]
+        assert "review_hints" not in scenes[1]
+
+
 class TestProvenanceRoundtrip:
     def test_generate_write_read(self, temp_dir: Path) -> None:
         """Full roundtrip: generate → write → read → verify."""

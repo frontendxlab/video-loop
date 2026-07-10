@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from unittest.mock import MagicMock
+from typing import Any
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -357,6 +358,132 @@ class TestScenesSummary:
         assert ss["engines"] == {}
         assert ss["total_duration_frames"] == 0
         assert "scenes" not in ss
+
+
+class TestVideoReportReviewHints:
+    """Tests for review_hints propagation in video report."""
+
+    def test_review_hints_not_included_when_omitted(self) -> None:
+        """No review_hints key when not provided."""
+        report = generate_video_report(video_path="/tmp/v.mp4")
+        assert "review_hints" not in report
+
+    def test_review_hints_included_when_provided(self) -> None:
+        """Review hints appear at top level when provided."""
+        hints = [
+            {"check": "verify route clips to map bounds", "severity": "error"},
+            {"check": "landmark labels readable", "severity": "warn"},
+        ]
+        report = generate_video_report(video_path="/tmp/v.mp4", review_hints=hints)
+        assert report["review_hints"] == hints
+
+    def test_review_hints_empty_list_omitted(self) -> None:
+        """Empty list is NOT included in report (cleaner artifact)."""
+        report = generate_video_report(video_path="/tmp/v.mp4", review_hints=[])
+        assert "review_hints" not in report
+
+    def test_review_hints_preserves_order(self) -> None:
+        """Review hints preserve insertion order (deterministic)."""
+        hints = [
+            {"check": "a", "severity": "error"},
+            {"check": "b", "severity": "warn"},
+            {"check": "c", "severity": "info"},
+        ]
+        report = generate_video_report(video_path="/tmp/v.mp4", review_hints=hints)
+        assert [h["check"] for h in report["review_hints"]] == ["a", "b", "c"]
+
+    def test_review_hints_serializable(self, temp_dir: Path) -> None:
+        """Report with review_hints serializes to JSON without error."""
+        hints = [{"check": "some check", "severity": "error"}]
+        report = generate_video_report(
+            video_path=str(temp_dir / "test.mp4"),
+            review_hints=hints,
+        )
+        dumped = json.dumps(report, indent=2, default=str)
+        loaded = json.loads(dumped)
+        assert loaded["review_hints"] == hints
+
+
+class TestSceneReportReviewHints:
+    """Tests for review_hints propagation in scene report."""
+
+    def test_not_included_when_omitted(self) -> None:
+        """No review_hints key when not provided."""
+        report = generate_scene_report(
+            scene_index=0, engine="remotion", duration_frames=180,
+            scene_path="/tmp/s.mp4",
+        )
+        assert "review_hints" not in report
+
+    def test_included_when_provided(self) -> None:
+        """Review hints appear when provided."""
+        hints = [{"check": "alpha channel valid", "severity": "error"}]
+        report = generate_scene_report(
+            scene_index=0, engine="remotion", duration_frames=180,
+            scene_path="/tmp/s.mp4", review_hints=hints,
+        )
+        assert report["review_hints"] == hints
+
+    def test_empty_list_omitted(self) -> None:
+        """Empty list not included."""
+        report = generate_scene_report(
+            scene_index=0, engine="remotion", duration_frames=180,
+            scene_path="/tmp/s.mp4", review_hints=[],
+        )
+        assert "review_hints" not in report
+
+    def test_serializable(self, temp_dir: Path) -> None:
+        """Scene report with review_hints serializes to JSON."""
+        hints = [{"check": "label readable", "severity": "warn"}]
+        report = generate_scene_report(
+            scene_index=1, engine="manim", duration_frames=90,
+            scene_path=str(temp_dir / "s.mp4"), review_hints=hints,
+        )
+        dumped = json.dumps(report, indent=2, default=str)
+        loaded = json.loads(dumped)
+        assert loaded["review_hints"] == hints
+
+
+class TestRunReviewRecipeId:
+    """Tests for recipe_id propagation in run_review."""
+
+    def _run(self, **kwargs: Any) -> Any:
+        from videoforge.review.frame_reviewer import FrameReviewer, run_review as rr
+        with patch.object(FrameReviewer, "check_mixed_engine") as mock_l0, \
+             patch.object(FrameReviewer, "check_integrity") as mock_l1, \
+             patch("videoforge.review.frame_reviewer.write_video_report") as mock_write:
+            mock_l0.return_value = {"issues": [], "passed": True, "sampled_frames": 6, "total_frames": 300}
+            mock_l1.return_value = {"issues": [], "passed": True, "total_frames": 300}
+            mock_write.return_value = "/tmp/report.json"
+            return rr("test.mp4", **kwargs)
+
+    def test_recipe_id_in_result(self) -> None:
+        """recipe_id propagated into result dict."""
+        result = self._run(recipe_id="map3d")
+        assert result.get("recipe_id") == "map3d"
+        assert "review_hints" in result
+        assert len(result["review_hints"]) >= 1
+
+    def test_recipe_id_hints_in_report(self) -> None:
+        """Review hints from recipe appear in report artifact."""
+        result = self._run(recipe_id="screenflow")
+        assert "review_hints" in result["report"]
+        assert len(result["report"]["review_hints"]) >= 1
+
+    def test_no_recipe_id_no_hints(self) -> None:
+        """No recipe_id means no hint keys in result."""
+        result = self._run()
+        assert "recipe_id" not in result
+        assert "review_hints" not in result
+        assert "review_hints" not in result["report"]
+
+    def test_unknown_recipe_id_returns_empty_hints(self) -> None:
+        """Unknown recipe id yields empty hints in result (graceful)."""
+        result = self._run(recipe_id="nonexistent-recipe")
+        assert result.get("recipe_id") == "nonexistent-recipe"
+        assert "review_hints" in result
+        assert result["review_hints"] == []
+        assert "review_hints" not in result["report"]  # empty list not included
 
 
 class TestReportShapeIntegration:

@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from videoforge.engine.models import VideoDefinition
+from videoforge.engine.recipes import load_review_hints_for_recipe, review_hints_to_dicts
 from videoforge.review.alpha_gate import AlphaGate
 from videoforge.review.axis_gate import DualChartAxisGate
 from videoforge.review.l0_mixed_engine import L0MixedEngineReview
@@ -410,12 +411,13 @@ def generate_video_report(
     l2_status: str = "pass",
     scene_reports: list[dict[str, Any]] | None = None,
     coherence_result: dict[str, Any] | None = None,
+    review_hints: list[dict[str, str]] | None = None,
 ) -> dict[str, Any]:
     """Build structured JSON artifact for final assembled video.
 
     Includes content hash, engine mix, render format, L0 summary, L1 summary,
-    L2b layout-overlap summary, per-scene artifact summary, and optional
-    coherence summary.
+    L2b layout-overlap summary, per-scene artifact summary, optional
+    coherence summary, and optional recipe-driven review hints.
 
     Args:
         video_path: Path to final MP4.
@@ -433,6 +435,9 @@ def generate_video_report(
         coherence_result: Optional coherence gate result dict. When provided,
             ``coherence_summary`` with coherent bool, issues list, and
             narrative_arc summary is included in report.
+        review_hints: Optional list of recipe review hint dicts
+            (``{"check": str, "severity": str}``). When provided, included
+            as ``review_hints`` in the report artifact.
 
     Returns:
         Report dict suitable for JSON serialization.
@@ -529,6 +534,10 @@ def generate_video_report(
         },
     }
 
+    # ── Review hints from recipe ────────────────────────────────────────────
+    if review_hints:
+        report["review_hints"] = review_hints
+
     # ── Coherence summary ───────────────────────────────────────────────────
     if coherence_result is not None:
         nar = coherence_result.get("narrative_arc", {})
@@ -588,6 +597,7 @@ def run_review(
     rerender: bool = False,
     rerender_hook: RepairHook | None = None,
     coherence_result: dict[str, Any] | None = None,
+    recipe_id: str | None = None,
 ) -> dict[str, Any]:
     """Run L0 + L1 + L2b review + optional coherence, generate report artifact.
 
@@ -597,6 +607,10 @@ def run_review(
     When ``rerender=True``, L0-repairable issues trigger the rerender
     orchestrator loop (bounded retry via ``run_orchestrated_review``).
     The orchestrator's final review replaces ``l0_result``.
+
+    When ``recipe_id`` is provided, loads the recipe's review hints from
+    the registry and includes them in the report artifact, provenance,
+    and scene reports (influences review context additively).
 
     Args:
         video_path: Path to video file to review.
@@ -611,6 +625,8 @@ def run_review(
             ``rerender=True``, a default no-op hook (always returns True) is used.
         coherence_result: Optional coherence gate result dict. When provided,
             coherence is included in the unified policy decision and report.
+        recipe_id: Optional recipe id for loading review hints. When provided,
+            hints are propagated into report, provenance, and scene reports.
 
     Returns:
         Dict with keys: l0_result, l0_status, l1_result, l2_result, l2_status,
@@ -619,9 +635,16 @@ def run_review(
                         ``orchestration_result``.
                         When ``coherence_result`` is provided, also includes
                         ``coherence_result``.
+                        When ``recipe_id`` is provided, also includes
+                        ``review_hints`` and ``recipe_id``.
     """
     if reviewer is None:
         reviewer = FrameReviewer()
+
+    # ── Load recipe review hints (additive deterministic context) ─────────
+    _review_hints: list[dict[str, str]] | None = None
+    if recipe_id:
+        _review_hints = load_review_hints_for_recipe(recipe_id)
 
     l0_result = reviewer.check_mixed_engine(video_path)
     l0_status = reviewer.evaluate_l0_policy(l0_result)
@@ -675,6 +698,7 @@ def run_review(
         l2_status=l2_status,
         scene_reports=scene_reports,
         coherence_result=coherence_result,
+        review_hints=_review_hints,
     )
     # Embed central policy verdict in report artifact
     report["policy_verdict"] = decision["verdict"]
@@ -690,6 +714,9 @@ def run_review(
         "report_path": report_path,
         "decision": decision,
     }
+    if _review_hints is not None:
+        result["review_hints"] = _review_hints
+        result["recipe_id"] = recipe_id
     if orchestration_result is not None:
         result["orchestration_result"] = orchestration_result
         result["scene_reports"] = scene_reports
@@ -714,11 +741,12 @@ def generate_scene_report(
     scene_path: str,
     render_format: dict[str, Any] | None = None,
     content_hash: str = "",
+    review_hints: list[dict[str, str]] | None = None,
 ) -> dict[str, Any]:
     """Build per-scene JSON artifact next to rendered scene file.
 
-    Includes engine, duration, render format, and content hash for
-    traceability back to the parent video definition.
+    Includes engine, duration, render format, content hash, and optional
+    recipe-driven review hints for traceability back to the parent recipe.
 
     Args:
         scene_index: 0-based scene index.
@@ -727,6 +755,8 @@ def generate_scene_report(
         scene_path: Path to rendered scene MP4.
         render_format: Dict with fps, width, height, pixel_format, etc.
         content_hash: Video-level content hash (16-char hex).
+        review_hints: Optional list of recipe review hint dicts
+            (``{"check": str, "severity": str}``).
 
     Returns:
         Scene report dict suitable for JSON serialization.
@@ -740,7 +770,7 @@ def generate_scene_report(
         "audio_codec": "aac",
     }
 
-    return {
+    report: dict[str, Any] = {
         "artifact": "videoforge-scene-report",
         "version": 1,
         "scene_index": scene_index,
@@ -758,6 +788,9 @@ def generate_scene_report(
             "audio_codec": fmt.get("audio_codec", "aac"),
         },
     }
+    if review_hints:
+        report["review_hints"] = review_hints
+    return report
 
 
 def write_scene_report(
@@ -797,6 +830,7 @@ def generate_provenance_graph(
     content_hash: str = "",
     scenes: list[dict] | None = None,
     engine_mix: list[str] | None = None,
+    review_hints: list[dict[str, str]] | None = None,
 ) -> dict[str, Any]:
     """Build deterministic provenance graph artifact.
 
@@ -817,6 +851,9 @@ def generate_provenance_graph(
             - duration_frames: Scene duration in frames.
             - assets: Dict of asset paths (audio_src, props_path, …).
         engine_mix: List of all engines used.
+        review_hints: Optional list of recipe review hint dicts
+            (``{"check": str, "severity": str}``). Included in the
+            provenance graph when provided.
 
     Returns:
         Provenance graph dict suitable for JSON serialization.
@@ -841,6 +878,8 @@ def generate_provenance_graph(
             ),
         },
     }
+    if review_hints:
+        graph["review_hints"] = review_hints
     return graph
 
 
@@ -861,6 +900,7 @@ def build_provenance_scenes(
     video_def: object,
     scene_paths: list[str],
     build_dir: str | Path = "",
+    recipe_ids: list[str | None] | None = None,
 ) -> list[dict[str, Any]]:
     """Build scenes list for provenance graph from render result.
 
@@ -869,6 +909,9 @@ def build_provenance_scenes(
             ``.audioTracks`` and ``.fps``).
         scene_paths: List of scene MP4 paths in render order.
         build_dir: Build directory (locates props JSON artifacts).
+        recipe_ids: Optional per-scene recipe ids. When provided, loads
+            each recipe's review hints and attaches them to the scene
+            provenance entry.
 
     Returns:
         List of scene provenance entries.
@@ -895,7 +938,7 @@ def build_provenance_scenes(
         if props_path.exists():
             assets["props_path"] = str(props_path.resolve())
 
-        scenes_data.append({
+        entry: dict[str, Any] = {
             "id": f"scene_{i:04d}",
             "engine": engine,
             "kind": scene.type.value
@@ -911,6 +954,17 @@ def build_provenance_scenes(
             "duration_frames": getattr(scene, "duration", 0)
             or getattr(scene, "duration_frames", 0),
             "assets": assets,
-        })
+        }
+
+        # Attach recipe review hints per scene when recipe_ids provided
+        if recipe_ids and i < len(recipe_ids):
+            rid = recipe_ids[i]
+            if rid:
+                hints = load_review_hints_for_recipe(rid)
+                if hints:
+                    entry["review_hints"] = hints
+                    entry["recipe_id"] = rid
+
+        scenes_data.append(entry)
 
     return scenes_data

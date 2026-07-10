@@ -8,12 +8,15 @@ from pathlib import Path
 import pytest
 
 from videoforge.engine.recipes import (
+    ReviewHint,
     clear_cache,
     get_recipe,
     load_recipes,
+    load_review_hints_for_recipe,
     recipes_by_scene_kind,
     recipes_by_engine,
     recipes_by_tag,
+    review_hints_to_dicts,
 )
 
 
@@ -405,6 +408,60 @@ def test_missing_version_raises(tmp_path: Path):
 def test_file_not_found_raises():
     with pytest.raises(FileNotFoundError):
         load_recipes("/nonexistent/path/registry.json")
+
+
+# ── review_hints serialization ─────────────────────────────────────
+
+
+def test_review_hints_to_dicts():
+    hints = (
+        ReviewHint(check="check 1", severity="error"),
+        ReviewHint(check="check 2", severity="warn"),
+    )
+    result = review_hints_to_dicts(hints)
+    assert result == [
+        {"check": "check 1", "severity": "error"},
+        {"check": "check 2", "severity": "warn"},
+    ]
+
+
+def test_review_hints_to_dicts_empty():
+    assert review_hints_to_dicts(()) == []
+
+
+def test_load_review_hints_for_recipe_known():
+    hints = load_review_hints_for_recipe("screenflow")
+    assert len(hints) >= 1
+    for h in hints:
+        assert "check" in h
+        assert "severity" in h
+        assert h["severity"] in ("error", "warn", "info")
+
+
+def test_load_review_hints_for_recipe_unknown():
+    assert load_review_hints_for_recipe("nonexistent-recipe") == []
+
+
+def test_load_review_hints_for_recipe_empty_when_no_hints(tmp_path: Path):
+    """Recipe with no review_hints field returns empty list."""
+    reg = tmp_path / "no_hints.json"
+    reg.write_text(
+        json.dumps({
+            "version": 1,
+            "recipes": [
+                {
+                    "id": "no-hints",
+                    "name": "No Hints",
+                    "scene_kind": "title",
+                    "preferred_engine": "remotion",
+                    "allowed_inputs": [
+                        {"key": "x", "type": "string", "required": True, "description": ""}
+                    ],
+                }
+            ],
+        })
+    )
+    assert load_review_hints_for_recipe("no-hints", reg) == []
 
 
 # ── all_engines helper ─────────────────────────────────────────────
