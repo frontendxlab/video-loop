@@ -29,10 +29,9 @@ def tts(text: str = Form(...), voice: str = Form(None)):
     if not text.strip():
         raise HTTPException(400, "Text cannot be empty")
     voice = (voice or "alba").strip().lower()
-    if voice in _ORIGINS_OF_PREDEFINED_VOICES:
-        ms = model._cached_get_state_for_audio_prompt(voice)
-    else:
-        ms = model._cached_get_state_for_audio_prompt(voice)
+    # Look up predefined voice URL or use voice name as-is (could be HF URL)
+    voice_path = _ORIGINS_OF_PREDEFINED_VOICES.get(voice, voice)
+    ms = model._cached_get_state_for_audio_prompt(voice_path)
     def gen():
         q = Queue()
         def fill():
