@@ -226,35 +226,51 @@ async def get_provider_status() -> dict[str, Any]:
 
     discovery_meta = discover_9router_models()
 
+    # Merge discovered models into 9router provider if available
+    enriched_providers = []
+    for p in providers:
+        provider_data = {
+            "provider": p["provider"],
+            "label": p.get("label", p["provider"]),
+            "defaultModel": p.get("defaultModel", ""),
+            "configured": bool(p.get("apiKey")),
+            "models": [
+                {
+                    "id": m["id"],
+                    "label": m.get("label", m["id"]),
+                    "maxTokens": m.get("maxTokens", 4096),
+                }
+                for m in p.get("models", [])
+            ],
+        }
+        # For 9router, merge discovered models
+        if p["provider"] == "9router" and discovery_meta.get("discovered"):
+            discovered_models = [
+                {
+                    "id": m["id"],
+                    "label": m.get("label", m["id"]),
+                    "maxTokens": m.get("maxTokens", 4096),
+                }
+                for m in discovery_meta.get("models", [])
+            ]
+            # Merge: discovered models + hardcoded (avoid duplicates)
+            existing_ids = {m["id"] for m in provider_data["models"]}
+            for dm in discovered_models:
+                if dm["id"] not in existing_ids:
+                    provider_data["models"].append(dm)
+            provider_data["discovered"] = True
+            provider_data["discoverySource"] = discovery_meta.get("source", "api")
+            provider_data["discoveryError"] = None
+        elif p["provider"] == "9router":
+            provider_data["discovered"] = False
+            provider_data["discoverySource"] = discovery_meta.get("source", "fallback")
+            provider_data["discoveryError"] = discovery_meta.get("error")
+        enriched_providers.append(provider_data)
+
     return {
         "activeProvider": active_provider,
         "activeModel": active_model,
         "available": active_cfg is not None,
         "configured": bool(active_cfg and active_cfg.get("apiKey")),
-        "providers": [
-            {
-                "provider": p["provider"],
-                "label": p.get("label", p["provider"]),
-                "defaultModel": p.get("defaultModel", ""),
-                "configured": bool(p.get("apiKey")),
-                "models": [
-                    {
-                        "id": m["id"],
-                        "label": m.get("label", m["id"]),
-                        "maxTokens": m.get("maxTokens", 4096),
-                    }
-                    for m in p.get("models", [])
-                ],
-                **(
-                    {
-                        "discovered": discovery_meta.get("discovered", False),
-                        "discoverySource": discovery_meta.get("source", "fallback"),
-                        "discoveryError": discovery_meta.get("error"),
-                    }
-                    if p["provider"] == "9router"
-                    else {}
-                ),
-            }
-            for p in providers
-        ],
+        "providers": enriched_providers,
     }
