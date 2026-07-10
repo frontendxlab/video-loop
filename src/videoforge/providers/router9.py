@@ -102,8 +102,26 @@ def discover_models(*, force: bool = False) -> dict[str, Any]:
     if not force and _cache is not None and (now - _cache_ts) < _CACHE_TTL:
         return _cache
 
-    api_url = os.environ.get("9ROUTER_API_URL", _DEFAULT_BASE_URL)
+    api_url = os.environ.get("9ROUTER_API_URL", "")
     api_key = os.environ.get("9ROUTER_API_KEY", "")
+
+    # If env vars not set, try to read from persisted settings
+    if not api_key or not api_url:
+        try:
+            from videoforge.api.settings import load_settings
+            settings = load_settings()
+            for p in settings.get("providers", []):
+                if p.get("provider") == "9router":
+                    if not api_key:
+                        api_key = p.get("apiKey", "")
+                    if not api_url:
+                        api_url = p.get("baseUrl", "")
+                    break
+        except Exception:
+            pass
+
+    if not api_url:
+        api_url = _DEFAULT_BASE_URL
 
     if not api_key:
         result = _fallback_result("9ROUTER_API_KEY not set")
