@@ -589,7 +589,7 @@ def concatenate_scenes(
 
     with open(list_file, "w") as f:
         for p in scene_paths:
-            f.write(f"file '{Path(p).name}'\n")
+            f.write(f"file '{Path(p).resolve()}'\n")
 
     all_match = True
     for p in scene_paths:

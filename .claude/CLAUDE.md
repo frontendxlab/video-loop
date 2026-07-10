@@ -11,7 +11,7 @@
 > (documentation, ownership, history, decisions). **Always verify against
 > actual source files before making changes** — the index may be stale.
 
-Last indexed: 2026-07-10 (commit 1fadb39). Confidence: 100%.
+Last indexed: 2026-07-10 (commit 7abf075). Confidence: 100%.
 ### Architecture
 **Repo is a video generation and review platform: it ingests source‑code repositories and associated media assets, fetches pull‑request metadata, renders animated scenes with Remotion and Manim, compresses the resulting footage via the *caveman‑compress* skill, and finally serves the polished videos together with an interactive review UI through a FastAPI‑based server.**  
 The monorepo orchestrates this end‑to‑end pipeline across a Python backend, a TypeScript/JavaScript front‑end, and a collection of reusable scripts, enabling developers to produce, validate, and share programmatically generated video content with minimal friction. ---
@@ -52,27 +52,27 @@ The monorepo orchestrates this end‑to‑end pipeline across a Python backend, 
 ### Hotspots (High Churn)
 | File | Churn | 90d Commits | Owner |
 |------|-------|-------------|-------|
-| `tests/api/test_jobs.py` | 100.0th %ile | 5 | Rashid |
-| `src/videoforge/api/jobs.py` | 99.8th %ile | 8 | Rashid |
-| `web/src/contracts/create.ts` | 99.0th %ile | 6 | Rashid |
-| `src/videoforge/orchestrator/runner.py` | 98.8th %ile | 7 | Rashid |
-| `tests/api/test_settings.py` | 98.5th %ile | 6 | Rashid |
+| `remotion-project/package-lock.json` | 100.0th %ile | 5 | Rashid |
+| `tests/api/test_jobs.py` | 99.8th %ile | 5 | Rashid |
+| `src/videoforge/api/jobs.py` | 99.5th %ile | 8 | Rashid |
+| `src/videoforge/engine/renderer.py` | 99.3th %ile | 13 | Rashid |
+| `web/src/contracts/create.ts` | 98.8th %ile | 6 | Rashid |
 
 ## Code health
 Three signals: **defect risk** (the overall score), **maintainability** (smells that hurt readability/change-cost without predicting bugs), and **performance** (static performance RISK: I/O-in-loop / N+1 shapes that waste work, high-precision/low-recall). Maintainability and performance are co-equal views, never blended into the defect headline. See `docs/CODE_HEALTH.md`.
 
-Defect risk, Hotspot health: 7.54/10 (stable) ·
-Average: 9.29/10 ·
-Worst: 3.71/10 (`vfx-cli`)
-Maintainability, Average: 9.49/10
-Performance risk, Average: 9.93/10
+Defect risk, Hotspot health: 7.09/10 (stable) ·
+Average: 9.19/10 ·
+Worst: 1.12/10 (`src/videoforge/engine/renderer.py`)
+Maintainability, Average: 9.41/10
+Performance risk, Average: 9.92/10
 
 ### Critical biomarkers
+- `src/videoforge/engine/renderer.py` — function hotspot (render_scenes) — impact −2.3
 - `vfx-cli` — function hotspot (wizard) — impact −2.3
-- `src/videoforge/engine/tts_mcp.py` — hidden coupling — impact −1.3
-- `src/videoforge/engine/tts_mcp.py` — hidden coupling — impact −1.3
-- `.claude/CLAUDE.md` — hidden coupling — impact −1.2
-- `.claude/CLAUDE.md` — hidden coupling — impact −1.2
+- `.claude/CLAUDE.md` — hidden coupling — impact −1.8
+- `.claude/CLAUDE.md` — prior defect — impact −1.8
+- `.repowise/state.json` — hidden coupling — impact −1.8
 
 ### Repowise MCP Tools
 
