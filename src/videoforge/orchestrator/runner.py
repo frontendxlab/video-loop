@@ -125,7 +125,7 @@ class PipelineRunner:
         if self._cancel_flag: return output_path
         self._set_stage(Stage.PLAN, AgentStatus.COMPLETE, 1.0, "Scenes planned")
 
-        # Stage 3: TTS — real audio generation via generate_audio()
+        # Stage 3: TTS — real audio generation via MCP Pocket TTS server
         scenes = self._load_scenes(scenes_json)
         audio_dir.mkdir(parents=True, exist_ok=True)
         for i, scene in enumerate(scenes):
@@ -137,8 +137,15 @@ class PipelineRunner:
             self._set_stage(Stage.TTS, AgentStatus.RUNNING, progress=i / max(len(scenes), 1), message=f"Scene {i+1}/{len(scenes)}")
             self._log("tts-agent", f"Generating TTS for scene {i+1}: {text[:50]}...")
             audio_path = audio_dir / f"scene_{i:04d}.wav"
-            # ponytail: sync generate_audio in executor; move to dedicated thread pool when pipeline is CPU-bound
-            result = await asyncio.to_thread(generate_audio, text, audio_path, voice, tts_url)
+            try:
+                from videoforge.engine.tts_mcp import generate_speech_mcp_sync
+                mcp_url = os.environ.get("POCKET_TTS_MCP_URL", "http://172.236.176.29:8000/sse")
+                result = await asyncio.to_thread(
+                    generate_speech_mcp_sync, text, audio_path, voice, mcp_url
+                )
+            except Exception as e:
+                self._log("tts-agent", f"MCP TTS failed: {e}, falling back to HTTP", "WARN")
+                result = await asyncio.to_thread(generate_audio, text, audio_path, voice, tts_url)
             scene["wordTimestamps"] = result["word_timestamps"]
             scene["duration"] = max(1, int(result["duration_seconds"] * fps))
             scene["audio_path"] = str(audio_path)

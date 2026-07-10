@@ -1,0 +1,135 @@
+"""TTS adapter using Pocket TTS MCP server.
+
+Connects to the remote Pocket TTS MCP server via SSE and calls generate_speech tool.
+Falls back to direct HTTP if MCP connection fails.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import base64
+import logging
+import struct
+import wave
+from pathlib import Path
+from typing import Any
+
+logger = logging.getLogger("videoforge.engine.tts_mcp")
+
+# Default Pocket TTS MCP server URL (from OpenCode config)
+DEFAULT_MCP_URL = "http://172.236.176.29:8000/sse"
+
+
+def _create_wav_from_pcm(pcm_data: bytes, sample_rate: int = 24000, channels: int = 1, sample_width: int = 2) -> bytes:
+    """Create WAV file from raw PCM data."""
+    import io
+    buf = io.BytesIO()
+    with wave.open(buf, 'wb') as wf:
+        wf.setnchannels(channels)
+        wf.setsampwidth(sample_width)
+        wf.setframerate(sample_rate)
+        wf.writeframes(pcm_data)
+    return buf.getvalue()
+
+
+async def generate_speech_via_mcp(
+    text: str,
+    voice: str = "alba",
+    mcp_url: str = DEFAULT_MCP_URL,
+) -> dict[str, Any]:
+    """Generate speech using Pocket TTS MCP server.
+
+    Returns:
+        dict with: audio_bytes (WAV), duration_seconds, sample_rate
+    """
+    from mcp import ClientSession
+    from mcp.client.sse import sse_client
+
+    async with sse_client(mcp_url) as (read, write):
+        async with ClientSession(read, write) as session:
+            await session.initialize()
+
+            # List available tools
+            tools = await session.list_tools()
+            tool_names = [t.name for t in tools.tools]
+            logger.info("MCP TTS tools: %s", tool_names)
+
+            # Call generate_speech
+            result = await session.call_tool(
+                "generate_speech",
+                arguments={"text": text, "voice": voice}
+            )
+
+            # Parse result
+            if result.content and len(result.content) > 0:
+                content = result.content[0]
+                if hasattr(content, 'data'):
+                    # AudioContent - base64 encoded audio
+                    audio_bytes = base64.b64decode(content.data)
+                    # Try to create WAV if not already WAV
+                    if audio_bytes[:4] == b'RIFF':
+                        wav_bytes = audio_bytes
+                    else:
+                        wav_bytes = _create_wav_from_pcm(audio_bytes)
+
+                    # Calculate duration
+                    with __import__('io').BytesIO(wav_bytes) as buf:
+                        with wave.open(buf, 'rb') as wf:
+                            frames = wf.getnframes()
+                            rate = wf.getframerate()
+                            duration = frames / rate if rate > 0 else 0
+
+                    return {
+                        "audio_bytes": wav_bytes,
+                        "duration_seconds": duration,
+                        "sample_rate": rate if rate > 0 else 24000,
+                    }
+
+    raise RuntimeError("MCP TTS returned no audio data")
+
+
+def generate_speech_mcp_sync(
+    text: str,
+    output_path: str | Path,
+    voice: str = "alba",
+    mcp_url: str = DEFAULT_MCP_URL,
+) -> dict[str, Any]:
+    """Synchronous wrapper for MCP TTS generation.
+
+    Args:
+        text: Text to synthesize
+        output_path: Where to save the WAV file
+        voice: Voice name (e.g., "alba")
+        mcp_url: Pocket TTS MCP server URL
+
+    Returns:
+        dict with: audio_path, duration_seconds, sample_rate, word_timestamps
+    """
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Run async MCP call
+    result = asyncio.run(generate_speech_via_mcp(text, voice, mcp_url))
+
+    # Save WAV file
+    output_path.write_bytes(result["audio_bytes"])
+
+    # Generate word timestamps (estimated)
+    words = text.split()
+    duration_ms = result["duration_seconds"] * 1000
+    word_timestamps = []
+    if words:
+        per_word_ms = duration_ms / len(words)
+        for i, word in enumerate(words):
+            word_timestamps.append({
+                "text": word,
+                "startMs": round(i * per_word_ms),
+                "endMs": round((i + 1) * per_word_ms),
+            })
+
+    return {
+        "audio_path": str(output_path.resolve()),
+        "duration_seconds": result["duration_seconds"],
+        "sample_rate": result["sample_rate"],
+        "word_timestamps": word_timestamps,
+    }
