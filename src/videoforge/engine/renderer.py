@@ -369,7 +369,13 @@ def render_scenes(
         else:
             scene_props = video.to_remotion_props()
             scene_props["scenes"] = [scene_props["scenes"][i]]
-            scene_props["audioTracks"] = [asdict(video.audioTracks[i])] if i < len(video.audioTracks) else []
+            # Use relative path for audio (filename only) since files are copied to public/
+            if i < len(video.audioTracks):
+                track_dict = asdict(video.audioTracks[i])
+                track_dict["src"] = f"audio/{Path(track_dict['src']).name}"
+                scene_props["audioTracks"] = [track_dict]
+            else:
+                scene_props["audioTracks"] = []
 
         props_path = output_dir / f"props_{i:04d}.json"
         with open(props_path, "w") as f:
