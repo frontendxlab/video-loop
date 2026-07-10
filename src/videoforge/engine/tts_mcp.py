@@ -64,25 +64,13 @@ async def generate_speech_via_mcp(
             if result.content and len(result.content) > 0:
                 content = result.content[0]
                 if hasattr(content, 'data'):
-                    # AudioContent - base64 encoded audio
+                    # AudioContent - base64 encoded audio (f32le format)
                     audio_bytes = base64.b64decode(content.data)
-                    # Try to create WAV if not already WAV
-                    if audio_bytes[:4] == b'RIFF':
-                        wav_bytes = audio_bytes
-                    else:
-                        wav_bytes = _create_wav_from_pcm(audio_bytes)
-
-                    # Calculate duration
-                    with __import__('io').BytesIO(wav_bytes) as buf:
-                        with wave.open(buf, 'rb') as wf:
-                            frames = wf.getnframes()
-                            rate = wf.getframerate()
-                            duration = frames / rate if rate > 0 else 0
 
                     return {
-                        "audio_bytes": wav_bytes,
-                        "duration_seconds": duration,
-                        "sample_rate": rate if rate > 0 else 24000,
+                        "audio_bytes": audio_bytes,
+                        "duration_seconds": 0,  # calculated after ffmpeg conversion
+                        "sample_rate": 24000,
                     }
 
     raise RuntimeError("MCP TTS returned no audio data")
