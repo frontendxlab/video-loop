@@ -10,7 +10,7 @@ import { RecipePicker } from "@/components/create-flow/recipe-picker";
 import { TemplatePicker } from "@/components/create-flow/template-picker";
 import { StagedChecklist } from "@/components/create-flow/staged-checklist";
 import { DEFAULT_OPTIONS, CREATE_STAGES } from "@/contracts/create";
-import type { CreateOptions, GrillResult, Recipe, SuggestedTemplate } from "@/contracts/create";
+import type { CreateOptions, GrillResult, Recipe } from "@/contracts/create";
 import { startGrill, submitGrillTurn, createJob } from "@/api/jobs";
 import { Sparkles, RotateCcw, Loader2 } from "lucide-react";
 

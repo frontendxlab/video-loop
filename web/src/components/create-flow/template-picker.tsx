@@ -4,7 +4,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { GENRE_TEMPLATES } from "@/contracts/create";
-import type { VideoTemplate, SuggestedTemplate } from "@/contracts/create";
+import type { SuggestedTemplate } from "@/contracts/create";
 import { Lightbulb, BookOpen, Monitor, Megaphone, ScrollText, BarChart3, GitCompare, Clock, Star } from "lucide-react";
 
 interface TemplatePickerProps {
@@ -28,7 +28,6 @@ const iconMap: Record<string, React.ReactNode> = {
 };
 
 export function TemplatePicker({ selected, onSelect, suggestions, disabled, className }: TemplatePickerProps) {
-  const templateMap = new Map(GENRE_TEMPLATES.map(t => [t.id, t]));
   const suggestionIds = new Set(suggestions.map(s => s.id));
 
   const toggle = (id: string) => {
