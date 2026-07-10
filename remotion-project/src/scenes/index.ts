@@ -16,4 +16,5 @@ export { OverlayCTA, OverlayCTASchema } from "./OverlayCTA";
 export { AudioVizScene, AudioVizSceneSchema } from "./AudioVizScene";
 export { ThreeSceneExample, ThreeSceneExampleSchema } from "./ThreeSceneExample";
 export { MapScene, MapSceneSchema } from "./MapScene";
+export { ScreenflowScene, ScreenflowSceneSchema } from "./ScreenflowScene";
 export type { WordTiming } from "../captions/wordTiming";
