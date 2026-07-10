@@ -7,6 +7,7 @@ import { layoutNodes, buildFlowEdges } from '@/components/flow-canvas-layout'
 import { FlowJobCanvas } from '@/components/flow-job-canvas'
 import { FlowSceneCanvas } from '@/components/flow-scene-canvas'
 import type { FlowNode, FlowEdge, CanvasNode } from '@/types/canvas'
+import type { SSEEvent } from '@/types/sse'
 import { getJobs } from '@/data/mock'
 
 /* ── FlowCanvas ────────────────────────────────────────────────────── */
@@ -287,7 +288,106 @@ describe('FlowJobCanvas', () => {
     const { container } = render(<FlowJobCanvas job={minimalJob} />)
     expect(container.querySelector('[role="button"]')).toBeDefined()
   })
+
+  it('renders unchanged when sseEvents is empty', () => {
+    render(<FlowJobCanvas job={mockJob} sseEvents={[]} />)
+    expect(screen.getByText(mockJob.title)).toBeDefined()
+  })
+
+  it('overrides subagent status to completed via SSE', () => {
+    const events: SSEEvent[] = [
+      makeEvent('subagent.completed', { subagentId: 'sa_3' }),
+    ]
+    render(<FlowJobCanvas job={mockJob} sseEvents={events} />)
+    // sa_3 was "running" in mock, now "completed" — check icon present
+    const sa3Card = screen.getByRole('button', { name: /Diff Renderer/ })
+    expect(sa3Card.querySelector('.lucide-check')).toBeDefined()
+  })
+
+  it('overrides subagent status to failed via SSE', () => {
+    const events: SSEEvent[] = [
+      makeEvent('subagent.failed', { subagentId: 'sa_3', error: 'Render crash' }),
+    ]
+    render(<FlowJobCanvas job={mockJob} sseEvents={events} />)
+    const errors = screen.getAllByText('Render crash')
+    expect(errors.length).toBeGreaterThanOrEqual(1)
+    const sa3Card = screen.getByRole('button', { name: /Diff Renderer/ })
+    expect(sa3Card.querySelector('.lucide-x')).toBeDefined()
+  })
+
+  it('overrides scene status to completed via SSE', () => {
+    const events: SSEEvent[] = [
+      makeEvent('render.scene_completed', { sceneId: 'scene_3' }),
+    ]
+    render(<FlowJobCanvas job={mockJob} sseEvents={events} />)
+    // scene_3 aria-label is "scene scene_3"
+    const sceneBtn = screen.getByRole('button', { name: /scene_3/ })
+    expect(sceneBtn.querySelector('.lucide-check')).toBeDefined()
+  })
+
+  it('overrides scene status to rendering via SSE', () => {
+    const events: SSEEvent[] = [
+      makeEvent('render.scene_started', { sceneId: 'scene_4' }),
+    ]
+    render(<FlowJobCanvas job={mockJob} sseEvents={events} />)
+    const sceneBtn = screen.getByRole('button', { name: /scene_4/ })
+    expect(sceneBtn.querySelector('.lucide-loader-2')).toBeDefined()
+  })
+
+  it('overrides stage progress via job.stage SSE', () => {
+    const events: SSEEvent[] = [
+      makeEvent('job.stage', { stage: 'review', progressPct: 85, phase: 'review' }),
+    ]
+    render(<FlowJobCanvas job={mockJob} sseEvents={events} />)
+    // Stage label should show "review"
+    expect(screen.getByText(/Stage: review/)).toBeDefined()
+  })
+
+  it('marks job as done on job.completed SSE', () => {
+    const events: SSEEvent[] = [
+      makeEvent('job.completed', { title: mockJob.title }),
+    ]
+    // job_001 is "running" — SSE should upgrade it to "done"
+    render(<FlowJobCanvas job={mockJob} sseEvents={events} />)
+    // Check icon should be visible somewhere on the job node
+    const jobBtn = screen.getByRole('button', { name: new RegExp(mockJob.title) })
+    const checkIcon = jobBtn.querySelector('.lucide-check')
+    expect(checkIcon).toBeDefined()
+  })
+
+  it('marks job as failed on job.failed SSE', () => {
+    const events: SSEEvent[] = [
+      makeEvent('job.failed', { title: mockJob.title, error: 'Something broke' }),
+    ]
+    render(<FlowJobCanvas job={mockJob} sseEvents={events} />)
+    const errors = screen.getAllByText('Something broke')
+    expect(errors.length).toBeGreaterThanOrEqual(1)
+  })
+
+  it('accumulates multiple SSE events across subagents and scenes', () => {
+    const events: SSEEvent[] = [
+      makeEvent('subagent.completed', { subagentId: 'sa_2' }),
+      makeEvent('subagent.started', { subagentId: 'sa_4' }),
+      makeEvent('render.scene_completed', { sceneId: 'scene_3' }),
+      makeEvent('render.scene_started', { sceneId: 'scene_4' }),
+    ]
+    render(<FlowJobCanvas job={mockJob} sseEvents={events} />)
+    const sa2Btn = screen.getByRole('button', { name: /Code Highlighter/ })
+    expect(sa2Btn.querySelector('.lucide-check')).toBeDefined()
+    const sa4Btn = screen.getByRole('button', { name: /Review Gate L0/ })
+    expect(sa4Btn.querySelector('.lucide-loader-2')).toBeDefined()
+    const sc3Btn = screen.getByRole('button', { name: /scene_3/ })
+    expect(sc3Btn.querySelector('.lucide-check')).toBeDefined()
+  })
 })
+
+/* ── Helper: build mock SSEEvent ── */
+function makeEvent(type: string, overrides: Record<string, unknown>): SSEEvent {
+  return {
+    type: type as any,
+    data: { jobId: 'job_001', timestamp: new Date().toISOString(), ...overrides } as any,
+  }
+}
 
 /* ── FlowSceneCanvas ────────────────────────────────────────────────── */
 

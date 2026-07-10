@@ -162,7 +162,7 @@ function JobDetailPage() {
         </TabsContent>
 
         <TabsContent value="flow">
-          <FlowJobCanvas job={job} className="h-[600px]" />
+          <FlowJobCanvas job={job} sseEvents={events} className="h-[600px]" />
         </TabsContent>
       </Tabs>
     </div>
