@@ -48,6 +48,19 @@ describe("inputProps schema", () => {
     expect(scene.type).toBe("outro");
   });
 
+  it("validates map-geo scene props", () => {
+    const scene = { type: "map-geo", centerLat: 48.8566, centerLng: 2.3522, zoom: 10, title: "Paris", duration: 150 };
+    expect(scene.type).toBe("map-geo");
+    expect(scene.centerLat).toBeCloseTo(48.8566);
+    expect(scene.zoom).toBe(10);
+  });
+
+  it("validates map-geo with markers", () => {
+    const scene = { type: "map-geo", centerLat: 0, centerLng: 0, markers: [{ lat: 48.85, lng: 2.35, label: "Paris" }], duration: 150 };
+    expect(scene.markers.length).toBe(1);
+    expect(scene.markers[0].label).toBe("Paris");
+  });
+
   it("validates full inputProps structure", () => {
     const props = {
       title: "Test Video",

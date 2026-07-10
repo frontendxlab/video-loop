@@ -65,6 +65,9 @@ routing:
   - kind: svg-morph
     engine: remotion
     reason: "SVG path-to-path morphing with spring physics"
+  - kind: map-geo
+    engine: remotion
+    reason: "SVG geo map with markers, routes, and grid overlay — no tile deps"
   - kind: kinetic-text
     engine: remotion
     reason: "Per-character kinetic typography with spring physics"
