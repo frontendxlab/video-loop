@@ -6,6 +6,12 @@ export {
 } from "./composite";
 export type { VintageParams, MagnifierMap } from "./composite";
 export {
+  applyGlitch,
+  applyVintage,
+  applyMagnifier,
+  renderTextContent,
+} from "./canvas-apply";
+export {
   EffectLayerSchema,
   GlitchConfigSchema,
   VintageConfigSchema,
