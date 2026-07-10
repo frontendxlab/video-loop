@@ -97,6 +97,62 @@ def evaluate_l1(result: dict[str, Any]) -> ReviewVerdict:
 # ── L2: Layout overlap policy ────────────────────────────────────────────────
 
 
+def evaluate_alpha(result: dict[str, Any]) -> ReviewVerdict:
+    """Map AlphaGate result to pass/warn/fail.
+
+    Reuses generic severity-based policy (same as :func:`evaluate_l0`).
+
+    Args:
+        result: AlphaGate result dict with ``"issues"`` key.
+
+    Returns:
+        ``ReviewVerdict.PASS``, ``WARN``, or ``FAIL``.
+    """
+    return evaluate_l0(result)
+
+
+def evaluate_visibility(result: dict[str, Any]) -> ReviewVerdict:
+    """Map VisibilityGate result to pass/warn/fail.
+
+    Reuses generic severity-based policy.
+
+    Args:
+        result: VisibilityGate result dict with ``"issues"`` key.
+
+    Returns:
+        ``ReviewVerdict.PASS``, ``WARN``, or ``FAIL``.
+    """
+    return evaluate_l0(result)
+
+
+def evaluate_axis(result: dict[str, Any]) -> ReviewVerdict:
+    """Map DualChartAxisGate result to pass/warn/fail.
+
+    Reuses generic severity-based policy.
+
+    Args:
+        result: DualChartAxisGate result dict with ``"issues"`` key.
+
+    Returns:
+        ``ReviewVerdict.PASS``, ``WARN``, or ``FAIL``.
+    """
+    return evaluate_l0(result)
+
+
+def evaluate_substring(result: dict[str, Any]) -> ReviewVerdict:
+    """Map HighlightSubstringGate result to pass/warn/fail.
+
+    Reuses generic severity-based policy.
+
+    Args:
+        result: HighlightSubstringGate result dict with ``"issues"`` key.
+
+    Returns:
+        ``ReviewVerdict.PASS``, ``WARN``, or ``FAIL``.
+    """
+    return evaluate_l0(result)
+
+
 def evaluate_l2(result: dict[str, Any]) -> ReviewVerdict:
     """Map L2 layout-overlap result to pass / warn / fail.
 

@@ -7,6 +7,8 @@ from pathlib import Path
 from typing import Any
 
 from videoforge.engine.models import VideoDefinition
+from videoforge.review.alpha_gate import AlphaGate
+from videoforge.review.axis_gate import DualChartAxisGate
 from videoforge.review.l0_mixed_engine import L0MixedEngineReview
 from videoforge.review.l3_smoothness import L3Smoothness
 from videoforge.review.l4_transitions import L4Transitions
@@ -17,10 +19,16 @@ from videoforge.review.rerender_orchestrator import run_orchestrated_review
 from videoforge.review.policy import (
     ReviewVerdict,
     aggregate as aggregate_policy,
+    evaluate_alpha as _policy_evaluate_alpha,
+    evaluate_axis as _policy_evaluate_axis,
     evaluate_l0 as _policy_evaluate_l0,
     evaluate_l1 as _policy_evaluate_l1,
     evaluate_l2 as _policy_evaluate_l2,
+    evaluate_substring as _policy_evaluate_substring,
+    evaluate_visibility as _policy_evaluate_visibility,
 )
+from videoforge.review.substring_gate import HighlightSubstringGate
+from videoforge.review.visibility_gate import VisibilityGate
 
 
 class FrameReviewer:
@@ -30,6 +38,10 @@ class FrameReviewer:
         self._l4 = L4Transitions()
         self._l5 = L5Consistency()
         self._overlap_gate = OverlapGate()
+        self._alpha_gate = AlphaGate()
+        self._visibility_gate = VisibilityGate()
+        self._axis_gate = DualChartAxisGate()
+        self._substring_gate = HighlightSubstringGate()
         self.max_retries = max_retries
 
     def check_integrity(self, video_path: str) -> dict[str, Any]:
@@ -157,6 +169,68 @@ class FrameReviewer:
         """
         return self._overlap_gate.run(elements, viewport)
 
+    def check_alpha(
+        self,
+        scene_payload: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Run alpha/overlay validation gate standalone.
+
+        Args:
+            scene_payload: Scene props dict with ``alpha``,
+                ``include_transparent_bg``, ``background_opacity`` keys.
+
+        Returns:
+            Dict with ``issues`` and ``passed`` keys.
+        """
+        return self._alpha_gate.run(scene_payload)
+
+    def check_visibility(
+        self,
+        scene_payload: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Run 3D/chart visibility gate standalone.
+
+        Args:
+            scene_payload: Scene props dict with data arrays
+                (``objects``, ``data_points``, ``bar_values``, etc.).
+
+        Returns:
+            Dict with ``issues`` and ``passed`` keys.
+        """
+        return self._visibility_gate.run(scene_payload)
+
+    def check_axis_sanity(
+        self,
+        scene_payload: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Run dual-chart axis-sanity gate standalone.
+
+        Args:
+            scene_payload: Scene props dict with ``x_labels``,
+                ``bar_data``, ``line_data``, ``dual_axes`` keys.
+
+        Returns:
+            Dict with ``issues`` and ``passed`` keys.
+        """
+        return self._axis_gate.run(scene_payload)
+
+    def check_highlight_substring(
+        self,
+        scene_payload: dict[str, Any],
+        case_sensitive: bool = True,
+    ) -> dict[str, Any]:
+        """Run highlight substring-presence gate standalone.
+
+        Args:
+            scene_payload: Scene props dict with ``focus_phrase``
+                and ``body_snippet`` keys.
+            case_sensitive: Whether substring match is case-sensitive.
+
+        Returns:
+            Dict with ``issues`` and ``passed`` keys.
+        """
+        return self._substring_gate.run(scene_payload, case_sensitive=case_sensitive)
+
     @staticmethod
     def evaluate_l0_policy(result: dict[str, Any]) -> str:
         """Evaluate L0 issues against severity-based gate policy.
@@ -182,6 +256,42 @@ class FrameReviewer:
             One of "pass", "warn", "fail".
         """
         return FrameReviewer._evaluate_by_severity(result)
+
+    @staticmethod
+    def evaluate_alpha_policy(result: dict[str, Any]) -> str:
+        """Evaluate AlphaGate result against severity-based policy.
+
+        Returns:
+            One of "pass", "warn", "fail".
+        """
+        return _policy_evaluate_alpha(result).value
+
+    @staticmethod
+    def evaluate_visibility_policy(result: dict[str, Any]) -> str:
+        """Evaluate VisibilityGate result against severity-based policy.
+
+        Returns:
+            One of "pass", "warn", "fail".
+        """
+        return _policy_evaluate_visibility(result).value
+
+    @staticmethod
+    def evaluate_axis_policy(result: dict[str, Any]) -> str:
+        """Evaluate DualChartAxisGate result against severity-based policy.
+
+        Returns:
+            One of "pass", "warn", "fail".
+        """
+        return _policy_evaluate_axis(result).value
+
+    @staticmethod
+    def evaluate_substring_policy(result: dict[str, Any]) -> str:
+        """Evaluate HighlightSubstringGate result against severity-based policy.
+
+        Returns:
+            One of "pass", "warn", "fail".
+        """
+        return _policy_evaluate_substring(result).value
 
     @staticmethod
     def _evaluate_by_severity(result: dict[str, Any]) -> str:
