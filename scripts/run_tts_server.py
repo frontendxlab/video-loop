@@ -53,4 +53,5 @@ def tts(text: str = Form(...), voice: str = Form(None)):
     return StreamingResponse(gen(), media_type="audio/wav")
 
 print("Starting uvicorn...", flush=True)
-uvicorn.run(app, host="localhost", port=8000, log_level="info")
+tts_port = int(os.environ.get("TTS_PORT", "8000"))
+uvicorn.run(app, host="localhost", port=tts_port, log_level="info")

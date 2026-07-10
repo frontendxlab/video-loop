@@ -1,0 +1,232 @@
+- generic [ref=f12e3]:
+  - complementary [ref=f12e4]:
+    - img [ref=f12e6]
+    - navigation [ref=f12e8]:
+      - link [ref=f12e9] [cursor=pointer]:
+        - /url: /jobs
+        - img
+      - link [ref=f12e10] [cursor=pointer]:
+        - /url: /create
+        - img
+      - link [ref=f12e11] [cursor=pointer]:
+        - /url: /recipes
+        - img
+      - link [ref=f12e12] [cursor=pointer]:
+        - /url: /reports
+        - img
+      - link [ref=f12e13] [cursor=pointer]:
+        - /url: /settings
+        - img
+  - generic [ref=f12e14]:
+    - banner [ref=f12e15]:
+      - generic [ref=f12e16]:
+        - img [ref=f12e17]
+        - generic [ref=f12e19]: VideoForge
+      - generic [ref=f12e21]: idle
+    - main [ref=f12e23]:
+      - generic [ref=f12e24]:
+        - generic [ref=f12e25]:
+          - heading "Create video" [level=1] [ref=f12e26]
+          - paragraph [ref=f12e27]: Describe your video — we handle the rest
+        - generic [ref=f12e28]:
+          - generic [ref=f12e29]:
+            - generic [ref=f12e30]:
+              - generic [ref=f12e31]:
+                - heading "What do you want to create?" [level=3] [ref=f12e32]:
+                  - img [ref=f12e33]
+                  - text: What do you want to create?
+                - paragraph [ref=f12e35]: Describe topic, style, and key points for your video
+              - generic [ref=f12e36]:
+                - generic [ref=f12e37]:
+                  - generic [ref=f12e38]:
+                    - generic [ref=f12e39]: Video prompt
+                    - generic [ref=f12e40]: 119 / 10 min
+                  - textbox "Video prompt" [disabled] [ref=f12e41]:
+                    - /placeholder: Describe video you want to create...
+                    - text: Create a short 30-second video explaining what Claude is and why developers should use it for building AI applications.
+                - generic [ref=f12e42]:
+                  - generic [ref=f12e45]:
+                    - heading "Templates" [level=3] [ref=f12e46]
+                    - paragraph [ref=f12e47]: Pick video genre templates to guide scene planning
+                  - generic [ref=f12e50]:
+                    - button "Explainer educational Explain concept with diagrams, key points, and clear narration 1. title 2. diagram 3. bullets 4. outro" [disabled] [ref=f12e51]:
+                      - generic [ref=f12e53]:
+                        - img [ref=f12e55]
+                        - generic [ref=f12e57]:
+                          - generic [ref=f12e58]:
+                            - generic [ref=f12e59]: Explainer
+                            - generic [ref=f12e60]: educational
+                          - paragraph [ref=f12e61]: Explain concept with diagrams, key points, and clear narration
+                      - generic [ref=f12e62]:
+                        - generic [ref=f12e63]: 1. title
+                        - generic [ref=f12e64]: 2. diagram
+                        - generic [ref=f12e65]: 3. bullets
+                        - generic [ref=f12e66]: 4. outro
+                    - button "Tutorial educational Step-by-step walkthrough with examples and clear instructions 1. title 2. code 3. bullets 4. outro" [disabled] [ref=f12e67]:
+                      - generic [ref=f12e69]:
+                        - img [ref=f12e71]
+                        - generic [ref=f12e73]:
+                          - generic [ref=f12e74]:
+                            - generic [ref=f12e75]: Tutorial
+                            - generic [ref=f12e76]: educational
+                          - paragraph [ref=f12e77]: Step-by-step walkthrough with examples and clear instructions
+                      - generic [ref=f12e78]:
+                        - generic [ref=f12e79]: 1. title
+                        - generic [ref=f12e80]: 2. code
+                        - generic [ref=f12e81]: 3. bullets
+                        - generic [ref=f12e82]: 4. outro
+                    - button "Product Demo marketing Showcase product features with callouts, comparisons, and CTA 1. title 2. comparison 3. comparison 4. outro" [disabled] [ref=f12e83]:
+                      - generic [ref=f12e85]:
+                        - img [ref=f12e87]
+                        - generic [ref=f12e89]:
+                          - generic [ref=f12e90]:
+                            - generic [ref=f12e91]: Product Demo
+                            - generic [ref=f12e92]: marketing
+                          - paragraph [ref=f12e93]: Showcase product features with callouts, comparisons, and CTA
+                      - generic [ref=f12e94]:
+                        - generic [ref=f12e95]: 1. title
+                        - generic [ref=f12e96]: 2. comparison
+                        - generic [ref=f12e97]: 3. comparison
+                        - generic [ref=f12e98]: 4. outro
+                    - button "Marketing marketing Promotional video with hook, problem-solution, and strong CTA 1. title 2. bullets 3. comparison 4. outro" [disabled] [ref=f12e99]:
+                      - generic [ref=f12e101]:
+                        - img [ref=f12e103]
+                        - generic [ref=f12e106]:
+                          - generic [ref=f12e107]:
+                            - generic [ref=f12e108]: Marketing
+                            - generic [ref=f12e109]: marketing
+                          - paragraph [ref=f12e110]: Promotional video with hook, problem-solution, and strong CTA
+                      - generic [ref=f12e111]:
+                        - generic [ref=f12e112]: 1. title
+                        - generic [ref=f12e113]: 2. bullets
+                        - generic [ref=f12e114]: 3. comparison
+                        - generic [ref=f12e115]: 4. outro
+                    - button "Storytelling narrative Narrative-driven video with emotional arc and story structure 1. title 2. bullets 3. quote 4. outro" [disabled] [ref=f12e116]:
+                      - generic [ref=f12e118]:
+                        - img [ref=f12e120]
+                        - generic [ref=f12e123]:
+                          - generic [ref=f12e124]:
+                            - generic [ref=f12e125]: Storytelling
+                            - generic [ref=f12e126]: narrative
+                          - paragraph [ref=f12e127]: Narrative-driven video with emotional arc and story structure
+                      - generic [ref=f12e128]:
+                        - generic [ref=f12e129]: 1. title
+                        - generic [ref=f12e130]: 2. bullets
+                        - generic [ref=f12e131]: 3. quote
+                        - generic [ref=f12e132]: 4. outro
+                    - button "Data Story data Data-driven narrative with charts, metrics, and insights 1. title 2. chart 3. chart 4. bullets" [disabled] [ref=f12e133]:
+                      - generic [ref=f12e135]:
+                        - img [ref=f12e137]
+                        - generic [ref=f12e139]:
+                          - generic [ref=f12e140]:
+                            - generic [ref=f12e141]: Data Story
+                            - generic [ref=f12e142]: data
+                          - paragraph [ref=f12e143]: Data-driven narrative with charts, metrics, and insights
+                      - generic [ref=f12e144]:
+                        - generic [ref=f12e145]: 1. title
+                        - generic [ref=f12e146]: 2. chart
+                        - generic [ref=f12e147]: 3. chart
+                        - generic [ref=f12e148]: 4. bullets
+                    - button "Comparison analysis Side-by-side comparison of options, versions, or approaches 1. title 2. comparison 3. comparison 4. diff" [disabled] [ref=f12e149]:
+                      - generic [ref=f12e151]:
+                        - img [ref=f12e153]
+                        - generic [ref=f12e158]:
+                          - generic [ref=f12e159]:
+                            - generic [ref=f12e160]: Comparison
+                            - generic [ref=f12e161]: analysis
+                          - paragraph [ref=f12e162]: Side-by-side comparison of options, versions, or approaches
+                      - generic [ref=f12e163]:
+                        - generic [ref=f12e164]: 1. title
+                        - generic [ref=f12e165]: 2. comparison
+                        - generic [ref=f12e166]: 3. comparison
+                        - generic [ref=f12e167]: 4. diff
+                    - button "Timeline narrative Chronological walkthrough of events, history, or roadmap 1. title 2. timeline 3. timeline 4. timeline 5. outro" [disabled] [ref=f12e168]:
+                      - generic [ref=f12e170]:
+                        - img [ref=f12e172]
+                        - generic [ref=f12e175]:
+                          - generic [ref=f12e176]:
+                            - generic [ref=f12e177]: Timeline
+                            - generic [ref=f12e178]: narrative
+                          - paragraph [ref=f12e179]: Chronological walkthrough of events, history, or roadmap
+                      - generic [ref=f12e180]:
+                        - generic [ref=f12e181]: 1. title
+                        - generic [ref=f12e182]: 2. timeline
+                        - generic [ref=f12e183]: 3. timeline
+                        - generic [ref=f12e184]: 4. timeline
+                        - generic [ref=f12e185]: 5. outro
+                    - button "Review analysis Honest review with pros/cons, rating, and final verdict 1. title 2. bullets 3. bullets 4. outro" [disabled] [ref=f12e186]:
+                      - generic [ref=f12e188]:
+                        - img [ref=f12e190]
+                        - generic [ref=f12e192]:
+                          - generic [ref=f12e193]:
+                            - generic [ref=f12e194]: Review
+                            - generic [ref=f12e195]: analysis
+                          - paragraph [ref=f12e196]: Honest review with pros/cons, rating, and final verdict
+                      - generic [ref=f12e197]:
+                        - generic [ref=f12e198]: 1. title
+                        - generic [ref=f12e199]: 2. bullets
+                        - generic [ref=f12e200]: 3. bullets
+                        - generic [ref=f12e201]: 4. outro
+                - generic [ref=f12e205] [cursor=pointer]:
+                  - heading "Recipe" [level=3] [ref=f12e206]
+                  - paragraph [ref=f12e207]: Pick a recipe to guide scene structure
+                - generic [ref=f12e209]:
+                  - heading "Options" [level=4] [ref=f12e210]
+                  - generic [ref=f12e211]:
+                    - generic [ref=f12e212]:
+                      - text: Voice
+                      - combobox "Voice" [disabled] [ref=f12e213]:
+                        - generic: Alba
+                        - img [ref=f12e214]
+                    - generic [ref=f12e216]:
+                      - text: Provider
+                      - combobox "Provider" [disabled] [ref=f12e217]:
+                        - generic: 9router
+                        - img [ref=f12e218]
+                    - generic [ref=f12e220]:
+                      - text: Model
+                      - combobox "Model" [disabled] [ref=f12e221]:
+                        - generic: DeepSeek V4 Flash
+                        - img [ref=f12e222]
+                    - generic [ref=f12e224]:
+                      - text: Max duration (s)
+                      - spinbutton "Max duration (s)" [disabled] [ref=f12e225]: "180"
+                    - generic [ref=f12e226]:
+                      - text: FPS
+                      - combobox "FPS" [disabled] [ref=f12e227]:
+                        - generic: "30"
+                        - img [ref=f12e228]
+                - generic [ref=f12e230]:
+                  - button "Grilling..." [disabled]:
+                    - img
+                    - text: Grilling...
+                  - button [disabled]:
+                    - img
+            - generic [ref=f12e233]:
+              - generic [ref=f12e235]:
+                - heading "Grill panel" [level=3] [ref=f12e236]
+                - generic [ref=f12e289]: Thinking...
+              - generic [ref=f12e291]:
+                - img [ref=f12e292]
+                - text: Processing...
+          - generic [ref=f12e240]:
+            - generic [ref=f12e241]:
+              - heading "Progress" [level=3] [ref=f12e242]
+              - paragraph [ref=f12e243]: Pipeline stage tracker
+            - generic [ref=f12e245]:
+              - heading "Pipeline stages" [level=4] [ref=f12e246]
+              - generic [ref=f12e247]:
+                - img [ref=f12e294]
+                - generic [ref=f12e254]: Grill prompt
+              - generic [ref=f12e255]:
+                - img [ref=f12e257]
+                - generic [ref=f12e262]: Plan scenes
+              - generic [ref=f12e263]:
+                - img [ref=f12e265]
+                - generic [ref=f12e270]: Generate audio
+              - generic [ref=f12e271]:
+                - img [ref=f12e273]
+                - generic [ref=f12e278]: Render video
+              - generic [ref=f12e279]:
+                - img [ref=f12e281]
+                - generic [ref=f12e285]: Review quality

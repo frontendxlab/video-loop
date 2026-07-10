@@ -13,7 +13,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "src"))
 
-TTS_URL = "http://localhost:8000"
+TTS_URL = "http://localhost:8001"
 VOICE = "alba"
 REMOTION = Path(__file__).resolve().parent / "remotion-project"
 PUBLIC_AUDIO = REMOTION / "public" / "audio"

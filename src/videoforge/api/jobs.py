@@ -801,6 +801,7 @@ async def _process_job_background(job_id: str, feed: EventFeed) -> None:
             topic=topic,
             scenes_json="",
             voice=job.get("provider", "alba"),
+            tts_url=os.environ.get("TTS_URL", "http://localhost:8001"),
             output_path=output_path,
             remotion_dir="remotion-project",
         )
