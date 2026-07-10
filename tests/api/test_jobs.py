@@ -712,7 +712,8 @@ class TestBackgroundProcessing:
         _clear_store()
 
         # Mock run_pipeline to complete instantly (no sleeps)
-        async def fake_run(self, topic="", scenes_json="", voice="alba", tts_url=""):
+        async def fake_run(self, topic="", scenes_json="", voice="alba", tts_url="",
+                           output_path="", remotion_dir="", fps=30, **kw):
             if self.stage_callback:
                 self.stage_callback("grill", "running", 0.1, "")
                 self.stage_callback("grill", "complete", 1.0, "")
@@ -721,10 +722,9 @@ class TestBackgroundProcessing:
                 self.stage_callback("render", "running", 0.1, "")
                 self.stage_callback("render", "complete", 1.0, "")
                 self.stage_callback("done", "complete", 1.0, "")
+            return output_path or "/tmp/videoforge/mock_final.mp4"
 
         monkeypatch.setattr(PipelineRunner, "run_pipeline", fake_run)
-        # Disable ffmpeg check for output generation
-        monkeypatch.setattr("videoforge.api.jobs.shutil.which", lambda _: None)
 
         app = create_app()
         client = TestClient(app)
@@ -748,7 +748,8 @@ class TestBackgroundProcessing:
 
         _clear_store()
 
-        async def fake_run(self, topic="", scenes_json="", voice="alba", tts_url=""):
+        async def fake_run(self, topic="", scenes_json="", voice="alba", tts_url="",
+                           output_path="", remotion_dir="", fps=30, **kw):
             if self.stage_callback:
                 self.stage_callback("grill", "running", 0.1, "")
                 self.stage_callback("grill", "complete", 1.0, "")
@@ -757,10 +758,13 @@ class TestBackgroundProcessing:
                 self.stage_callback("render", "running", 0.1, "")
                 self.stage_callback("render", "complete", 1.0, "")
                 self.stage_callback("done", "complete", 1.0, "")
+            # Write a real output file for artifact check
+            if output_path:
+                Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+                Path(output_path).write_text('{"mock": true}')
+            return output_path or "/tmp/videoforge/mock_final.mp4"
 
         monkeypatch.setattr(PipelineRunner, "run_pipeline", fake_run)
-        # Disable ffmpeg so placeholder is written
-        monkeypatch.setattr("videoforge.api.jobs.shutil.which", lambda _: None)
 
         app = create_app()
         client = TestClient(app)
@@ -775,7 +779,7 @@ class TestBackgroundProcessing:
         # Output file should exist
         assert Path(output_path).exists(), f"Output file not found: {output_path}"
         content = Path(output_path).read_text()
-        assert "simulated" in content or output_path.endswith(".mp4")
+        assert '"mock"' in content or output_path.endswith(".mp4")
 
     def test_background_processing_failure_sets_failed_status(self, monkeypatch):
         """Pipeline failure sets job status to 'failed' with error."""
@@ -784,7 +788,8 @@ class TestBackgroundProcessing:
 
         _clear_store()
 
-        async def fake_run_fail(self, topic="", scenes_json="", voice="alba", tts_url=""):
+        async def fake_run_fail(self, topic="", scenes_json="", voice="alba", tts_url="",
+                                output_path="", remotion_dir="", fps=30, **kw):
             msg = "Simulated pipeline failure"
             raise RuntimeError(msg)
 
@@ -806,15 +811,20 @@ class TestBackgroundProcessing:
         """JobCompleted event is emitted on successful pipeline execution."""
         from videoforge.orchestrator.runner import PipelineRunner
         import time
+        from pathlib import Path
 
         _clear_store()
 
-        async def fake_run(self, topic="", scenes_json="", voice="alba", tts_url=""):
+        async def fake_run(self, topic="", scenes_json="", voice="alba", tts_url="",
+                           output_path="", remotion_dir="", fps=30, **kw):
             if self.stage_callback:
                 self.stage_callback("done", "complete", 1.0, "")
+            if output_path:
+                Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+                Path(output_path).write_text('{"mock": true}')
+            return output_path or "/tmp/videoforge/mock_final.mp4"
 
         monkeypatch.setattr(PipelineRunner, "run_pipeline", fake_run)
-        monkeypatch.setattr("videoforge.api.jobs.shutil.which", lambda _: None)
 
         app = create_app()
         client = TestClient(app)
@@ -836,7 +846,8 @@ class TestBackgroundProcessing:
 
         _clear_store()
 
-        async def fake_run_fail(self, topic="", scenes_json="", voice="alba", tts_url=""):
+        async def fake_run_fail(self, topic="", scenes_json="", voice="alba", tts_url="",
+                                output_path="", remotion_dir="", fps=30, **kw):
             raise RuntimeError("Kaboom")
 
         monkeypatch.setattr(PipelineRunner, "run_pipeline", fake_run_fail)

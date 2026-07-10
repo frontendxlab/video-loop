@@ -12,8 +12,6 @@ import asyncio
 import hashlib
 import json
 import re
-import shutil
-import subprocess
 import uuid
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -760,43 +758,6 @@ def _make_stage_callback(
     return callback
 
 
-def _create_video_output(job_id: str, prompt: str, scene_count: int = 1) -> str:
-    """Generate minimal video output file.
-
-    Uses ffmpeg if available, otherwise writes placeholder JSON.
-    Returns output path.
-    """
-    output_dir = Path(f"/tmp/videoforge/{job_id}")
-    output_dir.mkdir(parents=True, exist_ok=True)
-    output_path = str(output_dir / "final.mp4")
-
-    ffmpeg = shutil.which("ffmpeg")
-    if ffmpeg:
-        try:
-            duration = max(3, scene_count * 3)
-            subprocess.run(
-                [
-                    ffmpeg, "-y",
-                    "-f", "lavfi", "-i", f"color=c=blue:s=1920x1080:d={duration}",
-                    "-f", "lavfi", "-i", "anullsrc=r=44100:cl=mono",
-                    "-shortest", output_path,
-                ],
-                capture_output=True, timeout=30,
-            )
-            return output_path
-        except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
-            pass
-
-    # Fallback: write JSON placeholder
-    Path(output_path).write_text(json.dumps({
-        "job_id": job_id,
-        "prompt": prompt,
-        "status": "simulated",
-        "message": "ffmpeg not available — placeholder output",
-    }))
-    return output_path
-
-
 async def _process_job_background(job_id: str, feed: EventFeed) -> None:
     """Background task: run pipeline, emit events, update store, produce output."""
     from videoforge.orchestrator.runner import PipelineRunner  # noqa: PLC0415
@@ -825,26 +786,29 @@ async def _process_job_background(job_id: str, feed: EventFeed) -> None:
                 prompt = ev.get("payload", {}).get("prompt", "")
                 break
 
+        from pathlib import Path as _Path
+
         topic = prompt[:80] if prompt else "Video generation"
+        output_dir = _Path(f"/tmp/videoforge/{job_id}")
+        output_dir.mkdir(parents=True, exist_ok=True)
+        output_path = str(output_dir / "final.mp4")
 
         runner = PipelineRunner(
             stage_callback=_make_stage_callback(job_id, feed, job),
         )
 
-        await runner.run_pipeline(
+        final_path = await runner.run_pipeline(
             topic=topic,
             scenes_json="",
             voice=job.get("provider", "alba"),
+            output_path=output_path,
+            remotion_dir="remotion-project",
         )
-
-        # Generate output video
-        scene_count = max(1, len(job.get("scenes", [])))
-        output_path = _create_video_output(job_id, prompt, scene_count)
 
         # Mark completed
         completed_ev = JobCompleted(
             jobId=job_id,
-            payload={"finalVideo": output_path, "duration": 30, "artifactCount": 1},
+            payload={"finalVideo": final_path, "duration": 30, "artifactCount": 1},
         )
         await feed.append(completed_ev)
         job["events"].append(_event_as_dict(completed_ev))
@@ -854,7 +818,7 @@ async def _process_job_background(job_id: str, feed: EventFeed) -> None:
         job["completedAt"] = datetime.utcnow().isoformat()
         job.setdefault("artifacts", []).append({
             "artifactType": "video/mp4",
-            "path": output_path,
+            "path": final_path,
             "sceneId": None,
         })
 
