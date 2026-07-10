@@ -141,12 +141,34 @@ def generate_speech_mcp_sync(
 
     result = result_holder["data"]
 
-    # Save WAV file
-    output_path.write_bytes(result["audio_bytes"])
+    # Save raw audio bytes (f32le format from Pocket TTS)
+    raw_path = output_path.with_suffix(".raw")
+    raw_path.write_bytes(result["audio_bytes"])
+
+    # Convert to standard WAV using ffmpeg
+    import subprocess
+    cmd = [
+        "ffmpeg", "-y", "-f", "f32le", "-ar", "24000", "-ac", "1",
+        "-i", str(raw_path),
+        "-acodec", "pcm_s16le",
+        str(output_path),
+    ]
+    conv = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+    raw_path.unlink(missing_ok=True)
+
+    if conv.returncode != 0 or not output_path.exists():
+        raise RuntimeError(f"FFmpeg audio conversion failed: {conv.stderr[-300:]}")
+
+    # Calculate duration from converted WAV
+    with wave.open(str(output_path), 'rb') as wf:
+        frames = wf.getnframes()
+        rate = wf.getframerate()
+        duration_seconds = frames / rate if rate > 0 else 0
+        sample_rate = rate
 
     # Generate word timestamps (estimated)
     words = text.split()
-    duration_ms = result["duration_seconds"] * 1000
+    duration_ms = duration_seconds * 1000
     word_timestamps = []
     if words:
         per_word_ms = duration_ms / len(words)

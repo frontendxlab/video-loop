@@ -11,7 +11,7 @@
 > (documentation, ownership, history, decisions). **Always verify against
 > actual source files before making changes** — the index may be stale.
 
-Last indexed: 2026-07-10 (commit 17d1da2). Confidence: 100%.
+Last indexed: 2026-07-10 (commit 56d0e7e). Confidence: 100%.
 ### Architecture
 **Repo is a video generation and review platform: it ingests source‑code repositories and associated media assets, fetches pull‑request metadata, renders animated scenes with Remotion and Manim, compresses the resulting footage via the *caveman‑compress* skill, and finally serves the polished videos together with an interactive review UI through a FastAPI‑based server.**  
 The monorepo orchestrates this end‑to‑end pipeline across a Python backend, a TypeScript/JavaScript front‑end, and a collection of reusable scripts, enabling developers to produce, validate, and share programmatically generated video content with minimal friction. ---
