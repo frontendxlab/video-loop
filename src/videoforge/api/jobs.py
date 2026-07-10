@@ -17,6 +17,7 @@ from typing import Any, Literal
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
+from videoforge.engine.templates import suggest_templates as _suggest_templates_from_registry
 from videoforge.api.adapters import EventFeed
 from videoforge.api.events import (
     ArtifactReady,
@@ -79,9 +80,20 @@ class SceneSuggestion(BaseModel):
     reasoning: str
 
 
+class SuggestedTemplate(BaseModel):
+    id: str
+    name: str
+    description: str
+    icon: str
+    category: str
+    match_reason: str
+    scene_count: int
+
+
 class GrillResult(BaseModel):
     refinedPrompt: str
     suggestedScenes: list[SceneSuggestion]
+    suggestedTemplates: list[SuggestedTemplate] = []
     missingDetails: list[str]
     confidence: float = Field(..., ge=0, le=1)
 
@@ -90,12 +102,44 @@ class CreateJobRequest(BaseModel):
     prompt: str = Field(..., min_length=10)
     options: CreateOptions = Field(default_factory=CreateOptions)
     runOverride: RunOverride | None = None
+    grillSessionId: str | None = None  # Use multi-turn session result instead of re-grilling
 
 
 class CreateJobResponse(BaseModel):
     jobId: str
     status: Literal["queued", "running"] = "queued"
     grillResult: GrillResult
+
+
+# ─── Multi-turn grill schemas ────────────────────────────────────────────
+
+
+class GrillStartRequest(BaseModel):
+    prompt: str = Field(..., min_length=10)
+    options: CreateOptions = Field(default_factory=CreateOptions)
+
+
+class GrillStartResponse(BaseModel):
+    sessionId: str
+    question: str
+    questionId: str
+    asked: int
+    total: int
+
+
+class GrillTurnRequest(BaseModel):
+    sessionId: str
+    answer: str = Field(..., min_length=1)
+    done: bool = False
+
+
+class GrillTurnResponse(BaseModel):
+    question: str | None = None
+    questionId: str | None = None
+    asked: int = 0
+    total: int = 0
+    done: bool = False
+    result: GrillResult | None = None
 
 
 # ─── Job detail schemas ──────────────────────────────────────────────────
@@ -326,10 +370,17 @@ def _calc_confidence(prompt: str, keywords: set[str]) -> float:
     return round(min(1.0, raw), 2)
 
 
+def _suggest_templates(prompt: str) -> list[SuggestedTemplate]:
+    """Suggest video templates based on prompt keywords."""
+    raw = _suggest_templates_from_registry(prompt, max_suggestions=3)
+    return [SuggestedTemplate(**t) for t in raw]
+
+
 def grill_prompt(prompt: str, options: CreateOptions | None = None) -> GrillResult:
     """Deterministic prompt grilling — no LLM, pure heuristics."""
     keywords = _extract_keywords(prompt)
     scenes = _suggest_scenes(keywords, prompt)
+    templates = _suggest_templates(prompt)
     refined = _refine_prompt(prompt, scenes)
     missing = _missing_details(prompt)
     confidence = _calc_confidence(prompt, keywords)
@@ -337,9 +388,87 @@ def grill_prompt(prompt: str, options: CreateOptions | None = None) -> GrillResu
     return GrillResult(
         refinedPrompt=refined,
         suggestedScenes=scenes,
+        suggestedTemplates=templates,
         missingDetails=missing,
         confidence=confidence,
     )
+
+
+# ─── Multi-turn interactive griller ───────────────────────────────────────
+
+_GRILL_QUESTIONS: list[tuple[str, str, str]] = [
+    ("audience", "Who is the target audience? (beginner, intermediate, advanced, or mixed)", "Know audience → tailor depth & examples"),
+    ("duration", "What duration do you want? (e.g. 2-3 min quick explainer, 5-10 min deep dive)", "Right length keeps engagement high"),
+    ("style", "What style / tone? (professional, casual, humorous, educational, dramatic)", "Tone sets the emotional frame"),
+    ("message", "What is the key message or call to action?", "Sharp message drives retention"),
+    ("examples", "Include specific examples or demos? (yes / no — if yes, describe)", "Examples make abstract concrete"),
+    ("scenes", "Any specific scene types you want? (code, diagrams, comparisons, charts)", "Scene mix shapes visual pacing"),
+]
+
+
+def _which_questions_to_ask(prompt: str, existing_answers: dict[str, str]) -> list[tuple[str, str, str]]:
+    """Return list of (id, question, reasoning) still relevant given prompt + existing answers."""
+    prompt_lower = prompt.lower()
+    all_text = prompt_lower + " " + " ".join(v.lower() for v in existing_answers.values())
+
+    # If already answered or clearly specified in prompt, skip
+    skip: set[str] = set()
+    if any(w in all_text for w in ("beginner", "intermediate", "advanced", "expert", "audience", "for ", "target")):
+        skip.add("audience")
+    if any(w in all_text for w in ("minute", "minutes", "min", "duration", "length", "second", "seconds", "long")):
+        skip.add("duration")
+    if any(w in all_text for w in ("style", "tone", "formal", "casual", "professional", "playful", "serious", "humor", "fun", "dramatic", "educational")):
+        skip.add("style")
+    if any(w in all_text for w in ("message", "call to action", "takeaway", "key point", "goal", "purpose")):
+        skip.add("message")
+    if any(w in all_text for w in ("example", "demo", "walkthrough", "sample", "case study")):
+        skip.add("examples")
+    if any(w in all_text for w in ("code scene", "diagram", "comparison", "chart", "scene", "shot")):
+        skip.add("scenes")
+
+    return [(qid, question, reason) for qid, question, reason in _GRILL_QUESTIONS if qid not in skip]
+
+
+class _GrillSession:
+    """Holds state for one multi-turn grill conversation."""
+
+    def __init__(self, prompt: str, options: CreateOptions) -> None:
+        self.prompt = prompt
+        self.options = options
+        self.answers: dict[str, str] = {}
+        self.pending: list[tuple[str, str, str]] = _which_questions_to_ask(prompt, {})
+        self.asked: list[str] = []
+
+    @property
+    def total(self) -> int:
+        return len(_GRILL_QUESTIONS)  # max possible
+
+    @property
+    def asked_count(self) -> int:
+        return len(self.asked)
+
+    def current_question(self) -> tuple[str, str, str] | None:
+        if not self.pending:
+            return None
+        return self.pending[0]
+
+    def record_answer(self, answer: str) -> None:
+        if not self.pending:
+            return
+        qid, question, reason = self.pending.pop(0)
+        self.answers[qid] = answer
+        self.asked.append(qid)
+
+    def build_final_result(self) -> GrillResult:
+        """Build enriched prompt from original + answers, then run griller."""
+        enriched = self.prompt
+        for qid, answer in self.answers.items():
+            if answer.strip():
+                enriched += f" {answer.strip()}"
+        return grill_prompt(enriched, self.options)
+
+
+_grill_sessions: dict[str, _GrillSession] = {}
 
 
 # ─── Artifact enrichment helpers ──────────────────────────────────────────
@@ -413,13 +542,81 @@ async def grill_endpoint(req: GrillRequest) -> GrillResult:
     return grill_prompt(req.prompt, req.options)
 
 
+@router.post("/grill/start")
+async def grill_start_endpoint(req: GrillStartRequest) -> GrillStartResponse:
+    """Start multi-turn grill — returns first question."""
+    session = _GrillSession(req.prompt, req.options)
+    sid = uuid.uuid4().hex[:16]
+    _grill_sessions[sid] = session
+
+    current = session.current_question()
+    if current is None:
+        # No questions needed — return result directly
+        result = session.build_final_result()
+        return GrillStartResponse(
+            sessionId=sid,
+            question="",
+            questionId="",
+            asked=0,
+            total=session.total,
+        )
+
+    qid, question, _reason = current
+    return GrillStartResponse(
+        sessionId=sid,
+        question=question,
+        questionId=qid,
+        asked=0,
+        total=session.total,
+    )
+
+
+@router.post("/grill/turn")
+async def grill_turn_endpoint(req: GrillTurnRequest) -> GrillTurnResponse:
+    """Submit answer, get next question or final result."""
+    session = _grill_sessions.get(req.sessionId)
+    if session is None:
+        raise HTTPException(status_code=404, detail="Grill session not found")
+
+    session.record_answer(req.answer)
+
+    # If user says done or no more questions, return final result
+    if req.done or session.current_question() is None:
+        final = session.build_final_result()
+        # Clean up session
+        _grill_sessions.pop(req.sessionId, None)
+        return GrillTurnResponse(
+            done=True,
+            result=final,
+            asked=session.asked_count,
+            total=session.total,
+        )
+
+    qid, question, _reason = session.current_question()
+    return GrillTurnResponse(
+        question=question,
+        questionId=qid,
+        asked=session.asked_count,
+        total=session.total,
+        done=False,
+    )
+
+
 @router.post("")
 async def create_job(
     req: CreateJobRequest,
     feed: EventFeed = Depends(get_feed),
 ) -> CreateJobResponse:
     """Create a new job: grill prompt, emit events, store job detail."""
-    result = grill_prompt(req.prompt, req.options)
+    if req.grillSessionId:
+        # Restore session to get final result
+        session = _grill_sessions.pop(req.grillSessionId, None)
+        if session:
+            result = session.build_final_result()
+        else:
+            result = grill_prompt(req.prompt, req.options)
+    else:
+        result = grill_prompt(req.prompt, req.options)
 
     # Resolve effective provider/model — runOverride wins over options defaults
     ro = req.runOverride

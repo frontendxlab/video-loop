@@ -7,10 +7,13 @@ from fastapi.testclient import TestClient
 from videoforge.api.app import create_app
 from videoforge.api.jobs import (
     GrillResult,
+    SuggestedTemplate,
     _calc_confidence,
     _extract_keywords,
     _job_store,
     _missing_details,
+    _suggest_templates,
+    _grill_sessions,
     grill_prompt,
     store_job,
 )
@@ -345,6 +348,52 @@ class TestGriller:
         details = _missing_details(rich)
         assert len(details) < 3
 
+    # ── Template suggestions ────────────────────────────────────────
+
+    def test_grill_returns_suggested_templates(self):
+        result = grill_prompt("Explain Kubernetes architecture with code examples")
+        assert hasattr(result, "suggestedTemplates")
+        assert isinstance(result.suggestedTemplates, list)
+
+    def test_suggest_templates_explain_prompt(self):
+        result = _suggest_templates("explain how DNS works step by step")
+        assert len(result) >= 1
+        assert isinstance(result[0], SuggestedTemplate)
+        assert result[0].scene_count >= 3
+
+    def test_suggest_templates_tutorial_prompt(self):
+        result = _suggest_templates("build a tutorial for Python beginners")
+        ids = [t.id for t in result]
+        assert "tutorial" in ids
+
+    def test_suggest_templates_is_deterministic(self):
+        a = _suggest_templates("show me the data analytics and metrics charts")
+        b = _suggest_templates("show me the data analytics and metrics charts")
+        assert [t.id for t in a] == [t.id for t in b]
+
+    def test_grill_result_contains_suggested_templates(self):
+        result = grill_prompt("create a promotional marketing campaign video")
+        template_ids = [t.id for t in result.suggestedTemplates]
+        assert len(template_ids) >= 1
+
+    def test_suggest_templates_empty_for_irrelevant(self):
+        result = _suggest_templates("xyzzy flurbo garblex")
+        assert isinstance(result, list)
+
+    def test_suggest_templates_max_respected(self):
+        result = _suggest_templates("explain tutorial data story timeline comparison review")
+        assert len(result) <= 3
+
+    def test_grill_result_template_has_expected_shape(self):
+        result = _suggest_templates("explain how Kubernetes networking works")[0]
+        assert result.id
+        assert result.name
+        assert result.description
+        assert result.icon
+        assert result.category
+        assert result.match_reason
+        assert result.scene_count > 0
+
 
 # ─── /api/jobs/grill endpoint ────────────────────────────────────────────
 
@@ -599,3 +648,145 @@ class TestJobsErrorHandling:
         payload = {**GRILL_PAYLOAD, "extraField": "should be ignored"}
         resp = client.post("/api/jobs/grill", json=payload)
         assert resp.status_code == 200
+
+
+# ─── Multi-turn grill ────────────────────────────────────────────────────
+
+
+class TestMultiTurnGrill:
+    """POST /api/jobs/grill/start + /grill/turn — interactive loop."""
+
+    def _clear_sessions(self):
+        _grill_sessions.clear()
+
+    def test_start_returns_session_and_question(self):
+        self._clear_sessions()
+        app = create_app()
+        client = TestClient(app)
+        resp = client.post("/api/jobs/grill/start", json={"prompt": "Explain Kubernetes architecture with code examples"})
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "sessionId" in data
+        assert len(data["sessionId"]) > 0
+        assert "question" in data
+        assert len(data["question"]) > 0
+        assert "questionId" in data
+        assert data["asked"] == 0
+        assert data["total"] > 0
+
+    def test_turn_returns_next_question(self):
+        self._clear_sessions()
+        app = create_app()
+        client = TestClient(app)
+        start = client.post("/api/jobs/grill/start", json={"prompt": "Create a tutorial about Docker"}).json()
+        sid = start["sessionId"]
+
+        turn = client.post("/api/jobs/grill/turn", json={"sessionId": sid, "answer": "Developers"}).json()
+        assert turn["done"] is False
+        assert "question" in turn
+        assert turn["questionId"] is not None
+        assert turn["asked"] >= 1
+        assert turn["total"] > 0
+
+    def test_turn_with_done_returns_final_result(self):
+        self._clear_sessions()
+        app = create_app()
+        client = TestClient(app)
+        start = client.post("/api/jobs/grill/start", json={"prompt": "Explain Kubernetes architecture with code examples"}).json()
+        sid = start["sessionId"]
+
+        # Answer first question and mark done
+        turn = client.post("/api/jobs/grill/turn", json={"sessionId": sid, "answer": "Developers", "done": True}).json()
+        assert turn["done"] is True
+        assert turn["result"] is not None
+        assert "refinedPrompt" in turn["result"]
+        assert "suggestedScenes" in turn["result"]
+        assert "missingDetails" in turn["result"]
+        assert "confidence" in turn["result"]
+        assert turn["asked"] >= 1
+
+    def test_full_loop_ends_with_result(self):
+        self._clear_sessions()
+        app = create_app()
+        client = TestClient(app)
+        start = client.post("/api/jobs/grill/start", json={"prompt": "Build a React component library"}).json()
+        sid = start["sessionId"]
+
+        # Answer questions until loop ends
+        result = None
+        for _ in range(10):  # safety limit
+            turn = client.post("/api/jobs/grill/turn", json={"sessionId": sid, "answer": "Yes please"}).json()
+            if turn["done"]:
+                result = turn["result"]
+                break
+
+        assert result is not None
+        assert len(result["suggestedScenes"]) >= 3
+        assert 0 <= result["confidence"] <= 1
+
+    def test_unknown_session_returns_404(self):
+        self._clear_sessions()
+        app = create_app()
+        client = TestClient(app)
+        resp = client.post("/api/jobs/grill/turn", json={"sessionId": "nonexistent", "answer": "test"})
+        assert resp.status_code == 404
+
+    def test_start_with_rich_prompt_returns_immediate_result(self):
+        """If prompt already specifies everything, no questions needed."""
+        self._clear_sessions()
+        app = create_app()
+        client = TestClient(app)
+        rich = "Create advanced tutorial for expert developers explaining Kubernetes architecture in 15 minutes with professional tone"
+        start = client.post("/api/jobs/grill/start", json={"prompt": rich}).json()
+        assert start["asked"] == 0
+        # Should still have a session and at least some questions may remain
+        assert start["sessionId"] is not None
+
+    def test_rich_prompt_answers_all_then_immediate_done(self):
+        """If prompt already specifies everything, session has minimal pending questions."""
+        self._clear_sessions()
+        app = create_app()
+        client = TestClient(app)
+        rich = "Create tutorial for beginners explaining Docker in 5 minutes with casual tone including examples"
+        start = client.post("/api/jobs/grill/start", json={"prompt": rich}).json()
+        sid = start["sessionId"]
+
+        # Only "message" and "scenes" might remain — answer once and done
+        turn = client.post("/api/jobs/grill/turn", json={"sessionId": sid, "answer": "Containerization is key", "done": True}).json()
+        assert turn["done"] is True
+        assert turn["result"] is not None
+
+    def test_create_job_with_session_id_uses_session_result(self):
+        self._clear_sessions()
+        app = create_app()
+        client = TestClient(app)
+        start = client.post("/api/jobs/grill/start", json={"prompt": "Explain Docker networking"}).json()
+        sid = start["sessionId"]
+
+        # Complete the session
+        client.post("/api/jobs/grill/turn", json={"sessionId": sid, "answer": "Developers", "done": True}).json()
+
+        # Create job with sessionId
+        resp = client.post("/api/jobs", json={
+            "prompt": "Explain Docker networking",
+            "options": {"voice": "alba", "provider": "9router", "model": "ocg/deepseek-v4-flash", "maxDuration": 180, "fps": 30},
+            "grillSessionId": sid,
+        })
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["status"] == "queued"
+        assert data["grillResult"]["confidence"] > 0
+
+    def test_create_job_with_bad_session_falls_back_to_regrill(self):
+        self._clear_sessions()
+        app = create_app()
+        client = TestClient(app)
+        resp = client.post("/api/jobs", json={
+            "prompt": "Explain Docker networking with code examples",
+            "options": {"voice": "alba", "provider": "9router", "model": "ocg/deepseek-v4-flash", "maxDuration": 180, "fps": 30},
+            "grillSessionId": "nonexistent",
+        })
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["status"] == "queued"
+        assert data["grillResult"]["confidence"] > 0

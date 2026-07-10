@@ -231,10 +231,162 @@ export const CreateOptionsSchema = z.object({
 });
 export type CreateOptions = z.infer<typeof CreateOptionsSchema>;
 
+// ── Genre template types ───────────────────────────────────────────
+
+export const TemplateSceneSchema = z.object({
+  sceneType: z.string(),
+  title: z.string(),
+  description: z.string(),
+  durationSeconds: z.number().default(4.0),
+});
+export type TemplateScene = z.infer<typeof TemplateSceneSchema>;
+
+export const VideoTemplateSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string(),
+  icon: z.string(),
+  category: z.string(),
+  scenes: z.array(TemplateSceneSchema),
+  tags: z.array(z.string()),
+});
+export type VideoTemplate = z.infer<typeof VideoTemplateSchema>;
+
+export const GENRE_TEMPLATES: VideoTemplate[] = [
+  {
+    id: "explainer",
+    name: "Explainer",
+    description: "Explain concept with diagrams, key points, and clear narration",
+    icon: "lightbulb",
+    category: "educational",
+    scenes: [
+      { sceneType: "title", title: "Topic Intro", description: "Opening title introducing the topic", durationSeconds: 4.0 },
+      { sceneType: "diagram", title: "How It Works", description: "Visual diagram explaining core concept", durationSeconds: 5.0 },
+      { sceneType: "bullets", title: "Key Takeaways", description: "Main takeaways highlighted in bullet form", durationSeconds: 4.0 },
+      { sceneType: "outro", title: "Summary & Next Steps", description: "Recap and further resources", durationSeconds: 4.0 },
+    ],
+    tags: ["explain", "concept", "introduction", "overview", "educational"],
+  },
+  {
+    id: "tutorial",
+    name: "Tutorial",
+    description: "Step-by-step walkthrough with examples and clear instructions",
+    icon: "book-open",
+    category: "educational",
+    scenes: [
+      { sceneType: "title", title: "Tutorial Title", description: "Opening title with topic and goal", durationSeconds: 4.0 },
+      { sceneType: "code", title: "Step-by-Step", description: "Walk through implementation with code examples", durationSeconds: 8.0 },
+      { sceneType: "bullets", title: "Key Takeaways", description: "Important points highlighted", durationSeconds: 4.0 },
+      { sceneType: "outro", title: "Next Steps", description: "Where to go from here", durationSeconds: 4.0 },
+    ],
+    tags: ["tutorial", "walkthrough", "how-to", "guide", "steps", "learn"],
+  },
+  {
+    id: "product-demo",
+    name: "Product Demo",
+    description: "Showcase product features with callouts, comparisons, and CTA",
+    icon: "monitor",
+    category: "marketing",
+    scenes: [
+      { sceneType: "title", title: "Product Intro", description: "Opening with product name and tagline", durationSeconds: 4.0 },
+      { sceneType: "comparison", title: "Feature 1", description: "First key feature with highlight callouts", durationSeconds: 6.0 },
+      { sceneType: "comparison", title: "Feature 2", description: "Second key feature demonstration", durationSeconds: 6.0 },
+      { sceneType: "outro", title: "Call to Action", description: "CTA with next steps for the viewer", durationSeconds: 4.0 },
+    ],
+    tags: ["product", "demo", "showcase", "feature", "marketing"],
+  },
+  {
+    id: "marketing",
+    name: "Marketing",
+    description: "Promotional video with hook, problem-solution, and strong CTA",
+    icon: "megaphone",
+    category: "marketing",
+    scenes: [
+      { sceneType: "title", title: "Hook", description: "Attention-grabbing opening hook", durationSeconds: 4.0 },
+      { sceneType: "bullets", title: "The Problem", description: "Problem statement that resonates", durationSeconds: 5.0 },
+      { sceneType: "comparison", title: "The Solution", description: "Solution presented with before/after", durationSeconds: 6.0 },
+      { sceneType: "outro", title: "Call to Action", description: "Strong closing with CTA", durationSeconds: 4.0 },
+    ],
+    tags: ["marketing", "promo", "promotional", "hype", "campaign"],
+  },
+  {
+    id: "storytelling",
+    name: "Storytelling",
+    description: "Narrative-driven video with emotional arc and story structure",
+    icon: "scroll-text",
+    category: "narrative",
+    scenes: [
+      { sceneType: "title", title: "Setup", description: "Establish context and characters", durationSeconds: 4.0 },
+      { sceneType: "bullets", title: "Conflict", description: "Present the challenge or stakes", durationSeconds: 5.0 },
+      { sceneType: "quote", title: "Resolution", description: "Climax and resolution of the story", durationSeconds: 5.0 },
+      { sceneType: "outro", title: "Reflection", description: "Closing reflections and call to action", durationSeconds: 4.0 },
+    ],
+    tags: ["story", "narrative", "emotional", "journey", "arc"],
+  },
+  {
+    id: "data-story",
+    name: "Data Story",
+    description: "Data-driven narrative with charts, metrics, and insights",
+    icon: "bar-chart-3",
+    category: "data",
+    scenes: [
+      { sceneType: "title", title: "Context", description: "Set the data context and motivation", durationSeconds: 4.0 },
+      { sceneType: "chart", title: "Data Overview", description: "Key metrics and data visualization", durationSeconds: 5.0 },
+      { sceneType: "chart", title: "Deep Dive", description: "Detailed breakdown of specific data points", durationSeconds: 6.0 },
+      { sceneType: "bullets", title: "Insights", description: "Actionable insights and conclusions", durationSeconds: 4.0 },
+    ],
+    tags: ["data", "chart", "metrics", "analytics", "statistics", "insights"],
+  },
+  {
+    id: "comparison",
+    name: "Comparison",
+    description: "Side-by-side comparison of options, versions, or approaches",
+    icon: "git-compare",
+    category: "analysis",
+    scenes: [
+      { sceneType: "title", title: "Comparison Intro", description: "What is being compared and why", durationSeconds: 4.0 },
+      { sceneType: "comparison", title: "Option A", description: "Overview of the first option", durationSeconds: 5.0 },
+      { sceneType: "comparison", title: "Option B", description: "Overview of the second option", durationSeconds: 5.0 },
+      { sceneType: "diff", title: "Verdict", description: "Summary verdict and recommendation", durationSeconds: 4.0 },
+    ],
+    tags: ["compare", "comparison", "vs", "versus", "difference", "migration"],
+  },
+  {
+    id: "timeline",
+    name: "Timeline",
+    description: "Chronological walkthrough of events, history, or roadmap",
+    icon: "clock",
+    category: "narrative",
+    scenes: [
+      { sceneType: "title", title: "Timeline Intro", description: "Opening with the scope of events", durationSeconds: 4.0 },
+      { sceneType: "timeline", title: "Event 1", description: "First key event or milestone", durationSeconds: 5.0 },
+      { sceneType: "timeline", title: "Event 2", description: "Second key event or milestone", durationSeconds: 5.0 },
+      { sceneType: "timeline", title: "Event 3", description: "Third key event or milestone", durationSeconds: 5.0 },
+      { sceneType: "outro", title: "Summary & Outlook", description: "Wrap-up and future outlook", durationSeconds: 4.0 },
+    ],
+    tags: ["timeline", "history", "roadmap", "events", "chronological"],
+  },
+  {
+    id: "review",
+    name: "Review",
+    description: "Honest review with pros/cons, rating, and final verdict",
+    icon: "star",
+    category: "analysis",
+    scenes: [
+      { sceneType: "title", title: "Review Intro", description: "What is being reviewed", durationSeconds: 4.0 },
+      { sceneType: "bullets", title: "Pros", description: "What works well — pros", durationSeconds: 5.0 },
+      { sceneType: "bullets", title: "Cons", description: "What could be improved — cons", durationSeconds: 5.0 },
+      { sceneType: "outro", title: "Final Verdict", description: "Rating and final recommendation", durationSeconds: 4.0 },
+    ],
+    tags: ["review", "rating", "pros-cons", "verdict", "opinion"],
+  },
+];
+
 export const CreateJobRequestSchema = z.object({
   prompt: z.string().min(10, "Prompt must be at least 10 characters"),
   options: CreateOptionsSchema,
   recipeId: z.string().optional(),
+  templateIds: z.array(z.string()).optional(),
 });
 export type CreateJobRequest = z.infer<typeof CreateJobRequestSchema>;
 
@@ -243,13 +395,125 @@ export const SceneSuggestionSchema = z.object({
 });
 export type SceneSuggestion = z.infer<typeof SceneSuggestionSchema>;
 
+export const SuggestedTemplateSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string(),
+  icon: z.string(),
+  category: z.string(),
+  match_reason: z.string(),
+  scene_count: z.number(),
+});
+export type SuggestedTemplate = z.infer<typeof SuggestedTemplateSchema>;
+
 export const GrillResultSchema = z.object({
   refinedPrompt: z.string(),
   suggestedScenes: z.array(SceneSuggestionSchema),
+  suggestedTemplates: z.array(SuggestedTemplateSchema).default([]),
   missingDetails: z.array(z.string()),
   confidence: z.number().min(0).max(1),
 });
 export type GrillResult = z.infer<typeof GrillResultSchema>;
+
+// ── Template types ────────────────────────────────────────────────
+
+export const TemplateSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string(),
+  icon: z.string(),
+  tags: z.array(z.string()),
+  styleHints: z.array(z.string()),
+});
+export type Template = z.infer<typeof TemplateSchema>;
+
+export const TEMPLATE_PRESETS: Template[] = [
+  {
+    id: "cinematic",
+    name: "Cinematic",
+    description: "Movie-like with dramatic pacing, smooth transitions, and widescreen feel",
+    icon: "clapperboard",
+    tags: ["dramatic", "polished", "slow-motion"],
+    styleHints: ["Dramatic pacing", "Smooth transitions", "Depth of field"],
+  },
+  {
+    id: "educational",
+    name: "Educational",
+    description: "Clear explanatory style with diagrams, annotations, and structured flow",
+    icon: "graduation-cap",
+    tags: ["explanatory", "structured", "annotations"],
+    styleHints: ["Clear typography", "Step-by-step reveals", "Supporting diagrams"],
+  },
+  {
+    id: "data-driven",
+    name: "Data-driven",
+    description: "Emphasize charts, graphs, and data visualization with precision animation",
+    icon: "bar-chart-3",
+    tags: ["charts", "statistics", "visualization"],
+    styleHints: ["Chart-first layout", "Precision animation", "Data callouts"],
+  },
+  {
+    id: "tutorial",
+    name: "Tutorial",
+    description: "Step-by-step walkthrough with numbered stages and highlight regions",
+    icon: "book-open",
+    tags: ["step-by-step", "walkthrough", "numbered"],
+    styleHints: ["Numbered steps", "Highlight regions", "Progress indicators"],
+  },
+  {
+    id: "social-clip",
+    name: "Social clip",
+    description: "Short, snappy format optimized for social media with bold captions",
+    icon: "smartphone",
+    tags: ["short", "bold", "captions"],
+    styleHints: ["Bold captions", "Fast cuts", "Mobile-first framing"],
+  },
+  {
+    id: "narrative",
+    name: "Narrative",
+    description: "Story-driven structure with beginning, middle, end and emotional arc",
+    icon: "scroll-text",
+    tags: ["story", "emotional", "arc"],
+    styleHints: ["Story arc pacing", "Emotional beats", "Narrative overlay"],
+  },
+  {
+    id: "minimalist",
+    name: "Minimalist",
+    description: "Clean, simple design with maximum whitespace and minimal distractions",
+    icon: "sparkles",
+    tags: ["clean", "simple", "whitespace"],
+    styleHints: ["Maximum whitespace", "Minimal elements", "Subtle animations"],
+  },
+  {
+    id: "dynamic",
+    name: "Dynamic",
+    description: "Fast-paced energetic style with frequent transitions and motion effects",
+    icon: "zap",
+    tags: ["fast-paced", "energetic", "transitions"],
+    styleHints: ["Quick transitions", "Motion effects", "Energetic pacing"],
+  },
+];
+
+// ── Multi-turn grill schemas ─────────────────────────────────────────
+
+export const GrillStartResponseSchema = z.object({
+  sessionId: z.string(),
+  question: z.string(),
+  questionId: z.string(),
+  asked: z.number(),
+  total: z.number(),
+});
+export type GrillStartResponse = z.infer<typeof GrillStartResponseSchema>;
+
+export const GrillTurnResponseSchema = z.object({
+  question: z.string().nullable(),
+  questionId: z.string().nullable(),
+  asked: z.number(),
+  total: z.number(),
+  done: z.boolean(),
+  result: GrillResultSchema.nullable(),
+});
+export type GrillTurnResponse = z.infer<typeof GrillTurnResponseSchema>;
 
 export const DEFAULT_OPTIONS: CreateOptions = {
   voice: "alba", provider: "9router", model: "ocg/deepseek-v4-flash", maxDuration: 180, fps: 30,

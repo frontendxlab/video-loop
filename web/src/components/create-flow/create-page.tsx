@@ -7,21 +7,33 @@ import { PromptInput } from "@/components/create-flow/prompt-input";
 import { CreateOptionsPanel } from "@/components/create-flow/create-options";
 import { GrillPanel } from "@/components/create-flow/grill-panel";
 import { RecipePicker } from "@/components/create-flow/recipe-picker";
+import { TemplatePicker } from "@/components/create-flow/template-picker";
 import { StagedChecklist } from "@/components/create-flow/staged-checklist";
 import { DEFAULT_OPTIONS, CREATE_STAGES } from "@/contracts/create";
-import type { CreateOptions, GrillResult, Recipe } from "@/contracts/create";
-import { grillPrompt, createJob } from "@/api/jobs";
-import { Sparkles, Send, RotateCcw, Loader2 } from "lucide-react";
+import type { CreateOptions, GrillResult, Recipe, SuggestedTemplate } from "@/contracts/create";
+import { startGrill, submitGrillTurn, createJob } from "@/api/jobs";
+import { Sparkles, RotateCcw, Loader2 } from "lucide-react";
 
 type StageStatus = "pending" | "active" | "completed" | "failed";
+type GrillPhase = "idle" | "conversation" | "complete";
+
+type Message = {
+  role: "assistant" | "user";
+  text: string;
+};
 
 export function CreatePage() {
   const navigate = useNavigate();
   const [prompt, setPrompt] = useState("");
   const [options, setOptions] = useState<CreateOptions>(DEFAULT_OPTIONS);
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
+  const [selectedTemplates, setSelectedTemplates] = useState<string[]>([]);
   const [grillResult, setGrillResult] = useState<GrillResult | null>(null);
+  const [grillPhase, setGrillPhase] = useState<GrillPhase>("idle");
   const [grillLoading, setGrillLoading] = useState(false);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [currentQuestion, setCurrentQuestion] = useState<string>("");
   const [jobLoading, setJobLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [stages, setStages] = useState(CREATE_STAGES.map(s => ({ ...s, status: "pending" as StageStatus })));
@@ -30,19 +42,77 @@ export function CreatePage() {
     if (prompt.trim().length < 10) return;
     setError(null);
     setGrillLoading(true);
+    setGrillPhase("conversation");
+    setMessages([]);
+    setCurrentQuestion("");
+    setGrillResult(null);
     setStages(prev => prev.map(s => s.id === "grill" ? { ...s, status: "active" as StageStatus } : s));
     try {
-      const result = await grillPrompt(prompt, options);
-      setGrillResult(result);
-      setStages(prev => prev.map(s => s.id === "grill" ? { ...s, status: "completed" as StageStatus } : s));
+      const start = await startGrill(prompt, options);
+      setSessionId(start.sessionId);
+      if (start.question) {
+        setCurrentQuestion(start.question);
+        setMessages([{ role: "assistant", text: start.question }]);
+      } else {
+        // No questions needed — immediate result
+        handleFinishGrill(start.sessionId);
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Grill failed";
       setError(msg);
+      setGrillPhase("idle");
       setStages(prev => prev.map(s => s.id === "grill" ? { ...s, status: "failed" as StageStatus } : s));
     } finally {
       setGrillLoading(false);
     }
   }, [prompt, options]);
+
+  const handleSendAnswer = useCallback(async (answer: string, done: boolean) => {
+    if (!sessionId) return;
+    setGrillLoading(true);
+    setMessages(prev => [...prev, { role: "user", text: answer }]);
+    setCurrentQuestion("");
+    try {
+      const turn = await submitGrillTurn(sessionId, answer, done);
+      if (turn.done && turn.result) {
+        setGrillResult(turn.result);
+        setGrillPhase("complete");
+        setStages(prev => prev.map(s => s.id === "grill" ? { ...s, status: "completed" as StageStatus } : s));
+        setMessages(prev => [...prev, { role: "assistant", text: "Great! I have enough details to create your video." }]);
+      } else if (turn.question) {
+        setCurrentQuestion(turn.question);
+        setMessages(prev => [...prev, { role: "assistant", text: turn.question! }]);
+      } else {
+        // Shouldn't happen — treat as done
+        setGrillPhase("complete");
+        setStages(prev => prev.map(s => s.id === "grill" ? { ...s, status: "completed" as StageStatus } : s));
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Grill turn failed";
+      setError(msg);
+    } finally {
+      setGrillLoading(false);
+    }
+  }, [sessionId]);
+
+  const handleFinishGrill = useCallback(async (sid?: string) => {
+    const id = sid ?? sessionId;
+    if (!id) return;
+    setGrillLoading(true);
+    try {
+      const turn = await submitGrillTurn(id, "done", true);
+      if (turn.result) {
+        setGrillResult(turn.result);
+        setGrillPhase("complete");
+        setStages(prev => prev.map(s => s.id === "grill" ? { ...s, status: "completed" as StageStatus } : s));
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to finalize grill";
+      setError(msg);
+    } finally {
+      setGrillLoading(false);
+    }
+  }, [sessionId]);
 
   const handleCreateJob = useCallback(async () => {
     if (!grillResult) return;
@@ -50,7 +120,7 @@ export function CreatePage() {
     setJobLoading(true);
     setStages(prev => prev.map(s => s.id === "plan" ? { ...s, status: "active" as StageStatus } : s));
     try {
-      const resp = await createJob(prompt, options, selectedRecipe?.id);
+      const resp = await createJob(prompt, options, selectedRecipe?.id, selectedTemplates, sessionId ?? undefined);
       navigate({ to: "/jobs/$jobId", params: { jobId: resp.jobId } });
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Job creation failed";
@@ -59,14 +129,15 @@ export function CreatePage() {
     } finally {
       setJobLoading(false);
     }
-  }, [grillResult, prompt, options, navigate]);
+  }, [grillResult, prompt, options, selectedRecipe, navigate, sessionId]);
 
   const handleReset = useCallback(() => {
-    setPrompt(""); setSelectedRecipe(null); setGrillResult(null); setGrillLoading(false); setJobLoading(false); setError(null);
+    setPrompt(""); setSelectedRecipe(null); setSelectedTemplates([]); setGrillResult(null); setGrillLoading(false); setJobLoading(false); setError(null);
+    setGrillPhase("idle"); setSessionId(null); setMessages([]); setCurrentQuestion("");
     setStages(CREATE_STAGES.map(s => ({ ...s, status: "pending" as StageStatus })));
   }, []);
 
-  const canGrill = prompt.trim().length >= 10 && !grillLoading && !jobLoading;
+  const canGrill = prompt.trim().length >= 10 && !grillLoading && !jobLoading && grillPhase === "idle";
 
   return (
     <div className="mx-auto max-w-5xl space-y-8 px-4 py-8">
@@ -90,20 +161,33 @@ export function CreatePage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <PromptInput value={prompt} onChange={setPrompt} disabled={grillLoading || jobLoading} />
+              <TemplatePicker
+                selected={selectedTemplates}
+                onSelect={setSelectedTemplates}
+                suggestions={grillResult?.suggestedTemplates ?? []}
+                disabled={grillLoading || jobLoading}
+              />
               <RecipePicker selected={selectedRecipe} onSelect={setSelectedRecipe} disabled={grillLoading || jobLoading} />
               <CreateOptionsPanel options={options} onChange={setOptions} disabled={grillLoading || jobLoading} />
               <div className="flex gap-2 pt-2">
                 <Button onClick={handleGrill} disabled={!canGrill}>
-                  {grillLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Grilling...</> : <><Send className="mr-2 h-4 w-4" />Grill prompt</>}
+                  {grillLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Grilling...</> : <><Sparkles className="mr-2 h-4 w-4" />Grill me</>}
                 </Button>
                 <Button variant="ghost" size="icon" onClick={handleReset} disabled={grillLoading || jobLoading}><RotateCcw className="h-4 w-4" /></Button>
               </div>
             </CardContent>
           </Card>
 
-          <GrillPanel result={grillResult} loading={grillLoading} />
+          <GrillPanel
+            result={grillResult}
+            loading={grillLoading}
+            conversationMode={grillPhase === "conversation"}
+            messages={messages}
+            currentQuestion={currentQuestion}
+            onSendAnswer={handleSendAnswer}
+          />
 
-          {grillResult && !grillLoading && (
+          {grillResult && grillPhase === "complete" && (
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">Director preview</CardTitle>
@@ -122,6 +206,20 @@ export function CreatePage() {
                     </div>
                   ))}
                 </div>
+                {grillResult.suggestedTemplates.length > 0 && (
+                  <div className="mt-4 space-y-2">
+                    <h4 className="text-xs font-medium text-muted-foreground">Suggested templates ({grillResult.suggestedTemplates.length})</h4>
+                    <div className="flex flex-wrap gap-2">
+                      {grillResult.suggestedTemplates.map((t) => (
+                        <div key={t.id} className="rounded-md border bg-secondary/10 px-2.5 py-1.5 text-xs">
+                          <span className="font-medium">{t.name}</span>
+                          <span className="ml-1 text-muted-foreground">({t.scene_count} scenes)</span>
+                          <p className="mt-0.5 text-[10px] text-muted-foreground/70">{t.match_reason}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 <Separator className="my-4" />
                 <div className="flex justify-end">
                   <Button size="lg" onClick={handleCreateJob} disabled={jobLoading}>
