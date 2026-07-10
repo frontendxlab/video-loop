@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react'
 import { type SceneNode, type VideoProject, Engine, computeProjectHash, computeSceneHash } from '@/lib/ir-types'
 import { pickEngine } from '@/lib/director'
 import { SceneGraph } from './scene-graph'
+import { CanvasSceneGraph } from './canvas-scene-graph'
 import { SceneDetail } from './scene-detail'
 import { cn } from '@/lib/utils'
 
@@ -21,6 +22,7 @@ interface DirectorPreviewProps { project: VideoProject }
 
 export function DirectorPreview({ project }: DirectorPreviewProps) {
   const [selectedId, setSelectedId] = useState<string | undefined>(project.scenes[0]?.id)
+  const [viewMode, setViewMode] = useState<'list' | 'canvas'>('canvas')
 
   const scenesWithHash = useMemo<SceneNode[]>(() =>
     project.scenes.map(s => ({ ...s, contentHash: s.contentHash ?? computeSceneHash(s) })), [project.scenes])
@@ -80,12 +82,30 @@ export function DirectorPreview({ project }: DirectorPreviewProps) {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="bg-card border border-border rounded-xl">
-          <div className="px-4 py-3 border-b border-border">
-            <h3 className="text-sm font-medium text-foreground">Scene Graph</h3>
-            <p className="text-[10px] text-muted-foreground mt-0.5">{scenesWithHash.length} node{scenesWithHash.length !== 1 ? 's' : ''} · click to inspect</p>
+          <div className="px-4 py-3 border-b border-border flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-medium text-foreground">Scene Graph</h3>
+              <p className="text-[10px] text-muted-foreground mt-0.5">{scenesWithHash.length} node{scenesWithHash.length !== 1 ? 's' : ''} · click to inspect</p>
+            </div>
+            <div className="flex items-center gap-1 bg-muted rounded-lg p-0.5">
+              <button
+                type="button"
+                onClick={() => setViewMode('list')}
+                className={cn('px-2.5 py-1 text-[11px] font-medium rounded-md transition-colors', viewMode === 'list' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground')}
+              >List</button>
+              <button
+                type="button"
+                onClick={() => setViewMode('canvas')}
+                className={cn('px-2.5 py-1 text-[11px] font-medium rounded-md transition-colors', viewMode === 'canvas' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground')}
+              >Canvas</button>
+            </div>
           </div>
-          <div className="p-3 max-h-[500px] overflow-y-auto">
-            <SceneGraph scenes={scenesWithHash} selectedId={selectedId} onSelect={s => setSelectedId(s.id)} />
+          <div className={cn(viewMode === 'list' ? 'p-3 max-h-[500px] overflow-y-auto' : 'p-0')}>
+            {viewMode === 'list' ? (
+              <SceneGraph scenes={scenesWithHash} selectedId={selectedId} onSelect={s => setSelectedId(s.id)} />
+            ) : (
+              <CanvasSceneGraph scenes={scenesWithHash} selectedId={selectedId} onSelect={s => setSelectedId(s.id)} />
+            )}
           </div>
         </div>
         <div className="bg-card border border-border rounded-xl">

@@ -5,6 +5,7 @@ import { pickEngine, getRoutingReason } from '@/lib/director'
 import { SceneGraph } from '@/components/scene-graph'
 import { SceneDetail } from '@/components/scene-detail'
 import { DirectorPreview } from '@/components/director-preview'
+import { CanvasSceneGraph } from '@/components/canvas-scene-graph'
 
 function makeScene(o: Partial<SceneNode> = {}): SceneNode {
   return { id: 'test_scene', kind: SceneKind.TITLE, payload: '{}', engine_hint: Engine.REMOTION, duration_frames: 90, narration: { text: 'Hello', words: [], source: 'estimated' }, ...o }
@@ -218,11 +219,107 @@ describe('SceneDetail', () => {
   })
 })
 
+describe('CanvasSceneGraph', () => {
+  it('renders empty state', () => {
+    render(<CanvasSceneGraph scenes={[]} onSelect={() => {}} />)
+    expect(screen.getByText('No scenes to display on canvas')).toBeDefined()
+  })
+
+  it('renders scene nodes with index badges', () => {
+    render(<CanvasSceneGraph scenes={[makeScene({ id: 's0', kind: SceneKind.TITLE }), makeScene({ id: 's1', kind: SceneKind.CODE })]} onSelect={() => {}} />)
+    expect(screen.getByText('1')).toBeDefined()
+    expect(screen.getByText('2')).toBeDefined()
+  })
+
+  it('renders kind badges', () => {
+    render(<CanvasSceneGraph scenes={[makeScene({ id: 's0', kind: SceneKind.TITLE }), makeScene({ id: 's1', kind: SceneKind.CHART })]} onSelect={() => {}} />)
+    expect(screen.getByText('Title')).toBeDefined()
+    expect(screen.getByText('Chart')).toBeDefined()
+  })
+
+  it('renders engine abbreviations', () => {
+    render(<CanvasSceneGraph scenes={[makeScene({ id: 's0', kind: SceneKind.TITLE }), makeScene({ id: 's1', kind: SceneKind.CHART })]} onSelect={() => {}} />)
+    const remLabels = screen.getAllByText('Rem')
+    expect(remLabels.length).toBe(1)  // TITLE → Remotion
+    const manLabels = screen.getAllByText('Man')
+    expect(manLabels.length).toBe(1)  // CHART → Manim
+  })
+
+  it('renders truncated content hash', () => {
+    render(<CanvasSceneGraph scenes={[makeScene({ id: 's0', contentHash: 'aabbccdd11223344' })]} onSelect={() => {}} />)
+    expect(screen.getByText(/#aabbccdd/)).toBeDefined()
+  })
+
+  it('renders duration info', () => {
+    render(<CanvasSceneGraph scenes={[makeScene({ id: 's0', duration_frames: 150 })]} onSelect={() => {}} />)
+    expect(screen.getByText(/150f/)).toBeDefined()
+    expect(screen.getByText(/5s/)).toBeDefined()
+  })
+
+  it('shows scene count label', () => {
+    render(<CanvasSceneGraph scenes={[makeScene({ id: 's0' }), makeScene({ id: 's1' }), makeScene({ id: 's2' })]} onSelect={() => {}} />)
+    expect(screen.getByText(/3 scenes/)).toBeDefined()
+  })
+
+  it('calls onSelect when node clicked', () => {
+    const onSelect = vi.fn()
+    render(<CanvasSceneGraph scenes={[makeScene({ id: 'clickable' })]} onSelect={onSelect} />)
+    const node = document.querySelector('[data-node-id="clickable"]')
+    expect(node).toBeDefined()
+    fireEvent.click(node!)
+    expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ id: 'clickable' }))
+  })
+
+  it('renders overlay badge when scene has overlays', () => {
+    const scene = makeScene({
+      id: 'ol_scene',
+      overlay_stack: { items: [{ id: 'o1', type: 'text', content: 'Hi', position: { x: 0, y: 0 }, startFrame: 0, durationFrames: 30, opacity: 1 }] },
+    })
+    render(<CanvasSceneGraph scenes={[scene]} onSelect={() => {}} />)
+    expect(screen.getByText(/OL:1/)).toBeDefined()
+  })
+
+  it('renders artifact badge when scene has ready artifacts', () => {
+    const scene = makeScene({
+      id: 'art_scene',
+      artifacts: { thumbnail: { state: 'ready' }, frame: { state: 'ready' } },
+    })
+    render(<CanvasSceneGraph scenes={[scene]} onSelect={() => {}} />)
+    expect(screen.getByText(/Art:✓/)).toBeDefined()
+  })
+
+  it('renders showcase kind badges', () => {
+    render(<CanvasSceneGraph scenes={[
+      makeScene({ id: 's0', kind: SceneKind.SHOWCASE }),
+      makeScene({ id: 's1', kind: SceneKind.SPLIT }),
+      makeScene({ id: 's2', kind: SceneKind.MOCKUP }),
+      makeScene({ id: 's3', kind: SceneKind.HERO }),
+    ]} onSelect={() => {}} />)
+    expect(screen.getByText('Showcase')).toBeDefined()
+    expect(screen.getByText('Split')).toBeDefined()
+    expect(screen.getByText('Mockup')).toBeDefined()
+    expect(screen.getByText('Hero')).toBeDefined()
+  })
+
+  it('renders zoom controls', () => {
+    render(<CanvasSceneGraph scenes={[makeScene({ id: 's0' })]} onSelect={() => {}} />)
+    expect(screen.getByLabelText('Zoom in')).toBeDefined()
+    expect(screen.getByLabelText('Zoom out')).toBeDefined()
+  })
+
+  it('renders legend with engine colors', () => {
+    render(<CanvasSceneGraph scenes={[makeScene({ id: 's0' }), makeScene({ id: 's1' })]} onSelect={() => {}} />)
+    expect(screen.getByText('Remotion')).toBeDefined()
+    expect(screen.getByText('Manim')).toBeDefined()
+    expect(screen.getByText('Animotion')).toBeDefined()
+  })
+})
+
 describe('DirectorPreview', () => {
   it('renders project title', () => { render(<DirectorPreview project={makeProject([makeScene()])} />); expect(screen.getByText('Test Project')).toBeDefined() })
   it('renders scene count', () => { render(<DirectorPreview project={makeProject([makeScene({ id: 'a' }), makeScene({ id: 'b' }), makeScene({ id: 'c' })])} />); expect(screen.getByText('3 scenes')).toBeDefined() })
   it('renders panel headers', () => { render(<DirectorPreview project={makeProject([makeScene()])} />); expect(screen.getByText('Scene Graph')).toBeDefined(); expect(screen.getByText('Scene Detail')).toBeDefined() })
-  it('renders duration', () => { render(<DirectorPreview project={makeProject([makeScene({ duration_frames: 90 }), makeScene({ duration_frames: 150 })])} />); expect(screen.getByText(/240f/)).toBeDefined() })
+  it('renders duration', () => { render(<DirectorPreview project={makeProject([makeScene({ id: 'a', duration_frames: 90 }), makeScene({ id: 'b', duration_frames: 150 })])} />); expect(screen.getByText(/240f/)).toBeDefined() })
   it('renders resolution', () => { render(<DirectorPreview project={makeProject([makeScene()])} />); expect(screen.getByText(/1920×1080/)).toBeDefined() })
   it('renders content hash', () => {
     const { container } = render(<DirectorPreview project={makeProject([makeScene()])} />)
@@ -235,6 +332,8 @@ describe('DirectorPreview', () => {
   })
   it('switches scene on click', () => {
     const { container } = render(<DirectorPreview project={makeProject([makeScene({ id: 'scene_a' }), makeScene({ id: 'scene_b' })])} />)
+    // Switch to list view first (default is canvas)
+    fireEvent.click(screen.getByText('List'))
     fireEvent.click(container.querySelectorAll('[role="listitem"]')[1])
     expect(Array.from(container.querySelectorAll('h3')).find(h => h.textContent?.startsWith('scene_b'))).toBeDefined()
   })
@@ -247,7 +346,42 @@ describe('DirectorPreview', () => {
   })
   it('routes showcase kinds to remotion by default', () => {
     render(<DirectorPreview project={makeProject([makeScene({ kind: SceneKind.SHOWCASE }), makeScene({ kind: SceneKind.SPLIT }), makeScene({ kind: SceneKind.MOCKUP }), makeScene({ kind: SceneKind.HERO })])} />)
+    // Switch to list view (canvas uses abbreviated engine names)
+    fireEvent.click(screen.getByText('List'))
     const remotionLabels = screen.getAllByText('Remotion')
     expect(remotionLabels.length).toBeGreaterThanOrEqual(4)
+  })
+
+  it('defaults to canvas view mode', () => {
+    render(<DirectorPreview project={makeProject([makeScene({ id: 's0' })])} />)
+    expect(screen.getByText('Canvas')).toBeDefined()
+    // List and Canvas toggle buttons present
+    expect(screen.getByText('List')).toBeDefined()
+  })
+
+  it('switches between list and canvas views', () => {
+    render(<DirectorPreview project={makeProject([makeScene({ id: 's0' })])} />)
+    // Default: canvas visible with canvas features
+    expect(screen.getByText(/drag to pan/)).toBeDefined()
+    // Switch to list
+    fireEvent.click(screen.getByText('List'))
+    expect(screen.queryByText(/drag to pan/)).toBeNull()
+    // Switch back to canvas
+    fireEvent.click(screen.getByText('Canvas'))
+    expect(screen.getByText(/drag to pan/)).toBeDefined()
+  })
+
+  it('canvas view mode shows zoom controls', () => {
+    render(<DirectorPreview project={makeProject([makeScene({ id: 's0' })])} />)
+    expect(screen.getByLabelText('Zoom in')).toBeDefined()
+    expect(screen.getByLabelText('Zoom out')).toBeDefined()
+  })
+
+  it('canvas view mode shows engine legend', () => {
+    render(<DirectorPreview project={makeProject([makeScene({ id: 's0' }), makeScene({ id: 's1', kind: SceneKind.CHART })])} />)
+    // Legend text can appear multiple times (canvas legend + routing bar + scene detail)
+    expect(screen.getAllByText('Remotion').length).toBeGreaterThanOrEqual(1)
+    expect(screen.getAllByText('Manim').length).toBeGreaterThanOrEqual(1)
+    expect(screen.getAllByText('Animotion').length).toBeGreaterThanOrEqual(1)
   })
 })
